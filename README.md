@@ -61,3 +61,21 @@ recoverable by shrinking `eta`. The lift gives the biggest win on a genuinely un
 W1 0.272 -> 0.071 at `a = 2`, for one extra scalar per particle.
 
 Figures are written to `figures/`. Requires `numpy`, `scipy`, `torch`, `matplotlib`, `seaborn`.
+
+## Multivariate Laplace
+
+`anchored_langevin_multivariate.ipynb` repeats the J = 0 vs constant-J comparison on genuinely
+multivariate (non-separable) Laplace targets, with `Sigma = D C D`, `D = diag(0.5, 1, 2)`, `rho = 0.6`:
+
+- **Target A**, elliptical Laplace: `U(x) = sqrt(x' inv(Sigma) x)` — kink at the single point 0.
+- **Target B**, correlated l1 Laplace: `U(x) = ||inv(L) x||_1` — kinks on d hyperplanes; reduces to the
+  product Laplace when Sigma is diagonal.
+
+Both have exact reference samplers (Gamma radius on the sphere; iid Laplace pushed through L), so no
+rejection step is needed. Experiments: J = 0 vs J_a on both targets, a sweep over a, a fixed-physical-time
+control showing the speed-up is not a discretization artifact, and a dimension scan d = 2, 3, 5, 10.
+
+Results: J gives ~1.5x on the slow coordinate for both targets, leaves the stationary law untouched
+(KS 0.010-0.032 at stationarity), and the gain survives eta-refinement at fixed horizon. It shrinks with
+dimension (2.5x at d = 2 down to 1.1x at d = 10) because the tridiagonal J_a only couples neighbouring
+coordinates. The smoothed anchors keep exp(U - U0) within [0.83, 1.0], so no clamping is required.
