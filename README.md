@@ -34,4 +34,30 @@ fastest to converge on the slowest-mixing target (`b = 2`: W1 0.147 vs 0.265 for
 baseline at iteration 2000); the pseudo-Huber anchor keeps `Delta` bounded, needs no clamping, and
 is the most accurate method in the truncated experiment and at the largest stepsizes.
 
+## Non-reversibility: constant skew J vs J = 0
+
+`anchored_langevin_nonreversible.ipynb` adds a constant skew-symmetric `J` (the Gaussian notebook's
+`J_fun`) to the anchored dynamics:
+
+```
+dX = -(I + J) grad U0(X) exp(Delta(X)) dt + sqrt(2) exp(Delta(X)/2) dW
+```
+
+The notebook proves invariance is unchanged for any `a` (the extra flux is `J grad(exp(-U0))`, and
+`div(J grad phi) = 0` for constant skew `J`), so `J` alters the rate only.
+
+Two facts shape the experiments. First, **in d = 1 every skew-symmetric matrix is zero**, so a
+constant-J scheme applied to a univariate target *is* the J = 0 scheme — the state space has to grow.
+Second, the non-reversible drift is `-J grad U0 exp(Delta)`, so it acts through the **anchor's**
+gradient: with `U0 = 0` the value of `a` is irrelevant.
+
+1. **Product Laplace in d = 3**, `b = (0.5, 1, 2)`: `{subgradient LMC, anchored} x {J = 0, J_a}`, plus a
+   sweep over `a` and an `eta`-refinement check.
+2. **Univariate Laplace via a 2D lift**: sample `pi(x1) pi(x2)` with skew coupling, read the x1 marginal.
+
+Results: `J` accelerates the slow coordinate (d = 3, coordinate 3: W1 0.212 -> 0.133 at `a = 2`), leaves
+the stationary law untouched, and costs discretization accuracy on the fast coordinates at large `a` —
+recoverable by shrinking `eta`. The lift gives the biggest win on a genuinely univariate target:
+W1 0.272 -> 0.071 at `a = 2`, for one extra scalar per particle.
+
 Figures are written to `figures/`. Requires `numpy`, `scipy`, `torch`, `matplotlib`, `seaborn`.
