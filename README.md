@@ -79,3 +79,19 @@ Results: J gives ~1.5x on the slow coordinate for both targets, leaves the stati
 (KS 0.010-0.032 at stationarity), and the gain survives eta-refinement at fixed horizon. It shrinks with
 dimension (2.5x at d = 2 down to 1.1x at d = 10) because the tridiagonal J_a only couples neighbouring
 coordinates. The smoothed anchors keep exp(U - U0) within [0.83, 1.0], so no clamping is required.
+
+## Heavy-tailed Gibbs target
+
+`anchored_langevin_heavy_tailed.ipynb` repeats the experiments with
+`U(x) = iota * log(1 + ||x||^2)`, `iota > 1 + d/2`, so `pi(x) = (1+||x||^2)^{-iota}` has polynomial tails.
+This `U` is smooth, so the anchor's role shifts from smoothing a kink to re-timing the tail: taking
+`U0 = c log(1+||x||^2)` gives drift `-2c x (1+||x||^2)^{iota-c-1}`, and `c = iota-1` makes it linear.
+
+The target is the multivariate t with `nu = 2 iota - d`, sampled exactly as `Z/sqrt(G)`; `nu > 2` is
+precisely the stated condition `iota > 1 + d/2`.
+
+Results: the anchor exponent dominates — `c = iota-1` reaches the sampling floor while plain Langevin is
+2x away, with `q99(||x||)` 5.25 vs 3.63 against a target 5.40. J does little on the isotropic target (no
+slow/fast directions) and hurts once the anchor already works; on an anisotropic version it helps again,
+best combination beating plain Langevin by 4.5x. A fixed-physical-time control shows the J gain is real
+for plain Langevin but not for the tail-accelerated anchor, so the two mechanisms are partly redundant.
