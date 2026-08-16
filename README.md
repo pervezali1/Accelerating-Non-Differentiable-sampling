@@ -95,3 +95,24 @@ Results: the anchor exponent dominates — `c = iota-1` reaches the sampling flo
 slow/fast directions) and hurts once the anchor already works; on an anisotropic version it helps again,
 best combination beating plain Langevin by 4.5x. A fixed-physical-time control shows the J gain is real
 for plain Langevin but not for the tail-accelerated anchor, so the two mechanisms are partly redundant.
+
+## Constrained sampling on the ball, with a state-dependent J
+
+`anchored_langevin_ball_constrained.ipynb` samples on `K = {x in R^3 : ||x||_2^2 <= 1}` by projection,
+comparing `J = 0`, the constant skew `J_a`, and the state-dependent axial field `J_s(x) w = s (x cross w)`.
+
+State dependence changes the dynamics: the invariant form becomes
+
+```
+dX = e^Delta [ -(I + J(x)) grad U0 + div J(x) ] dt + sqrt(2) e^(Delta/2) dW
+```
+
+and the constraint adds a second requirement, `J(x) nu(x) = 0` on the boundary, so the skew drift is
+tangential. The axial field satisfies both (div J = 0 to machine precision, J(x)x = 0 identically); the
+constant field satisfies the first and violates the second.
+
+Results: at strength 4 the constant field inflates coordinate-2 W1 by 4x (0.075 vs 0.019) and adds boundary
+mass (8.1% vs 6.1%), while the axial field is indistinguishable from J = 0. Sweeping the strength, the
+constant field degrades monotonically (W1 0.0136 -> 0.0405) and the axial field does not (0.0136 -> 0.0119).
+The projection atom is a separate, benign error scaling like sqrt(eta); the boundary-condition violation
+plateaus under stepsize refinement and does not go away.
