@@ -147,8 +147,9 @@ Paper-matching figures: prior + three posteriors with the constraint and x*, and
 New: W1 against an exact rejection-sampled posterior, the beta sweep, minibatch vs full gradient, a
 stepsize-stability study, and a constrained Bayesian Lasso where the anchoring actually does work.
 
-Results: MSE cannot separate the methods (all within 0.5% of each other and the floor) because x* lies
-outside K; W1 and boundary mass can. J_a is 50x off on two coordinates. The stability study separates the
+Results: at the paper's 300-iteration horizon both skew fields accelerate (MSE 0.545 for J_a and 0.627 for
+J_s against 0.751 for PSGLD, mean of 5 runs); at stationarity MSE cannot separate them (all within 0.5% of
+the floor) because x* lies outside K, while W1 and boundary mass can. J_a is 50x off on two coordinates. The stability study separates the
 two error types: J_a's error is flat in eta (0.096 -> 0.092, irreducible, from J n != 0) while J_s's falls
 5x (0.297 -> 0.058, pure discretization) — with a crossover where at eta = 1e-3 the admissible field is
 worse than the inadmissible one, 87% of its mass pinned to the boundary by tangential Euler overshoot.
