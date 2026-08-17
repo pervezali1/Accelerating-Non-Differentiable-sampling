@@ -153,3 +153,20 @@ the floor) because x* lies outside K, while W1 and boundary mass can. J_a is 50x
 two error types: J_a's error is flat in eta (0.096 -> 0.092, irreducible, from J n != 0) while J_s's falls
 5x (0.297 -> 0.058, pure discretization) — with a crossover where at eta = 1e-3 the admissible field is
 worse than the inadmissible one, 87% of its mass pinned to the boundary by tangential Euler overshoot.
+
+## Constrained Bayesian logistic regression
+
+`anchored_langevin_bayes_logistic.ipynb` runs the paper's Section 3.3 synthetic experiment: their Eq.
+(3.13) data (n = 2000, X ~ N(0, 2I), 20% test split), their parameters (eta = 1e-4, m = 50, 1000
+iterations, a = 1, s = 10), on the ball and the smoothed l_p ball. beta_* is not stated in the paper; the
+notebook uses their linear-regression x_* and reports the resulting Bayes ceiling.
+
+The paper uses accuracy because W1 "is not practical" for logistic regression. In d = 3 it is: a
+1.9M-point grid over K gives a reference stable to 4 decimals, so both metrics are reported.
+
+Results: this does NOT reproduce the paper's ranking. PSGLD sits on the reference (test accuracy 0.754 vs
+0.754, W1 0.003-0.012) while both skew fields are worse, on both constraint sets; rescaling beta_* to raise
+the ceiling to 0.91 does not flip it. Accuracy is nearly blind as a diagnostic - J_a is 30x worse in W1 yet
+scores within one standard deviation on accuracy - and it saturates in ~150 iterations. The stepsize study
+repeats the linear-regression split: on the exact posterior the paper's s = 10 collapses to chance (0.505,
+100% of mass on the boundary), refining eta recovers J_s but not J_a.
