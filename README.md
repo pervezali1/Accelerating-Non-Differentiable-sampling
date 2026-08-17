@@ -132,3 +132,23 @@ Results: the inadmissible constant field degrades monotonically with strength (2
 l_p set) while every admissible field is flat; and at the paper's own strength s = 5 the field reaches the
 sampling floor in roughly 400 iterations against 2000-3000 for J = 0, a 4-5x reduction in iteration
 complexity. The effect is entirely in the transient: at iteration 3000 all runs read 0.013-0.015.
+
+## Constrained Bayesian linear regression
+
+`anchored_langevin_bayes_linreg.ipynb` runs the paper's Section 3.2 experiment: their Eq. (3.8) data
+(n = 1e5, m = 50, x* = [1,-0.7,-0.5] with ||x*|| = 1.32 > 1, so the constraint is active), their J_a (a = 1)
+and J_s (s = 5), their stepsize 1e-4, on the ball and the smoothed l_p ball.
+
+The paper writes the target as a sum over data but uses the average gradient; the notebook makes the
+implied temperature explicit (beta = 32) and shows the whole range — beta = 1 washes the data out, beta = n
+is a point mass.
+
+Paper-matching figures: prior + three posteriors with the constraint and x*, and MSE vs iteration.
+New: W1 against an exact rejection-sampled posterior, the beta sweep, minibatch vs full gradient, a
+stepsize-stability study, and a constrained Bayesian Lasso where the anchoring actually does work.
+
+Results: MSE cannot separate the methods (all within 0.5% of each other and the floor) because x* lies
+outside K; W1 and boundary mass can. J_a is 50x off on two coordinates. The stability study separates the
+two error types: J_a's error is flat in eta (0.096 -> 0.092, irreducible, from J n != 0) while J_s's falls
+5x (0.297 -> 0.058, pure discretization) — with a crossover where at eta = 1e-3 the admissible field is
+worse than the inadmissible one, 87% of its mass pinned to the boundary by tangential Euler overshoot.
