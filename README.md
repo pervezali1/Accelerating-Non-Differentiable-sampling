@@ -116,3 +116,19 @@ mass (8.1% vs 6.1%), while the axial field is indistinguishable from J = 0. Swee
 constant field degrades monotonically (W1 0.0136 -> 0.0405) and the axial field does not (0.0136 -> 0.0119).
 The projection atom is a separate, benign error scaling like sqrt(eta); the boundary-condition violation
 plateaus under stepsize refinement and does not go away.
+
+## The paper's J construction
+
+`anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
+Deviations Approach* (Wang, Tu, Wang, Zhu) inside the anchored dynamics. Their recipe: for K = {g <= lam},
+take `psi = (lam - g) h`, `k = grad psi`, `J(x) w = k(x) x w`. Curl-free gives their Assumption 3
+(`div J = 0`); `grad psi = -h grad g` on the boundary gives Assumption 2 (`J n = 0`).
+
+Three instances are run and verified (max |curl k| <= 1.3e-9, max |J(x)n| <= 4.6e-16 on the boundary,
+against 1.41 for the constant J_a): the ball with h = 1 (their Eq. 3.2), the ball with h = 1 + ||x||^2, and
+the smoothed l_p ball with p = 4, eps = 0.2, lam = 1 (their Eq. 3.3).
+
+Results: the inadmissible constant field degrades monotonically with strength (2.4x on the ball, 3.0x on the
+l_p set) while every admissible field is flat; and at the paper's own strength s = 5 the field reaches the
+sampling floor in roughly 400 iterations against 2000-3000 for J = 0, a 4-5x reduction in iteration
+complexity. The effect is entirely in the transient: at iteration 3000 all runs read 0.013-0.015.
