@@ -99,7 +99,9 @@ for plain Langevin but not for the tail-accelerated anchor, so the two mechanism
 ## Constrained sampling on the ball, with a state-dependent J
 
 `anchored_langevin_ball_constrained.ipynb` samples on `K = {x in R^3 : ||x||_2^2 <= 1}` by projection,
-comparing `J = 0`, the constant skew `J_a`, and the state-dependent axial field `J_s(x) w = s (x cross w)`.
+comparing `J = 0` against the state-dependent axial field `J_s(x) w = s (x cross w)`. The constant skew `J_a`
+is excluded here because it violates the boundary condition below; `anchored_langevin_paper_J.ipynb` measures
+what that costs.
 
 State dependence changes the dynamics: the invariant form becomes
 
@@ -108,14 +110,17 @@ dX = e^Delta [ -(I + J(x)) grad U0 + div J(x) ] dt + sqrt(2) e^(Delta/2) dW
 ```
 
 and the constraint adds a second requirement, `J(x) nu(x) = 0` on the boundary, so the skew drift is
-tangential. The axial field satisfies both (div J = 0 to machine precision, J(x)x = 0 identically); the
-constant field satisfies the first and violates the second.
+tangential. The axial field satisfies both: div J = 0 to machine precision (correction term exactly zero),
+and J(x)x = 0 identically (max |J nu| = 1.1e-16 on the sphere).
 
-Results: at strength 4 the constant field inflates coordinate-2 W1 by 4x (0.075 vs 0.019) and adds boundary
-mass (8.1% vs 6.1%), while the axial field is indistinguishable from J = 0. Sweeping the strength, the
-constant field degrades monotonically (W1 0.0136 -> 0.0405) and the axial field does not (0.0136 -> 0.0119).
-The projection atom is a separate, benign error scaling like sqrt(eta); the boundary-condition violation
-plateaus under stepsize refinement and does not go away.
+Results: at strength 4 the axial field is statistically indistinguishable from J = 0 at stationarity on both
+targets (Target A W1 (0.011,0.015,0.010) vs (0.010,0.019,0.012), KS 0.026 vs 0.024, boundary mass 6.3% vs
+6.1%) — which is what invariance predicts, and means the circulation is free. Sweeping the strength from 0 to
+8, W1 does not degrade (0.0136 -> 0.0119 on Target A) and boundary mass is flat to within half a point;
+satisfying J nu = 0 is what buys that. The residual boundary mass is a projection atom, benign and scaling
+like sqrt(eta) (11.8% -> 6.1% -> 3.1%, atom/sqrt(eta) constant at 1.86, 1.94, 1.96), and the fixed-time
+control shows both schemes limited only by it. The acceleration itself is in the transient, not at
+stationarity — see `anchored_langevin_paper_J.ipynb`.
 
 ## The paper's J construction
 
