@@ -99,9 +99,9 @@ for plain Langevin but not for the tail-accelerated anchor, so the two mechanism
 ## Constrained sampling on the ball, with a state-dependent J
 
 `anchored_langevin_ball_constrained.ipynb` samples on `K = {x in R^3 : ||x||_2^2 <= 1}` by projection,
-comparing `J = 0` against the state-dependent axial field `J_s(x) w = s (x cross w)`. The constant skew `J_a`
-is excluded here because it violates the boundary condition below; `anchored_langevin_paper_J.ipynb` measures
-what that costs.
+comparing `J = 0` against the state-dependent axial field `J_s(x) w = s (x cross w)`, and **tunes s**. The
+constant skew `J_a` is excluded here because it violates the boundary condition below;
+`anchored_langevin_paper_J.ipynb` measures what that costs.
 
 State dependence changes the dynamics: the invariant form becomes
 
@@ -110,17 +110,32 @@ dX = e^Delta [ -(I + J(x)) grad U0 + div J(x) ] dt + sqrt(2) e^(Delta/2) dW
 ```
 
 and the constraint adds a second requirement, `J(x) nu(x) = 0` on the boundary, so the skew drift is
-tangential. The axial field satisfies both: div J = 0 to machine precision (correction term exactly zero),
-and J(x)x = 0 identically (max |J nu| = 1.1e-16 on the sphere).
+tangential. The axial field satisfies both: div J = 0 to machine precision, and J(x)x = 0 identically
+(max |J nu| = 5.6e-16 on the sphere).
 
-Results: at strength 4 the axial field is statistically indistinguishable from J = 0 at stationarity on both
-targets (Target A W1 (0.011,0.015,0.010) vs (0.010,0.019,0.012), KS 0.026 vs 0.024, boundary mass 6.3% vs
-6.1%) — which is what invariance predicts, and means the circulation is free. Sweeping the strength from 0 to
-8, W1 does not degrade (0.0136 -> 0.0119 on Target A) and boundary mass is flat to within half a point;
-satisfying J nu = 0 is what buys that. The residual boundary mass is a projection atom, benign and scaling
-like sqrt(eta) (11.8% -> 6.1% -> 3.1%, atom/sqrt(eta) constant at 1.86, 1.94, 1.96), and the fixed-time
-control shows both schemes limited only by it. The acceleration itself is in the transient, not at
-stationarity — see `anchored_langevin_paper_J.ipynb`.
+Because J cannot move the invariant law, the tuning target is a rate. Two are reported, both averaged over
+7 seeds: W1 at a fixed iteration budget, and tau(eps), the iterations needed to reach accuracy eps and stay
+there.
+
+Tuning a constant s exposes a trade-off: tau(0.03) falls monotonically (624 -> 208 on Target A as s goes
+0 -> 20) while the stationary W1 is flat to s ~ 6 then climbs (0.0126 -> 0.0189). So s = 6 is free but only
+1.7x, and s = 12 is 2.4x but 18% worse at stationarity.
+
+Annealing removes the trade-off. Taking `s(k) = s0 max(0, 1 - k/K)` with s0 = 20, K = 800 is admissible for
+the same reason a constant is — div J = 0 and J nu = 0 hold for every value of s, so every step preserves
+the same target and the chain is merely non-homogeneous — and after iteration K the scheme is J = 0, so it
+inherits its accuracy exactly.
+
+Results: the annealed field beats J = 0 at every threshold on both targets and ties it at stationarity.
+Target A tau(0.05/0.035/0.03) = 164/194/216 against 474/571/624, a 2.9x speed-up, W1 at 300 iterations
+0.0186 vs 0.0984 (5.3x); Target B 117/141/159 against 469/559/598, up to 4.0x, W1 at 300 iterations 0.0157
+vs 0.0966 (6.2x). Stationary W1 is 0.0125 vs 0.0126 and 0.0131 vs 0.0129, boundary mass and max KS
+unchanged. The gaps are 10-30 seed-standard-deviations wide.
+
+The constant-s penalty is discretization, not bias, which is what licenses the schedule: at fixed physical
+time the ratio of s = 12 error to s = 0 error falls 1.62 -> 1.40 -> 1.12 -> 0.99 as eta is refined 8x, then
+sits inside the seed noise. The projection atom is a separate artefact present at every s including zero,
+scaling like sqrt(eta) (11.8% -> 6.1% -> 3.1%).
 
 ## The paper's J construction
 
