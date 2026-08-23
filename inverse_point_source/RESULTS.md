@@ -283,3 +283,97 @@ Reading of this table:
 * **One inversion worth noting:** softplus produces the *highest peak* (0.766)
   while scoring worse on MSE. If peak contrast between two merged lobes matters
   more to you than fit, that trade is worth revisiting.
+
+### 9.3 Trunk resolution
+
+Same budget, GELU + `b²`, input standardisation on.
+
+| trunk | `P` | floor | best val loss | mean peak |
+|---|---|---|---|---|
+| `h = λ/8`, `s = 0.15` | 169 | `1.24e-02` | `1.4150e-02` | 0.734 |
+| **`h = λ/12`, `s = 0.15`** | **400** | `2.39e-03` | **`8.3328e-03`** | **0.799** |
+
+Refining the trunk is the largest single win in this study: **−41 %** against the
+best λ/8 result, and **−63 %** against the original configuration end to end
+(`2.23e-02 → 8.33e-03`). The mean peak climbs 0.647 → 0.799 toward the target's
+1.0, which is the merged-lobe symptom receding.
+
+The balance also flips, and that is the useful part. On λ/8 the network sat 14 %
+above the trunk's floor — nothing left to win without changing the trunk. On
+λ/12 it sits **3.5× above** the `2.39e-03` floor, so the trunk is no longer the
+binding constraint and capacity, epochs and augmentation are what matter next.
+
+### 9.4 Loss terms
+
+| run | best val loss | mean peak |
+|---|---|---|
+| weighted MSE only | `8.3328e-03` | 0.799 |
+| \+ soft Dice, `W_DICE = 0.3` | `8.3412e-03` | 0.770 |
+
+**Soft Dice does not help — measured and rejected.** The difference is 0.1 %,
+inside the 0.3 % run-to-run spread, and it *lowers* the peak. The motivating
+argument (MSE against a target that is zero on ~99 % of the grid is minimised by
+hedging toward the conditional mean, which blurs) is sound in the abstract but
+does not show up as a gain here; most likely the `1 + 20·target` weighting
+already does that job. `W_DICE` stays at `0.0` in the notebook.
+
+### 9.5 Rotation augmentation and the auxiliary coordinate head
+
+| run | indicator loss | mean peak |
+|---|---|---|
+| fine trunk, weighted MSE | `8.3328e-03` | 0.799 |
+| \+ rotation augmentation | **`7.8254e-03`** | 0.790 |
+| \+ auxiliary coordinate head | `9.6844e-03` | 0.784 |
+
+The indicator loss is not the metric that matters, though, so the trained
+checkpoints were re-scored on **localisation error** over 150 fresh
+configurations, using the prominence detector:
+
+| model | peak-pick error | correct `N` | aux head's own coordinates |
+|---|---|---|---|
+| fine trunk | 0.02778 | 100 % | — |
+| **\+ rotation augmentation** | **0.02425** | 100 % | — |
+| \+ auxiliary coordinate head | 0.03146 | 100 % | 0.03901 |
+
+**Rotation augmentation is worth more than its loss number suggests**: −6 % on
+the MSE but **−13 % on localisation error**. It is also exact and costs one
+`torch.roll` per batch. Note this was measured at 30 epochs on 6 400 samples;
+augmentation suppresses overfitting, so its value should grow with a longer run
+on the full 60 000, but that has not been measured here.
+
+**The auxiliary coordinate head is rejected.** The idea was that regressing the
+two source positions directly, under a permutation-invariant Chamfer loss, would
+give sub-grid localisation without peak-picking. Measured, its own coordinate
+output (0.03901) is worse than peak-picking the same model's indicator (0.03146),
+and both are worse than not having the head at all (0.02778). The Chamfer term
+competes with the indicator objective for shared-body capacity and pays nothing
+back.
+
+**Localisation is now sub-grid**: 0.02425 against a grid spacing of 0.0317. That
+is still ~2.6× above the 0.0092 that 1 % noise supports at `λ/4` (§5), so
+headroom remains, but the gap has closed a long way.
+
+**The detector is more robust than §6 suggested.** On real trained models it
+returned the correct source count on **100 %** of 150 fresh configurations. The
+95.5 % in §6 was measured on deliberately degraded synthetic fields with unequal
+lobe strengths and heavy blur, so it is a conservative bound rather than the
+expected rate.
+
+---
+
+## 10. Summary: what to change, in order of payoff
+
+| change | effect | cost |
+|---|---|---|
+| Refine the RBF trunk to `h = λ/12` or finer | `1.42e-02 → 8.33e-03` | more parameters, slower epochs |
+| Standardise the branch input | `2.23e-02 → 1.58e-02` | free |
+| GELU instead of tanh | `1.58e-02 → 1.42e-02` | free |
+| Rotation augmentation | −13 % localisation error | one `torch.roll` per batch |
+| Prominence detector + sub-grid refinement | correct-count 85.5 % → 95.5 % on hard fields | free |
+| Fix `T_max`, `AdamW`, the `s` shadowing | correctness | free |
+
+Measured and **rejected**: soft-Dice loss term, auxiliary coordinate head, plain
+softplus positivity.
+
+End to end on the indicator loss: **`2.23e-02 → 7.83e-03`, −65 %**, with the mean
+peak rising 0.647 → 0.790 and localisation error at 0.024, below one grid cell.
