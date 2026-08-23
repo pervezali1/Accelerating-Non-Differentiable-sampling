@@ -317,47 +317,59 @@ hedging toward the conditional mean, which blurs) is sound in the abstract but
 does not show up as a gain here; most likely the `1 + 20·target` weighting
 already does that job. `W_DICE` stays at `0.0` in the notebook.
 
-### 9.5 Rotation augmentation and the auxiliary coordinate head
+### 9.5 Rotation augmentation, soft Dice and the auxiliary coordinate head
 
-| run | indicator loss | mean peak |
-|---|---|---|
-| fine trunk, weighted MSE | `8.3328e-03` | 0.799 |
-| \+ rotation augmentation | **`7.8254e-03`** | 0.790 |
-| \+ auxiliary coordinate head | `9.6844e-03` | 0.784 |
-
-The indicator loss is not the metric that matters, though, so the trained
-checkpoints were re-scored on **localisation error** over 150 fresh
-configurations, using the prominence detector:
-
-| model | peak-pick error | correct `N` | aux head's own coordinates |
+| run | indicator loss | mean peak | localisation error |
 |---|---|---|---|
-| fine trunk | 0.02778 | 100 % | — |
-| **\+ rotation augmentation** | **0.02425** | 100 % | — |
-| \+ auxiliary coordinate head | 0.03146 | 100 % | 0.03901 |
+| fine trunk, weighted MSE (F1) | `8.3328e-03` | 0.799 | 0.02778 |
+| \+ rotation augmentation (F3) | `7.8254e-03` | 0.790 | **0.02425** |
+| \+ auxiliary coordinate head (F4) | `9.6844e-03` | 0.784 | 0.03146 |
+| \+ Dice + augmentation + aux (F5) | **`7.2605e-03`** | 0.774 | 0.02502 |
 
-**Rotation augmentation is worth more than its loss number suggests**: −6 % on
-the MSE but **−13 % on localisation error**. It is also exact and costs one
-`torch.roll` per batch. Note this was measured at 30 epochs on 6 400 samples;
-augmentation suppresses overfitting, so its value should grow with a longer run
-on the full 60 000, but that has not been measured here.
+Localisation error is over 150 fresh configurations with the prominence
+detector; all four models returned the correct source count on 100 % of them.
+Paired differences, same configurations, `n = 150`:
 
-**The auxiliary coordinate head is rejected.** The idea was that regressing the
-two source positions directly, under a permutation-invariant Chamfer loss, would
-give sub-grid localisation without peak-picking. Measured, its own coordinate
-output (0.03901) is worse than peak-picking the same model's indicator (0.03146),
-and both are worse than not having the head at all (0.02778). The Chamfer term
-competes with the indicator objective for shared-body capacity and pays nothing
-back.
+| comparison | Δ error | SE | t | verdict |
+|---|---|---|---|---|
+| F3 − F1, rotation augmentation | **−0.00352** | 0.00117 | **−3.02** | real improvement |
+| F4 − F1, aux head alone | **+0.00369** | 0.00094 | **+3.91** | real regression |
+| F5 − F3, adding Dice + aux to augmentation | +0.00077 | 0.00079 | +0.97 | indistinguishable |
 
-**Localisation is now sub-grid**: 0.02425 against a grid spacing of 0.0317. That
-is still ~2.6× above the 0.0092 that 1 % noise supports at `λ/4` (§5), so
-headroom remains, but the gap has closed a long way.
+**This is the clearest case in the study for not ranking by training loss.** F5
+has the best indicator loss of every run here — `7.26e-03`, 7 % below F3 — and
+ranked that way it is the winner. On localisation error it is not
+distinguishable from F3 (t = 0.97, worse on 79 of 150 samples). The extra Dice
+term and coordinate head buy a better *fit* that does not become better
+*localisation*, so they are complexity without payoff.
+
+**Rotation augmentation: keep.** −6 % on the indicator loss, **−13 % on
+localisation error**, t = −3.02. Exact, and one `torch.roll` per batch. Measured
+at 30 epochs on 6 400 samples; since augmentation suppresses overfitting its
+value should grow on the full 60 000 over more epochs, though that is not
+measured here.
+
+**Auxiliary coordinate head: reject.** The idea was that regressing the two
+positions directly under a permutation-invariant Chamfer loss would give sub-grid
+localisation without peak-picking. Measured, its own coordinate output is the
+worst of any route tried (0.03901 alone, 0.04436 in F5) — worse than peak-picking
+the same model's indicator, and adding it alone is a significant regression
+(t = +3.91). The Chamfer term competes with the indicator objective for shared-
+body capacity and pays nothing back.
+
+**Soft Dice: reject.** Alone it is `8.3412e-03` against `8.3328e-03`, inside
+run-to-run noise, and it lowers the peak. The `1 + 20*target` weighting appears
+to already do the job it was meant to.
+
+**Localisation is now sub-grid**: 0.02425 against a grid spacing of 0.0317. Still
+~2.6× above the 0.0092 that 1 % noise supports at `λ/4` (§5), so headroom
+remains, but the gap has closed a long way.
 
 **The detector is more robust than §6 suggested.** On real trained models it
 returned the correct source count on **100 %** of 150 fresh configurations. The
 95.5 % in §6 was measured on deliberately degraded synthetic fields with unequal
-lobe strengths and heavy blur, so it is a conservative bound rather than the
-expected rate.
+lobe strengths and heavy blur, so it is a conservative bound, not the expected
+rate.
 
 ---
 
@@ -368,12 +380,15 @@ expected rate.
 | Refine the RBF trunk to `h = λ/12` or finer | `1.42e-02 → 8.33e-03` | more parameters, slower epochs |
 | Standardise the branch input | `2.23e-02 → 1.58e-02` | free |
 | GELU instead of tanh | `1.58e-02 → 1.42e-02` | free |
-| Rotation augmentation | −13 % localisation error | one `torch.roll` per batch |
-| Prominence detector + sub-grid refinement | correct-count 85.5 % → 95.5 % on hard fields | free |
+| Rotation augmentation | −13 % localisation error, t = −3.02 | one `torch.roll` per batch |
+| Prominence detector + sub-grid refinement | correct count 85.5 % → 95.5 % on hard fields | free |
 | Fix `T_max`, `AdamW`, the `s` shadowing | correctness | free |
 
-Measured and **rejected**: soft-Dice loss term, auxiliary coordinate head, plain
+Measured and **rejected**: soft-Dice term, auxiliary coordinate head, plain
 softplus positivity.
 
-End to end on the indicator loss: **`2.23e-02 → 7.83e-03`, −65 %**, with the mean
-peak rising 0.647 → 0.790 and localisation error at 0.024, below one grid cell.
+End to end: indicator loss **`2.23e-02 → 7.83e-03` (−65 %)**, mean peak
+**0.647 → 0.790**, localisation error **0.0243 — below one grid cell**.
+
+**Report localisation error against separation, not the training loss.** F5 above
+is the concrete reason: it wins on loss and not on localisation.
