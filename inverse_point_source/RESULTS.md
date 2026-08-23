@@ -217,3 +217,69 @@ Exact to machine precision, no interpolation. Each training sample stands in for
   `d_min = 0.3142`. That figure is an extrapolation.
 * `I_true` is 60000 × 4096 float32 = **983 MB**, plus 246 MB for `X_all`.
 
+
+---
+
+## 9. Ablations
+
+All runs use the same 8 000-sample dataset (6 400 train / 1 600 val), the same
+seed, batch 64, `AdamW(1e-3, wd 5e-5)`, `CosineAnnealingLR`, 40 epochs, and the
+same weighted MSE for reporting. The baseline reproduces the original notebook's
+behaviour closely (`2.23e-02` here against `2.14e-02` in the original run on
+48 000 samples), and two independently generated datasets gave `1.5802e-02` and
+`1.5747e-02` for the same configuration — a 0.3 % spread, so the differences
+below are well above run-to-run noise.
+
+### 9.1 Trunk `h = λ/8`, `s = 0.15` (representational floor `1.24e-02`)
+
+| run | best val loss | mean peak |
+|---|---|---|
+| A — original configuration | `2.23e-02` | 0.647 |
+| B — `T_max` fixed to `NUM_EPOCHS` | `2.35e-02` | 0.621 |
+| C — B + input standardisation | `1.58e-02` | 0.719 |
+| **D1 — C + GELU instead of tanh** | **`1.42e-02`** | 0.734 |
+
+Cumulative on the original trunk: **`2.23e-02` → `1.42e-02`, −36 %**, from two
+changes that cost nothing at runtime. At `1.42e-02` the network is only 14 %
+above this trunk's `1.24e-02` floor — there is almost nothing left to win
+without changing the trunk.
+
+**B is not an improvement at this budget, and that is expected.** With
+`T_max = 300` and only 40 (or 100) epochs the learning rate stays high, which
+helps a run nowhere near converged. The fix matters once you train to
+convergence with early stopping; it is a correctness fix, not a free win, and it
+is honest to report it as slightly worse in a truncated comparison.
+
+### 9.2 Positivity map and activation
+
+Same trunk, same budget, input standardisation on throughout.
+
+| activation + positivity | best val loss | mean peak |
+|---|---|---|
+| **GELU + `b²`** | **`1.4150e-02`** | 0.734 |
+| GELU + `softplus(b−4)` | `1.5090e-02` | **0.766** |
+| tanh + `b²` (the paper's combination) | `1.5747e-02` | 0.719 |
+| tanh + softplus, last-layer bias −4 | `1.6789e-02` | 0.718 |
+| tanh + `softplus(b−4)` | `1.6794e-02` | 0.726 |
+| tanh + `softplus(b)` | `1.7862e-02` | 0.716 |
+| GELU + `softplus(b)` unshifted | `8.7072e-02` | **0.000** |
+
+Reading of this table:
+
+* **`b²` wins.** The theoretical objection to it — `d(b²)/db = 2b` vanishes
+  exactly where `b = 0`, so units sitting near zero get no gradient — is real,
+  but it only bites while the inputs are unnormalised and nearly every unit *is*
+  near zero. Once standardised, `b²` is the best map measured.
+* **`softplus(0) = 0.693` is the problem with the naive swap**: at init all `P`
+  coefficients are ≈ 0.7 and the field is a large positive constant over the
+  whole domain. With tanh this merely costs accuracy (`1.79e-02`). With GELU it
+  is fatal — the optimiser drives the pre-activations very negative, softplus
+  saturates at 0 along with its derivative, and the model parks at exactly the
+  predict-zero loss with a mean peak of 0.000.
+* **Shifting the argument by 4 fixes it**, and two independent routes to the same
+  shift agree: `softplus(b−4)` gives `1.6794e-02` and initialising the last-layer
+  bias to −4 gives `1.6789e-02`. For the GELU pairing the shift is worth `8.71e-02
+  → 1.51e-02`, a 5.8× difference from one constant.
+* **One inversion worth noting:** softplus produces the *highest peak* (0.766)
+  while scoring worse on MSE. If peak contrast between two merged lobes matters
+  more to you than fit, that trade is worth revisiting.
