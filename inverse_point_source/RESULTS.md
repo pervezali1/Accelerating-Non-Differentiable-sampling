@@ -286,22 +286,37 @@ Reading of this table:
 
 ### 9.3 Trunk resolution
 
-Same budget, GELU + `b²`, input standardisation on.
+Two sweeps: one varying the trunk with GELU, one holding the activation at tanh
+so the trunk is the only thing changing.
 
-| trunk | `P` | floor | best val loss | mean peak |
-|---|---|---|---|---|
-| `h = λ/8`, `s = 0.15` | 169 | `1.24e-02` | `1.4150e-02` | 0.734 |
-| **`h = λ/12`, `s = 0.15`** | **400** | `2.39e-03` | **`8.3328e-03`** | **0.799** |
+| trunk | `P` | params | floor | tanh + `b²` | GELU + `b²` | peak (tanh) |
+|---|---|---|---|---|---|---|
+| `h = λ/8`, `s = 0.15` | 169 | ~0.7 M | `1.24e-02` | `1.5747e-02` | `1.4150e-02` | 0.719 |
+| **`h = λ/12`, `s = 0.15`** | **400** | ~2.5 M | `2.39e-03` | **`1.0094e-02`** | **`8.3328e-03`** | **0.796** |
+| `h = λ/16`, `s = 0.30` | 676 | ~5.7 M | `2.60e-04` | `1.0469e-02` | — | 0.788 |
 
-Refining the trunk is the largest single win in this study: **−41 %** against the
-best λ/8 result, and **−63 %** against the original configuration end to end
-(`2.23e-02 → 8.33e-03`). The mean peak climbs 0.647 → 0.799 toward the target's
-1.0, which is the merged-lobe symptom receding.
+Refining the trunk is the largest single win in this study, and holding the
+activation fixed isolates it: `1.5747e-02 → 1.0094e-02`, **−36 %**, peak
+0.719 → 0.796. The trunk change and the GELU change compose rather than overlap
+— GELU on the same λ/12 trunk reaches `8.3328e-03`.
 
-The balance also flips, and that is the useful part. On λ/8 the network sat 14 %
-above the trunk's floor — nothing left to win without changing the trunk. On
-λ/12 it sits **3.5× above** the `2.39e-03` floor, so the trunk is no longer the
-binding constraint and capacity, epochs and augmentation are what matter next.
+**But refinement stops paying at λ/12.** λ/16 lowers the representational floor
+by another 10× and scores *slightly worse* (`1.0469e-02` against `1.0094e-02`).
+Once the trunk is no longer the binding constraint, a lower floor buys nothing
+and the larger branch network — ~5.7 M parameters against ~2.5 M — is simply
+harder to fit in the same number of epochs. **λ/12 is the default.**
+
+This is budget-dependent, and honestly so: measured at 40 epochs on 6 400
+samples. λ/16 still has an order of magnitude of unused headroom in its floor,
+so on the full 60 000 samples over 200 epochs it may well overtake λ/12. That
+has not been measured here. The diagnostic to settle it is already in the
+notebook — compare the trained loss against `FLOOR` and see which side the gap
+sits on.
+
+The flip is the useful part. On λ/8 the network sat **14 % above** the trunk's
+floor: nothing left to win without changing the trunk. On λ/12 it sits **4.2×
+above** its floor: the trunk is no longer the constraint, and capacity, epochs
+and augmentation are what matter next.
 
 ### 9.4 Loss terms
 
@@ -377,7 +392,7 @@ rate.
 
 | change | effect | cost |
 |---|---|---|
-| Refine the RBF trunk to `h = λ/12` or finer | `1.42e-02 → 8.33e-03` | more parameters, slower epochs |
+| Refine the RBF trunk to `h = λ/12` (not finer) | `1.42e-02 → 8.33e-03` | ~2.5 M parameters, slower epochs |
 | Standardise the branch input | `2.23e-02 → 1.58e-02` | free |
 | GELU instead of tanh | `1.58e-02 → 1.42e-02` | free |
 | Rotation augmentation | −13 % localisation error, t = −3.02 | one `torch.roll` per batch |

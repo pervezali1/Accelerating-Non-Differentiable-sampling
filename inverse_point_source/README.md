@@ -40,8 +40,9 @@ Tagged in the notebook as **[FIX]** (correctness), **[ACC]** (accuracy) and
 - Standardisation statistics are computed on the training split only.
 
 **Accuracy**
-- Finer RBF trunk (`h = λ/16`, `s = 0.30`): representational floor `1.24e-02` →
-  `2.60e-04`.
+- Finer RBF trunk (`h = λ/12`): floor `1.24e-02` → `2.39e-03`, and the trained
+  loss `1.57e-02` → `1.01e-02` with the activation held fixed. Measured; `λ/16`
+  lowers the floor another 10x but scores slightly *worse* at this budget.
 - Input standardisation: measured `2.23e-02` → `1.58e-02` in a matched A/B.
 - Exact rotation augmentation — rotating the sources equals `np.roll` of the
   data to 6e-14, so every sample stands in for 256.
@@ -67,8 +68,8 @@ than guessed. Correct source count on a 200-field benchmark: 85.5 % → 95.5 %.
 
 The notebook regenerates `point_source_data_2/cauchy_dataset_two_sources_close.npz`
 if it is missing and reuses it otherwise. Cell 1 holds every knob. The trunk is
-larger than before (`P = 676` against 169), so the branch network grows from
-~0.7 M to ~5.7 M parameters — noticeably slower per epoch, and worth a GPU.
+larger than before (`P = 400` against 169), so the branch network grows from
+~0.7 M to ~2.5 M parameters — slower per epoch, and worth a GPU.
 
 If memory is tight, drop `Y_train` and rely on `targets_from_sources` to rebuild
 targets per batch; with `ROT_AUGMENT = True` they are rebuilt anyway.
