@@ -174,6 +174,42 @@ J = 0 already reaches the floor. The radial reflection map is not exactly measur
 ((2R-r)/r)^(d-1)); its error is O(eta) and the refinement study shows no plateau, but it should be
 rechecked at much larger eta.
 
+## Closed-form anchored U0, and where J belongs
+
+`anchored_langevin_closedform_U0.ipynb` runs the specified scheme
+
+```
+x <- Pi_K( x - eta a(x) grad U0(x) + eta alpha e^U(x) J(x) grad psi(x) + sqrt(2 eta a(x)) xi ),
+a(x) = e^{U(x) - U0(x)},  U = f + g,  U0 = f + g0,  g0 = E[g(x + mu xi)]
+```
+
+with g0 evaluated in **closed form** by the piecewise-quadratic lemma rather than by an inner Monte Carlo
+step, for the Lasso, MCP and SCAD regularizers. One generic implementation covers all three; only the
+breakpoint/coefficient table changes. Verified: the closed form matches a 2e6-sample MC estimate to 1.9e-4,
+which is within MC's own standard error, and p0' matches d/dx p0 to 8e-11.
+
+**Where J attaches is structural.** Because psi = (lam - G)h has grad psi = -2xh parallel to nu on the
+boundary, `(J grad psi).nu` is proportional to `(Jx).x = 0` for *any* skew J — so a constant skew is
+admissible automatically (max |(J grad psi).nu| = 4.4e-16), and `div(J grad psi) = 0` exactly for any
+constant skew and any psi. This settles a question the earlier notebooks left open: the constant skew was
+inadmissible there only because it acted on grad U0 (mean |(J grad U0).nu| = 0.703). Corollary: the axial
+field J(x)w = grad psi x w cannot be used in this formulation, since J grad psi = grad psi x grad psi = 0
+identically. The two constructions are alternatives, not a pair.
+
+**The rotation axis is the binding constraint.** A constant skew in R^3 rotates only the plane orthogonal
+to its axis. At alpha = 0.5 on Lasso, tau(0.06) is 960 (1.1x) with the axis along the slowest eigenvector of
+Sigma, 830 (1.3x) for the tridiagonal J, and 417 (2.5x) with the axis along the *fastest* eigenvector —
+which leaves the rotation plane spanned by the two slowest directions. Design rule: take the axis to be the
+smallest-variance eigenvector of the target covariance.
+
+Results with the aligned axis and alpha annealed 2 -> 0 over 800 iterations, against 1.2-1.3x for the
+unaligned axis: Lasso tau(0.06) 327 vs 1057 (3.2x), MCP 247 vs 1057 (4.3x), SCAD 313 vs 1007 (3.2x), and
+4-6x lower error at a 300-iteration budget. Stationary W1, boundary mass and max KS are unchanged or
+slightly better on all three.
+
+Recorded negative result: setting h = e^{-U0} in psi to cancel the e^U factor is admissible and does shrink
+the drift's dynamic range (58x -> 23x), but is consistently worse than h = 1.
+
 ## The paper's J construction
 
 `anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
