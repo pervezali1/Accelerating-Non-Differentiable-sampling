@@ -137,6 +137,43 @@ time the ratio of s = 12 error to s = 0 error falls 1.62 -> 1.40 -> 1.12 -> 0.99
 sits inside the seed noise. The projection atom is a separate artefact present at every s including zero,
 scaling like sqrt(eta) (11.8% -> 6.1% -> 3.1%).
 
+## Diagnosing "J does not accelerate", and a rebuilt integrator
+
+`anchored_langevin_ball_optimized.ipynb` takes the configuration in which the skew field appears to *hurt*
+(R = 1.5, eta = 5e-3, delta = 0.2: J = 0 gives W1 [0.0185 0.0283 0.0238], J_s at s = 4 gives
+[0.0185 0.0305 0.0334]) and isolates the two independent causes, then fixes both.
+
+Cause 1 is the metric. Those numbers are `W1[-100:].mean()`, the error at stationarity, and J_s leaves pi
+invariant by construction — it changes the rate, not the fixed point, so it can only add discretization
+there. A rate has to be read in the transient or through tau(eps).
+
+Cause 2 is the integrator. `J_s(x) g = s (x cross g)` is tangential to the sphere, but Euler follows the
+tangent line, inflating the radius by O((eta s)^2) per step. Measured directly, one Euler skew step from the
+boundary leaves ||x||/R at 1.00039 (s = 4) and 1.02489 (s = 32); projection absorbs the excess, so boundary
+mass climbs 7.4% -> 42.1% and the error follows. At eta = 1e-3 this is 25x smaller and invisible.
+
+Three fixes:
+
+1. integrate the skew part as an exact rotation (Rodrigues, Strang-split) — ||x|| preserved to 3.6e-15, so
+   boundary mass becomes flat in s (7.4% -> 6.4% at s = 32, against Euler's 42.1%);
+2. reflect at the boundary instead of projecting — removes the projection atom, 7.5% -> 0.24% against a
+   target 0.22%, and drops the stationary W1 from 0.0218 to 0.0130, exactly the sampling floor;
+3. anneal s(k) = 16 max(0, 1 - k/200).
+
+At s = 0 the two integrators are bit-identical, which is the control.
+
+Results at the same eta: Target A tau(0.06/0.04/0.025) = 66/74/352 against 286/362/1776 for the original
+(4.3x/4.9x/5.0x), and it reaches 0.018 in 1530 iterations where the original cannot reach it at any
+iteration count; Target B 52/74/102 against 320/400/1012 (6.2x/5.4x/9.9x). Stationary W1 sits on the floor
+on both, max KS improves (0.0160 vs 0.0224, 0.0230 vs 0.0260). The annealed chain and the J = 0 chain
+coalesce under common noise (max |x_ann - x_0| falls 1.72 -> 0.0043 over 2000 steps), so the schedule
+provably costs nothing at stationarity.
+
+Caveat: fix 2 does most of the accuracy work and fixes 1 and 3 do the speed work — reflection alone with
+J = 0 already reaches the floor. The radial reflection map is not exactly measure-preserving (Jacobian
+((2R-r)/r)^(d-1)); its error is O(eta) and the refinement study shows no plateau, but it should be
+rechecked at much larger eta.
+
 ## The paper's J construction
 
 `anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
