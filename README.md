@@ -280,6 +280,45 @@ thresholds on all three, since there is no boundary overshoot to avoid), and the
 cost on MCP and SCAD (W1 0.0271 -> 0.0296, 0.0207 -> 0.0236) -- ordinary discretization from the larger
 drift, so the unconstrained win should be taken at a finite budget rather than read at stationarity.
 
+## Real data: J = 0 vs constant J vs state-dependent J
+
+`anchored_langevin_real_data.ipynb` applies the three variants to constrained Bayesian regression on the
+**diabetes** dataset (n = 442, bundled with scikit-learn). Three features are used -- s1 (total cholesterol),
+s2 (LDL), s5 (log triglycerides) -- chosen because corr(s1, s2) = 0.897 gives real multicollinearity,
+cond(A'A/n) = 28.5 and a posterior whose principal sds differ by 5.3x. f is the centered least-squares fit
+(beta = 200), g is the penalty, U0 = f + g0 with g0 in closed form. K = {||x|| <= 0.85} is active since
+||OLS|| = 0.994. Reference is exact rejection (f quadratic, g >= 0). **alpha is fixed, not annealed.**
+
+| | tau(0.05) | tau(0.02) | tau(0.01) | W1 @ 500 | W1 stationary |
+|---|---|---|---|---|---|
+| Lasso, J = 0 | 487 | 743 | 933 | 0.0464 | 0.00416 |
+| Lasso, constant J | 160 (3.0x) | 260 (2.9x) | 367 (2.5x) | 0.0058 | 0.00390 |
+| Lasso, state-dep J | 240 (2.0x) | 337 (2.2x) | 413 (2.3x) | 0.0039 | 0.00410 |
+| MCP, J = 0 | 487 | 753 | 953 | 0.0470 | 0.00393 |
+| MCP, constant J | 170 (2.9x) | 267 (2.8x) | 390 (2.4x) | 0.0061 | 0.00358 |
+| MCP, state-dep J | 243 (2.0x) | 337 (2.2x) | 420 (2.3x) | 0.0044 | 0.00406 |
+| SCAD, J = 0 | 493 | 770 | 997 | 0.0479 | 0.00361 |
+| SCAD, constant J | 170 (2.9x) | 270 (2.9x) | 417 (2.4x) | 0.0072 | 0.00332 |
+| SCAD, state-dep J | 250 (2.0x) | 347 (2.2x) | 427 (2.3x) | 0.0049 | 0.00377 |
+
+The constant field wins on iteration count (2.4-3.0x); the state-dependent field wins on error at a fixed
+500-iteration budget (8-12x below J = 0). Nothing moves the posterior: boundary mass unchanged to within
+0.2 points, max KS equal or better with J, and posterior means agree to three decimals with the exact
+rejection reference (Lasso: -0.287/0.218/0.617 exact vs -0.292/0.226/0.619 for J = 0), against an
+unpenalised OLS of -0.545/0.437/0.708.
+
+**A synthetic-data conclusion that reverses here.** In the earlier notebooks h = 1 in psi = (R^2-||x||^2)h
+was better and h = e^{-U0} was recorded as a negative result. On real data it reverses, decisively: a
+posterior at beta = 200 is sharply peaked, so e^U -- which multiplies the h = 1 drift -- has median 1.9e43
+and max 7.9e124 on the boundary. No alpha is usable; the largest that does not overflow (~1e-40) reproduces
+the J = 0 row exactly in every column. The tempered h = e^{-U0} multiplies by a(x) in [0.936, 1.000]
+instead. Both stay admissible (tangency <= 3.2e-14, |div(J grad psi)| <= 5.3e-15), so this is numerical
+range, not theory. The deciding quantity is e^U's dynamic range over K: 130x synthetic, 1e124 here.
+
+Caveat: U is defined only up to an additive constant and the skew drift is NOT invariant to it
+(U -> U + c scales it by e^c), so alpha is meaningless unless the centering is stated; here f is the
+least-squares fit minus its minimum.
+
 ## The paper's J construction
 
 `anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
