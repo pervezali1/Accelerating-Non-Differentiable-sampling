@@ -210,6 +210,39 @@ slightly better on all three.
 Recorded negative result: setting h = e^{-U0} in psi to cancel the e^U factor is admissible and does shrink
 the drift's dynamic range (58x -> 23x), but is consistently worse than h = 1.
 
+## J = 0 vs a state-dependent J, on each regularizer
+
+`anchored_langevin_statedep_J.ipynb` compares alpha = 0 against a genuinely state-dependent J(x) on Lasso,
+MCP and SCAD, using the same closed-form anchored U0 and the same scheme as above.
+
+Because J acts on grad psi (not grad U0), the usual axial field is unavailable: k = grad psi gives
+J grad psi = grad psi x grad psi = 0 identically (measured median ||J grad psi|| = 0.0000). The fix is to
+keep the axial form J(x)w = k(x) x w but generate it from a *different* potential, k = grad chi. Then
+`div(k x grad psi) = grad psi . (curl k) - k . (curl grad psi)` and both terms vanish because both fields
+are curl-free, so invariance holds exactly for any chi; tangency on the boundary is automatic as before.
+The family is graded by chi: linear chi gives the constant skew, chi = 1/2 x'Sinv x gives a linear k, and
+chi = U0 gives a fully state-dependent k that is free (grad U0 is already computed). Verified by autograd:
+max |curl k| <= 5.6e-17, max |div(J grad psi)| <= 8.9e-16, max |(J grad psi).nu| <= 8.9e-16 on dK.
+
+Results with k = grad U0 and alpha annealed 2 -> 0 over 800 iterations, against J = 0:
+
+| | tau(0.06) | tau(0.04) | W1 @ 300 | W1 stationary | max KS |
+|---|---|---|---|---|---|
+| Lasso, J = 0 | 1057 | 1300 | 0.2564 | 0.0203 | 0.0310 |
+| Lasso, state-dep | 380 (2.8x) | 567 (2.3x) | 0.0714 (3.6x) | 0.0162 | 0.0253 |
+| MCP, J = 0 | 1057 | 1310 | 0.2603 | 0.0216 | 0.0305 |
+| MCP, state-dep | 340 (3.1x) | 440 (3.0x) | 0.0694 (3.8x) | 0.0187 | 0.0272 |
+| SCAD, J = 0 | 1007 | 1207 | 0.2527 | 0.0188 | 0.0315 |
+| SCAD, state-dep | 343 (2.9x) | 530 (2.3x) | 0.0695 (3.6x) | 0.0154 | 0.0235 |
+
+Max KS improves on all three and boundary mass is unchanged, so the gain is purely a rate effect. The three
+regularizers behave almost identically, as expected: the skew field acts through grad psi and the geometry
+of K, neither of which knows anything about g.
+
+Qualification: the aligned *constant* skew is still slightly better (3.2x/4.3x/3.2x), so on this target
+axis alignment, not state dependence, is what buys the acceleration. The state-dependent field's appeal is
+that it needs no spectral information about the target, only grad U0.
+
 ## The paper's J construction
 
 `anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
