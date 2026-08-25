@@ -243,6 +243,43 @@ Qualification: the aligned *constant* skew is still slightly better (3.2x/4.3x/3
 axis alignment, not state dependence, is what buys the acceleration. The state-dependent field's appeal is
 that it needs no spectral information about the target, only grad U0.
 
+## Unconstrained: J = 0 vs a constant J, on each regularizer
+
+`anchored_langevin_unconstrained_J.ipynb` runs the unconstrained scheme (no projection) and compares
+alpha = 0 against a constant skew J on Lasso, MCP and SCAD, with the same closed-form anchored U0.
+
+**Removing K removes psi, and the naive replacement diverges.** Invariance is not the obstacle: for a
+constant skew, div(J grad psi) = sum_ij J_ij d_i d_j psi = 0 for any psi, and there is no boundary
+condition. Usability is. On K the factor e^U is bounded; on R^3 it is not -- over the Lasso target e^U has
+median 7.4, q99 1.7e3, max 4.9e5. Carrying over grad psi = -x gives a drift ~ e^U x that overflows to inf
+within 400 steps. Tempering fixes it: psi = -e^{-U0} gives grad psi = e^{-U0} grad U0, so
+`alpha e^U J grad psi = alpha a(x) J grad U0` (bounded, a in [0.507, 1]) and the update collapses to
+`x <- x - eta a (I + alpha J) grad U0 + sqrt(2 eta a) xi` -- anchored non-reversible Langevin, with J back
+on grad U0. The two formulations are therefore not in conflict: on a constrained set J must act on grad psi
+to be tangential, and unconstrained the only usable psi puts it back on grad U0.
+
+Results at a 6000-iteration horizon (the unconstrained target is much wider, ||x|| reaching ~5 against 1.5,
+so 2000 iterations is not enough for J = 0 to converge):
+
+| | tau(0.15) | tau(0.10) | tau(0.06) | W1 @ 500 | W1 @ 6000 |
+|---|---|---|---|---|---|
+| Lasso, J = 0 | 1027 | 1497 | 2293 | 0.2549 | 0.0238 |
+| Lasso, J const | 613 (1.7x) | 770 (1.9x) | 1030 (2.2x) | 0.1447 | 0.0232-0.0246 |
+| MCP, J = 0 | 1460 | 2197 | 3543 | 0.3209 | 0.0271 |
+| MCP, J const | 953 (1.5x) | 1317 (1.7x) | 1857 (1.9x) | 0.2325 | 0.0296 |
+| SCAD, J = 0 | 1070 | 1543 | 2277 | 0.2685 | 0.0207 |
+| SCAD, J const | 713 (1.5x) | 1000 (1.5x) | 1567 (1.5x) | 0.1914 | 0.0236 |
+
+Best gains 2.2x / 1.9x / 1.5x, against 2.8-3.1x for the same comparison on the ball -- removing the
+constraint *reduces* what the skew field buys, because circulation along level sets is most valuable
+exactly where a wall is slowing the reversible dynamics. Axis alignment matters as before (tau(0.06) on
+Lasso: 1810 tridiagonal vs 1030 aligned).
+
+Two qualifications: annealing alpha is no longer the right default (constant alpha = 2 wins at the tight
+thresholds on all three, since there is no boundary overshoot to avoid), and there is a small stationary
+cost on MCP and SCAD (W1 0.0271 -> 0.0296, 0.0207 -> 0.0236) -- ordinary discretization from the larger
+drift, so the unconstrained win should be taken at a finite budget rather than read at stationarity.
+
 ## The paper's J construction
 
 `anchored_langevin_paper_J.ipynb` implements the skew field of *Accelerating Constrained Sampling: A Large
