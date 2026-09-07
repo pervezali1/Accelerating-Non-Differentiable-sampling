@@ -147,3 +147,61 @@ def ablation_panel(ablation, floor_mean, title, name):
     fig.tight_layout()
     _save(fig, name)
     return fig
+
+
+def accuracy_panels(sweep, ref_acc, dists, s_main, floor_mean, title, name):
+    """What $W_1$ sees against what accuracy sees, on one x-axis.
+
+    ``sweep[label] = {"s", "W1_mean", "acc_mean", "acc_se"}``; ``ref_acc`` is the
+    reference's per-draw accuracy array; ``dists[label]`` are per-draw accuracies at
+    ``s_main``.
+
+    The accuracy panel is deliberately scaled to the reference's own 5-95% per-draw
+    range. Auto-scaling to the curves would magnify half a percentage point into a
+    dramatic-looking trend; against the spread the posterior already has, the honest
+    picture is that the curves do not move.
+    """
+    lo, hi = np.quantile(ref_acc, [0.05, 0.95])
+    fig, axes = plt.subplots(1, 3, figsize=(17.5, 4.6))
+
+    for lab, r in sweep.items():
+        axes[0].plot(r["s"], r["W1_mean"], "o-", color=COLOR[lab], linewidth=2, label=lab)
+    axes[0].axhline(floor_mean, color="k", linestyle="--", linewidth=1.3, label="reference floor")
+    axes[0].set_yscale("log")
+    axes[0].set_ylabel(r"mean $W_1$ over coordinates", fontsize=13)
+    axes[0].set_title("what $W_1$ sees", fontsize=12)
+
+    for lab, r in sweep.items():
+        axes[1].errorbar(r["s"], r["acc_mean"], yerr=2 * np.asarray(r["acc_se"]),
+                         fmt="o-", color=COLOR[lab], linewidth=2, capsize=3, label=lab)
+    axes[1].axhline(ref_acc.mean(), color="k", linestyle="--", linewidth=1.3,
+                    label="reference (exact target)")
+    smax = max(sweep[next(iter(sweep))]["s"])
+    axes[1].fill_between([-0.4, smax + 0.4], lo, hi, color="k", alpha=0.10, zorder=0,
+                         label="reference 5-95% across draws")
+    pad = 0.3 * (hi - lo)
+    axes[1].set_ylim(lo - pad, hi + pad)
+    axes[1].set_xlim(-0.4, smax + 0.4)
+    axes[1].set_ylabel("accuracy, averaged over draws", fontsize=13)
+    axes[1].set_title("what accuracy sees  (error bars $\pm 2$ MC s.e.)", fontsize=12)
+
+    axes[0].legend(fontsize=9)
+    axes[1].legend(fontsize=8, loc="lower right", framealpha=0.92)
+    for ax in axes[:2]:
+        ax.set_xlabel("skew strength $s$", fontsize=13)
+        ax.grid(True, alpha=0.25)
+
+    for lab, a in dists.items():
+        c = "k" if lab.startswith("reference") else COLOR[lab]
+        sns.kdeplot(x=a, ax=axes[2], color=c, linewidth=2, label=lab, bw_adjust=0.9)
+    axes[2].set_xlim(lo - pad, hi + pad)
+    axes[2].set_xlabel("accuracy of a single posterior draw", fontsize=13)
+    axes[2].set_ylabel("density", fontsize=13)
+    axes[2].set_title("the whole distribution, at $s = {:g}$".format(s_main), fontsize=12)
+    axes[2].grid(True, alpha=0.25)
+    axes[2].legend(fontsize=9)
+
+    fig.suptitle(title, fontsize=15)
+    fig.tight_layout()
+    _save(fig, name)
+    return fig

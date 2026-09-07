@@ -91,9 +91,33 @@ class BallConstrainedGibbsSVM:
     def inside(self, w):
         return torch.norm(w, dim=1) <= self.R * (1 + 1e-12)
 
+    # ---------------- downstream statistics -----------------------------------------
+    # These read the posterior the way a practitioner would.  All three are computed on
+    # the same rows the posterior was fitted to, so they are *in-sample*: the question
+    # they answer is whether a sampling bias reaches a decision statistic, not how well
+    # the classifier generalises.
+    @torch.no_grad()
+    def _correct(self, w_samples):
+        """``(N, n)`` boolean: draw k classifies row i correctly iff ``w_k . psi_i > 0``."""
+        w = torch.as_tensor(np.atleast_2d(np.asarray(w_samples)), dtype=self.Psi.dtype)
+        return (w @ self.Psi.T) > 0
+
     def accuracy(self, w_samples):
-        """Posterior-mean 0/1 accuracy -- a sanity check that the posterior is doing
-        statistics, not just geometry."""
-        w = torch.as_tensor(np.atleast_2d(w_samples)).mean(dim=0, keepdim=True)
-        margin = (w @ self.Psi.T).squeeze(0)
-        return float((margin > 0).double().mean())
+        """Accuracy of the single plug-in classifier ``w_bar = E[w]``."""
+        w = torch.as_tensor(np.atleast_2d(np.asarray(w_samples))).mean(dim=0, keepdim=True)
+        return float(((w @ self.Psi.T) > 0).double().mean())
+
+    def accuracy_per_draw(self, w_samples):
+        """``(N,)`` accuracy of each posterior draw taken on its own.
+
+        Its *spread* is a posterior quantity in its own right, so a sampler can get the
+        mean right and the spread wrong."""
+        return self._correct(w_samples).double().mean(dim=1).numpy()
+
+    def accuracy_predictive(self, w_samples):
+        """Accuracy of the posterior-predictive (majority-vote) classifier.
+
+        Row ``i`` is called correctly when more than half the posterior mass classifies
+        it correctly, i.e. this is the Bayes rule under the sampled posterior rather
+        than under any single ``w``."""
+        return float((self._correct(w_samples).double().mean(dim=0) > 0.5).double().mean())

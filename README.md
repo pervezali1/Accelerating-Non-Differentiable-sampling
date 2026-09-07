@@ -86,6 +86,24 @@ near-boundary mass barely moves (6.80% → 10.20% across the sweep on Titanic, a
 no longer divergence-free. Boundary mass diagnoses a violated wall condition and is blind to a
 missing correction term.
 
+**Accuracy sees none of it.** Across the whole sweep — mean $W_1$ ranging over a factor of 16 —
+every method's classification accuracy stays inside the reference posterior's own 5-95% spread.
+On MAGIC the per-draw accuracy actually *rises* with the bias (0.7832 → 0.7855 for the constant
+field, 0.7832 → 0.7859 for the uncorrected one, as $s$ goes 0 → 8) while the admissible field
+sits on the reference at 0.7831: the two most badly biased samplers score highest.
+$\operatorname{sign}(w^\top\psi_i)$ is invariant under $w \mapsto cw$, so a scale-invariant
+statistic is structurally blind to the radial distortion these fields produce.
+
+| | catches a violated $J\nu = 0$ | catches a missing $\nabla\!\cdot J$ |
+|---|---|---|
+| mass near $\partial K$ | yes | **no** |
+| accuracy | **no** | **no** |
+| $W_1$ against a trusted reference | yes | yes |
+
+These accuracy numbers are **in-sample** — the posterior is fitted to all $n$ rows, and the
+question asked is whether sampling bias reaches a decision statistic, not how well the model
+generalises.
+
 **Refining the stepsize fixes the projection atom and cannot fix a wrong boundary condition.**
 At fixed physical time $T = 0.6$ on Titanic, the $J = 0$ atom falls 6.80% → 4.50% → 3.10% as
 $\eta$ is refined 4×, with atom$/\sqrt\eta$ nearly constant (3.93, 3.67, 3.58), while the
