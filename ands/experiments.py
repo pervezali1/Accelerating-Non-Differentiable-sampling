@@ -121,7 +121,7 @@ def chain(key, skew, s, cfg=CONFIG, eta=None, n_steps=None, ref=None, track=True
             track_every=cfg["track_every"])
         out = {"x": x}
         if tr is not None:
-            out["iters"], out["W1"] = tr
+            out.update(tr)
         return out
 
     return _cache("chain_" + key, build, key=key, skew=skew, s=s, eta=eta,
@@ -133,3 +133,25 @@ def chain(key, skew, s, cfg=CONFIG, eta=None, n_steps=None, ref=None, track=True
 
 def score(ref, x, R):
     return G.summarise(ref, x, R)
+
+
+def learning_curve(key, skew, s, cfg=CONFIG, drop_correction=False, track_every=10,
+                   seed=None):
+    """Accuracy against iteration, from the ``w = 0`` start.
+
+    Cached separately from :func:`chain`: it tracks a different quantity at a finer
+    interval, so it is a different run even though the trajectory is the same one."""
+    tgt = build_target(key, cfg)
+    seed = cfg["seed"] if seed is None else seed
+
+    def build():
+        x, tr = S.run_anchored_langevin(
+            tgt, skew, s, eta=cfg["eta"], n_steps=cfg["n_steps"], N=cfg["N"], seed=seed,
+            drop_correction=drop_correction, ref=None, track_every=track_every,
+            track_accuracy=True)
+        return {"x": x, "iters": tr["iters"], "acc": tr["acc"]}
+
+    return _cache("curve_" + key, build, key=key, skew=skew, s=s, seed=seed,
+                  drop_correction=drop_correction, track_every=track_every,
+                  **{k: cfg[k] for k in ("tau", "lam", "delta", "N", "n_steps", "eta")},
+                  R=DATASETS[key]["R"])

@@ -205,3 +205,53 @@ def accuracy_panels(sweep, ref_acc, dists, s_main, floor_mean, title, name):
     fig.tight_layout()
     _save(fig, name)
     return fig
+
+
+def learning_curves(curves, ref_acc, title, name, zoom=250, band_for=None):
+    """Accuracy against iteration, from the ``w = 0`` start at chance.
+
+    ``curves[label] = {"iters", "acc"}`` with ``acc`` columns (mean, q05, q95) across
+    walkers. Two panels because the interesting part and the reassuring part live at
+    different scales: the climb finishes inside the first few hundred iterations, which
+    a single full-range axis would squash into the left margin.
+
+    The dashed ceiling is what the *exact* posterior scores. It is not 1: these are
+    linear classifiers on real, noisy data, and the Bayes rate for this model class is
+    where the curve is supposed to stop.
+    """
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.6))
+    ceiling = float(ref_acc.mean())
+    band_for = band_for or next(iter(curves))
+    # the admissible runs land on top of each other, so style carries what colour cannot
+    styles = ["-", "-", (0, (5, 2)), (0, (1, 1.6))]
+    widths = [3.4, 2.0, 2.0, 2.0]
+
+    for ax, xmax, sub in ((axes[0], zoom, "the climb"),
+                          (axes[1], None, "the whole run")):
+        for (lab, r), ls, lw in zip(curves.items(), styles, widths):
+            it, a = r["iters"], r["acc"]
+            m = np.ones_like(it, dtype=bool) if xmax is None else (it <= xmax)
+            ax.plot(it[m], a[m, 0], color=COLOR[lab], linewidth=lw, linestyle=ls,
+                    label=lab, solid_capstyle="round")
+            if lab == band_for:
+                ax.fill_between(it[m], a[m, 1], a[m, 2], color=COLOR[lab], alpha=0.15,
+                                linewidth=0, label="5-95% across walkers")
+        ax.axhline(ceiling, color="k", linestyle="--", linewidth=1.4,
+                   label="exact posterior ({:.3f})".format(ceiling))
+        ax.axhline(0.5, color="0.45", linestyle=":", linewidth=1.4, label="chance (0.5)")
+        ax.set_xlabel("Iterations", fontsize=13)
+        ax.set_ylabel("classification accuracy", fontsize=13)
+        ax.set_title(sub, fontsize=12)
+        ax.grid(True, alpha=0.25)
+    axes[0].set_xlim(0, zoom)
+    axes[0].set_ylim(0.47, ceiling + 0.035)
+    axes[0].legend(fontsize=9, loc="lower right")
+    # the right panel keeps the full 0.5-1 scale on purpose: the ceiling here is the
+    # Bayes rate of a linear model on noisy data, and it is nowhere near 1
+    axes[1].set_ylim(0.48, 1.0)
+    axes[1].set_yticks(np.arange(0.5, 1.01, 0.05))
+    axes[1].legend(fontsize=9, loc="lower right", ncol=2)
+    fig.suptitle(title, fontsize=15)
+    fig.tight_layout()
+    _save(fig, name)
+    return fig

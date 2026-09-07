@@ -97,22 +97,35 @@ class BallConstrainedGibbsSVM:
     # they answer is whether a sampling bias reaches a decision statistic, not how well
     # the classifier generalises.
     @torch.no_grad()
+    def _score(self, w):
+        """``(N, n)`` in {0, 1/2, 1}: draw k scores row i by ``sign(w_k . psi_i)``, with
+        an exact zero margin counted as half.
+
+        The tie matters in exactly one place and it is the place the learning curve
+        starts: every chain is launched from ``w = 0``, where every margin is exactly
+        zero. Counting a tie as a coin flip puts that start at chance, 0.5, which is
+        what it is. For any ``w != 0`` on continuous features ties have probability
+        zero, so nothing else in the notebook is affected."""
+        m = w @ self.Psi.T
+        return (m > 0).to(m.dtype) + 0.5 * (m == 0).to(m.dtype)
+
+    @torch.no_grad()
     def _correct(self, w_samples):
-        """``(N, n)`` boolean: draw k classifies row i correctly iff ``w_k . psi_i > 0``."""
         w = torch.as_tensor(np.atleast_2d(np.asarray(w_samples)), dtype=self.Psi.dtype)
-        return (w @ self.Psi.T) > 0
+        return self._score(w)
 
     def accuracy(self, w_samples):
         """Accuracy of the single plug-in classifier ``w_bar = E[w]``."""
-        w = torch.as_tensor(np.atleast_2d(np.asarray(w_samples))).mean(dim=0, keepdim=True)
-        return float(((w @ self.Psi.T) > 0).double().mean())
+        w = torch.as_tensor(np.atleast_2d(np.asarray(w_samples)),
+                            dtype=self.Psi.dtype).mean(dim=0, keepdim=True)
+        return float(self._score(w).mean())
 
     def accuracy_per_draw(self, w_samples):
         """``(N,)`` accuracy of each posterior draw taken on its own.
 
         Its *spread* is a posterior quantity in its own right, so a sampler can get the
         mean right and the spread wrong."""
-        return self._correct(w_samples).double().mean(dim=1).numpy()
+        return self._correct(w_samples).mean(dim=1).numpy()
 
     def accuracy_predictive(self, w_samples):
         """Accuracy of the posterior-predictive (majority-vote) classifier.
@@ -120,4 +133,4 @@ class BallConstrainedGibbsSVM:
         Row ``i`` is called correctly when more than half the posterior mass classifies
         it correctly, i.e. this is the Bayes rule under the sampled posterior rather
         than under any single ``w``."""
-        return float((self._correct(w_samples).double().mean(dim=0) > 0.5).double().mean())
+        return float((self._correct(w_samples).mean(dim=0) > 0.5).double().mean())

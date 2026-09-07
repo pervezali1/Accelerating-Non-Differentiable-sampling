@@ -25,9 +25,16 @@ from .skew import build_skew
 
 def run_anchored_langevin(target, skew="none", s=0.0, eta=1e-4, n_steps=2000,
                           N=2000, seed=0, drop_correction=False, x0_scale=0.0,
-                          ref=None, track_every=10, w1_coords=None):
+                          ref=None, track_every=10, w1_coords=None,
+                          track_accuracy=False):
     """Return ``(final_samples, trace)`` where ``trace`` is ``(iteration, W1 per
-    tracked coordinate)`` against ``ref`` (or ``None`` when ``ref`` is not given)."""
+    tracked coordinate)`` against ``ref`` (or ``None`` when ``ref`` is not given).
+
+    With ``track_accuracy`` the trace gains the ensemble's classification accuracy at
+    each tracked iteration -- mean over walkers plus the 5th and 95th percentiles across
+    them. Every chain starts from ``w = 0``, i.e. from chance, so this is a learning
+    curve: it measures how fast the sampler walks its ensemble from a coin flip up to
+    whatever the posterior supports."""
     from scipy.stats import wasserstein_distance
 
     d = target.d
@@ -38,8 +45,19 @@ def run_anchored_langevin(target, skew="none", s=0.0, eta=1e-4, n_steps=2000,
     x = target.project(x)
 
     coords = list(range(d)) if w1_coords is None else list(w1_coords)
-    iters, W = [], []
+    iters, W, A = [], [], []
     sqrt2eta = np.sqrt(2.0 * eta)
+
+    def _acc_row(state):
+        a = target.accuracy_per_draw(state.numpy())
+        return [float(a.mean()), float(np.quantile(a, 0.05)), float(np.quantile(a, 0.95))]
+
+    if track_accuracy:                               # iteration 0 is the w = 0 start
+        iters.append(0)
+        A.append(_acc_row(x))
+        if ref is not None:
+            xn = x.numpy()
+            W.append([wasserstein_distance(ref[:, i], xn[:, i]) for i in coords])
 
     for it in range(n_steps):
         Delta, gU0 = target.anchored_step(x)
@@ -47,12 +65,21 @@ def run_anchored_langevin(target, skew="none", s=0.0, eta=1e-4, n_steps=2000,
         drift = eD * (gU0 + field.apply(x, gU0) - field.divergence(x))
         noise = torch.exp(0.5 * Delta).unsqueeze(1) * torch.randn(N, d, generator=g)
         x = target.project(x - eta * drift + sqrt2eta * noise)
-        if ref is not None and ((it + 1) % track_every == 0 or it == 0):
-            xn = x.numpy()
+        if (ref is not None or track_accuracy) and ((it + 1) % track_every == 0 or it == 0):
             iters.append(it + 1)
-            W.append([wasserstein_distance(ref[:, i], xn[:, i]) for i in coords])
+            if ref is not None:
+                xn = x.numpy()
+                W.append([wasserstein_distance(ref[:, i], xn[:, i]) for i in coords])
+            if track_accuracy:
+                A.append(_acc_row(x))
 
-    trace = None if ref is None else (np.array(iters), np.array(W))
+    if ref is None and not track_accuracy:
+        return x.numpy(), None
+    trace = {"iters": np.array(iters)}
+    if ref is not None:
+        trace["W1"] = np.array(W)
+    if track_accuracy:
+        trace["acc"] = np.array(A)                   # columns: mean, q05, q95
     return x.numpy(), trace
 
 

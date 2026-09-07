@@ -100,6 +100,14 @@ statistic is structurally blind to the radial distortion these fields produce.
 | accuracy | **no** | **no** |
 | $W_1$ against a trusted reference | yes | yes |
 
+**The learning curve** (`figures/learning_curve_*.png`) is the accuracy plot that does carry
+information. Every chain starts at $w = 0$, where every margin is exactly zero and accuracy is
+exactly chance, so the trace runs 0.5 up to the posterior's own rate — 0.789 on Titanic, 0.783 on
+MAGIC, reached to within 1% inside ~100-200 iterations. That ceiling is not 1: these are linear
+classifiers on real, noisy data, and a sampler that climbed past its own target's rate would be
+reporting a bug. During the climb the inadmissible constant field is the slowest of the three
+(0.711 against 0.749 at iteration 40 on MAGIC).
+
 These accuracy numbers are **in-sample** — the posterior is fitted to all $n$ rows, and the
 question asked is whether sampling bias reaches a decision statistic, not how well the model
 generalises.
