@@ -1,0 +1,46 @@
+titanic  reference: 2500 samples, RWM acceptance 0.240, boundary mass 0.0056, W1 floor 0.0063
+[titanic]  1/19 none  s=0 drop=0 eta=3.0e-04 steps= 2000  W1=0.0061  worst=0.0086  KS=0.037  dK= 6.80%  (33s)
+[titanic]  2/19 const s=1 drop=0 eta=3.0e-04 steps= 2000  W1=0.0198  worst=0.0528  KS=0.144  dK= 7.85%  (30s)
+[titanic]  3/19 axial s=1 drop=0 eta=3.0e-04 steps= 2000  W1=0.0059  worst=0.0077  KS=0.041  dK= 6.75%  (31s)
+[titanic]  4/19 axial s=1 drop=1 eta=3.0e-04 steps= 2000  W1=0.0284  worst=0.0748  KS=0.209  dK= 7.25%  (33s)
+[titanic]  5/19 const s=2 drop=0 eta=3.0e-04 steps= 2000  W1=0.0303  worst=0.0781  KS=0.200  dK=11.15%  (33s)
+[titanic]  6/19 axial s=2 drop=0 eta=3.0e-04 steps= 2000  W1=0.0055  worst=0.0078  KS=0.045  dK= 6.45%  (33s)
+[titanic]  7/19 axial s=2 drop=1 eta=3.0e-04 steps= 2000  W1=0.0490  worst=0.1212  KS=0.326  dK= 7.05%  (33s)
+[titanic]  8/19 const s=4 drop=0 eta=3.0e-04 steps= 2000  W1=0.0387  worst=0.0911  KS=0.218  dK=16.50%  (32s)
+[titanic]  9/19 axial s=4 drop=0 eta=3.0e-04 steps= 2000  W1=0.0065  worst=0.0101  KS=0.038  dK= 7.20%  (28s)
+[titanic] 10/19 axial s=4 drop=1 eta=3.0e-04 steps= 2000  W1=0.0724  worst=0.1632  KS=0.427  dK= 8.40%  (28s)
+[titanic] 11/19 const s=8 drop=0 eta=3.0e-04 steps= 2000  W1=0.0475  worst=0.1065  KS=0.242  dK=27.15%  (31s)
+[titanic] 12/19 axial s=8 drop=0 eta=3.0e-04 steps= 2000  W1=0.0131  worst=0.0225  KS=0.073  dK= 8.10%  (32s)
+[titanic] 13/19 axial s=8 drop=1 eta=3.0e-04 steps= 2000  W1=0.1014  worst=0.2232  KS=0.519  dK=10.20%  (30s)
+[titanic] 14/19 none  s=0 drop=0 eta=1.5e-04 steps= 4000  W1=0.0060  worst=0.0129  KS=0.047  dK= 4.50%  (63s)
+[titanic] 15/19 const s=4 drop=0 eta=1.5e-04 steps= 4000  W1=0.0371  worst=0.0841  KS=0.204  dK=12.45%  (56s)
+[titanic] 16/19 axial s=4 drop=0 eta=1.5e-04 steps= 4000  W1=0.0053  worst=0.0091  KS=0.040  dK= 4.95%  (64s)
+[titanic] 17/19 none  s=0 drop=0 eta=7.5e-05 steps= 8000  W1=0.0056  worst=0.0097  KS=0.040  dK= 3.10%  (110s)
+[titanic] 18/19 const s=4 drop=0 eta=7.5e-05 steps= 8000  W1=0.0397  worst=0.0941  KS=0.238  dK= 9.35%  (125s)
+[titanic] 19/19 axial s=4 drop=0 eta=7.5e-05 steps= 8000  W1=0.0067  worst=0.0122  KS=0.051  dK= 2.80%  (124s)
+[titanic] done in 1076s   floor=0.0063  target dK=0.56%
+
+magic    reference: 2500 samples, RWM acceptance 0.234, boundary mass 0.0032, W1 floor 0.0084
+[magic]  1/19 none  s=0 drop=0 eta=3.0e-04 steps= 2000  W1=0.0096  worst=0.0160  KS=0.041  dK= 3.75%  (71s)
+[magic]  2/19 const s=1 drop=0 eta=3.0e-04 steps= 2000  W1=0.0202  worst=0.0533  KS=0.098  dK= 4.75%  (75s)
+[magic]  3/19 axial s=1 drop=0 eta=3.0e-04 steps= 2000  W1=0.0097  worst=0.0155  KS=0.041  dK= 3.75%  (77s)
+[magic]  4/19 axial s=1 drop=1 eta=3.0e-04 steps= 2000  W1=0.0353  worst=0.0808  KS=0.146  dK= 4.10%  (79s)
+[magic]  5/19 const s=2 drop=0 eta=3.0e-04 steps= 2000  W1=0.0291  worst=0.0862  KS=0.142  dK= 5.75%  (72s)
+[magic]  6/19 axial s=2 drop=0 eta=3.0e-04 steps= 2000  W1=0.0090  worst=0.0145  KS=0.043  dK= 3.40%  (79s)
+[magic]  7/19 axial s=2 drop=1 eta=3.0e-04 steps= 2000  W1=0.0623  worst=0.1446  KS=0.234  dK= 4.20%  (72s)
+[magic]  8/19 const s=4 drop=0 eta=3.0e-04 steps= 2000  W1=0.0409  worst=0.1265  KS=0.193  dK=10.30%  (72s)
+[magic]  9/19 axial s=4 drop=0 eta=3.0e-04 steps= 2000  W1=0.0092  worst=0.0153  KS=0.045  dK= 3.50%  (72s)
+[magic] 10/19 axial s=4 drop=1 eta=3.0e-04 steps= 2000  W1=0.1047  worst=0.2324  KS=0.381  dK= 4.50%  (72s)
+[magic] 11/19 const s=8 drop=0 eta=3.0e-04 steps= 2000  W1=0.0531  worst=0.1678  KS=0.264  dK=16.55%  (74s)
+[magic] 12/19 axial s=8 drop=0 eta=3.0e-04 steps= 2000  W1=0.0140  worst=0.0318  KS=0.083  dK= 4.20%  (74s)
+[magic] 13/19 axial s=8 drop=1 eta=3.0e-04 steps= 2000  W1=0.1534  worst=0.3254  KS=0.565  dK= 5.00%  (73s)
+[magic] 14/19 none  s=0 drop=0 eta=1.5e-04 steps= 4000  W1=0.0077  worst=0.0137  KS=0.038  dK= 2.50%  (148s)
+[magic] 15/19 const s=4 drop=0 eta=1.5e-04 steps= 4000  W1=0.0399  worst=0.1150  KS=0.196  dK= 7.65%  (151s)
+[magic] 16/19 axial s=4 drop=0 eta=1.5e-04 steps= 4000  W1=0.0090  worst=0.0121  KS=0.036  dK= 2.50%  (152s)
+[magic] 17/19 none  s=0 drop=0 eta=7.5e-05 steps= 8000  W1=0.0101  worst=0.0208  KS=0.048  dK= 2.60%  (288s)
+[magic] 18/19 const s=4 drop=0 eta=7.5e-05 steps= 8000  W1=0.0444  worst=0.1341  KS=0.222  dK= 7.45%  (290s)
+[magic] 19/19 axial s=4 drop=0 eta=7.5e-05 steps= 8000  W1=0.0111  worst=0.0258  KS=0.046  dK= 2.55%  (300s)
+[magic] done in 2497s   floor=0.0084  target dK=0.32%
+
+
+[exited with code 0]

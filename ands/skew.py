@@ -192,9 +192,10 @@ def antisymmetry_error(field: SkewField, x: torch.Tensor) -> float:
     return err
 
 
-def boundary_flux(field: SkewField, x_unit: torch.Tensor) -> torch.Tensor:
-    """``||J(x) nu(x)||`` for points on the unit sphere; must be 0 for admissibility."""
-    return field.apply(x_unit, x_unit).norm(dim=1)
+def boundary_flux(field: SkewField, x: torch.Tensor) -> torch.Tensor:
+    """``||J(x) nu(x)||`` with ``nu = x / ||x||``; must be 0 on ``dK`` for admissibility."""
+    nu = x / x.norm(dim=1, keepdim=True)
+    return field.apply(x, nu).norm(dim=1)
 
 
 def mean_operator_norm(field: SkewField, x: torch.Tensor) -> float:

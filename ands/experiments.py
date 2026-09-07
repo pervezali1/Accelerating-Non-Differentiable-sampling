@@ -25,8 +25,8 @@ CONFIG = {
     "lam": 1.0,          # L1 prior strength
     "delta": 0.02,       # anchor smoothing scale
     "N": 2000,           # walkers in the Langevin ensemble
-    "n_steps": 3000,
-    "eta": 3e-4,
+    "n_steps": 2000,     # eta * n_steps = 0.6 units of physical time; the chain
+    "eta": 3e-4,         # settles by ~0.15, so this is deep in stationarity
     "s_main": 4.0,       # skew strength for the head-to-head
     "sweep": [0.0, 1.0, 2.0, 4.0, 8.0],
     "ref_chains": 2500,

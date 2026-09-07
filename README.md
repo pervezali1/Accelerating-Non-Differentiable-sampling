@@ -50,6 +50,47 @@ still annihilates $x$ identically (so $J_s\nu = 0$ on the wall by construction) 
 divergence-free once $d > 2$. At $d = 10$ and $d = 11$ the correction is the same order as the
 drift, so the notebook can run the ablation the synthetic study could not.
 
+## What the runs show
+
+Scored against two independent exact random-walk Metropolis references (acceptance 0.240 and
+0.234), with the $W_1$ floor — the level at which two samples of this size are
+indistinguishable — measured rather than assumed.
+
+**Head-to-head at skew strength $s = 4$.** The constant field is antisymmetric and
+divergence-free; it fails only $J\nu = 0$, and that one defect costs a factor of six.
+
+| | mean $W_1$ | max KS | mass near $\partial K$ |
+|---|---|---|---|
+| Titanic — $J = 0$ | 0.0061 | 0.037 | 6.80% |
+| Titanic — constant $J_a$ | **0.0387** | **0.218** | **16.50%** |
+| Titanic — state-dependent $J_s$ | 0.0065 | 0.038 | 7.20% |
+| Titanic — reference (truth) | 0.0063 | — | 0.56% |
+| MAGIC — $J = 0$ | 0.0096 | 0.041 | 3.75% |
+| MAGIC — constant $J_a$ | **0.0409** | **0.193** | **10.30%** |
+| MAGIC — state-dependent $J_s$ | 0.0092 | 0.045 | 3.50% |
+| MAGIC — reference (truth) | 0.0084 | — | 0.32% |
+
+**Dropping $\nabla\!\cdot J$ is worse than using an inadmissible field** — the experiment the
+3-dimensional study could not run, since there the correction was identically zero.
+
+| mean $W_1$ | $s=0$ | $s=1$ | $s=2$ | $s=4$ | $s=8$ |
+|---|---|---|---|---|---|
+| Titanic — $J_s$ with the correction | 0.0061 | 0.0059 | 0.0055 | 0.0065 | 0.0131 |
+| Titanic — $J_s$, correction dropped | 0.0061 | 0.0284 | 0.0490 | 0.0724 | **0.1014** |
+| MAGIC — $J_s$ with the correction | 0.0096 | 0.0097 | 0.0090 | 0.0092 | 0.0140 |
+| MAGIC — $J_s$, correction dropped | 0.0096 | 0.0353 | 0.0623 | 0.1047 | **0.1534** |
+
+The two failures leave different fingerprints. The uncorrected field *is* tangential, so its
+near-boundary mass barely moves (6.80% → 10.20% across the sweep on Titanic, against
+6.80% → 27.15% for the constant field); its damage is interior, where the flux it generates is
+no longer divergence-free. Boundary mass diagnoses a violated wall condition and is blind to a
+missing correction term.
+
+**Refining the stepsize fixes the projection atom and cannot fix a wrong boundary condition.**
+At fixed physical time $T = 0.6$ on Titanic, the $J = 0$ atom falls 6.80% → 4.50% → 3.10% as
+$\eta$ is refined 4×, with atom$/\sqrt\eta$ nearly constant (3.93, 3.67, 3.58), while the
+constant-$J$ $W_1$ plateaus at 0.0387 → 0.0371 → 0.0397.
+
 ## Layout
 
 ```

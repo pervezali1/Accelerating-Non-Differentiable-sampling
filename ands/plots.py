@@ -42,22 +42,70 @@ def w1_traces(runs, floor, feature_names, title, name, coords=(1, 2, 3)):
 
 
 def density_panels(ref, runs, R, title, name, dims=(1, 2), feature_names=None):
-    """2-d marginal contours with the constraint circle drawn, target first."""
+    """2-d marginal contours, reference first, with the constraint circle for scale.
+
+    The window is the data, not the ball: in d = 10 the posterior occupies a thin shell
+    of the ball, and drawing the whole disc would reduce every panel to a dot. The
+    circle is left in so the reader can see how far the wall is in this projection --
+    the constraint binds radially, in all d coordinates at once, not in any 2-d slice.
+    Where it *does* show up here is as a displaced and rotated mode."""
     panels = [("reference (exact target)", ref)] + [(lab, r["x"]) for lab, r in runs.items()]
+    i, j = dims
+    allX = np.concatenate([X for _, X in panels])
+    pad = 0.15 * (allX[:, [i, j]].max(0) - allX[:, [i, j]].min(0))
+    xlim = (allX[:, i].min() - pad[0], allX[:, i].max() + pad[0])
+    ylim = (allX[:, j].min() - pad[1], allX[:, j].max() + pad[1])
+
     fig, axes = plt.subplots(1, len(panels), figsize=(4.9 * len(panels), 4.7),
                              sharex=True, sharey=True)
-    i, j = dims
+    mu = ref[:, [i, j]].mean(0)
     for ax, (lab, X) in zip(axes, panels):
         sns.kdeplot(x=X[:, i], y=X[:, j], fill=True, levels=8, ax=ax, thresh=0.02)
+        ax.plot(*mu, "k+", markersize=11, markeredgewidth=1.6, zorder=5,
+                label="reference mean")
         ax.add_patch(Circle((0, 0), R, edgecolor="b", facecolor="none", linewidth=1.6))
         ax.set_title(lab, fontsize=12)
-        ax.set_xlim(-1.05 * R, 1.05 * R)
-        ax.set_ylim(-1.05 * R, 1.05 * R)
+        ax.set_xlim(*xlim)
+        ax.set_ylim(*ylim)
         ax.set_aspect("equal", adjustable="box")
         ax.grid(True, alpha=0.25)
         ax.set_xlabel(feature_names[i] if feature_names else "$x_{}$".format(i), fontsize=12)
     axes[0].set_ylabel(feature_names[j] if feature_names else "$x_{}$".format(j), fontsize=12)
+    axes[0].legend(fontsize=9, loc="upper left")
     fig.suptitle(title, fontsize=15, y=1.02)
+    fig.tight_layout()
+    _save(fig, name)
+    return fig
+
+
+def radius_panels(ref, runs, R, title, name):
+    """Where the constraint actually shows: the law of ``||w||``.
+
+    Projection deposits an atom exactly at ``||w|| = R`` that the continuous target does
+    not have. The left panel is the bulk of the radial density, the right panel is the
+    atom itself -- the last 2% of the radius, on a log count scale."""
+    fig, axes = plt.subplots(1, 2, figsize=(13.5, 4.5))
+    series = [("reference (exact target)", ref, "k")] + \
+             [(lab, r["x"], COLOR[lab]) for lab, r in runs.items()]
+    for lab, X, c in series:
+        r = np.linalg.norm(X, axis=1)
+        sns.kdeplot(x=r, ax=axes[0], color=c, linewidth=2, label=lab, clip=(0, R),
+                    bw_adjust=0.6)
+        axes[1].hist(r, bins=np.linspace(0.97 * R, R, 25), histtype="step",
+                     color=c, linewidth=2, label=lab,
+                     weights=np.full(len(r), 1.0 / len(r)))   # the samples differ in size
+    axes[0].axvline(R, color="b", linewidth=1.4, linestyle=":")
+    axes[0].set_xlabel(r"$\|w\|_2$", fontsize=13)
+    axes[0].set_ylabel("density", fontsize=13)
+    axes[0].set_title("radial marginal", fontsize=12)
+    axes[1].set_yscale("log")
+    axes[1].set_xlabel(r"$\|w\|_2$   (last 3% before the wall)", fontsize=13)
+    axes[1].set_ylabel("fraction of the sample", fontsize=13)
+    axes[1].set_title(r"the projection atom at $\|w\| = R$", fontsize=12)
+    for ax in axes:
+        ax.grid(True, alpha=0.25)
+        ax.legend(fontsize=9)
+    fig.suptitle(title, fontsize=15)
     fig.tight_layout()
     _save(fig, name)
     return fig
