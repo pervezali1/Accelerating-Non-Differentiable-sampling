@@ -132,17 +132,23 @@ notebooks/         the executed study
 tests/             what the theory claims, asserted
 ```
 
-## A standalone script
+## Standalone, in one file
 
-[`examples/learning_curve_standalone.py`](examples/learning_curve_standalone.py) reproduces the
-accuracy learning curve end to end in one file — NumPy, pandas and matplotlib only, no torch and
-nothing from the `ands` package. It fetches the data, builds the target, samples, runs its own
-exact reference for the ceiling, and writes the figure:
+[`examples/learning_curve_standalone.ipynb`](examples/learning_curve_standalone.ipynb) reproduces
+the accuracy learning curve end to end — NumPy, pandas and matplotlib only, no torch and nothing
+from the `ands` package. It fetches the data, builds the target, checks both closed-form
+divergences by central differences, samples, runs its own exact reference for the ceiling, and
+draws the curve. Run top to bottom, about two minutes. The same thing as a command-line script is
+[`learning_curve_standalone.py`](examples/learning_curve_standalone.py):
 
 ```bash
 python examples/learning_curve_standalone.py                # both datasets, ~3 min
 python examples/learning_curve_standalone.py --dataset titanic --walkers 500
 ```
+
+Either one is an independent reimplementation, and the main results survive it: run from scratch
+the ceiling comes out at 0.7895 on Titanic and 0.7828 on MAGIC, against 0.7895 and 0.7832 from
+the cached study.
 
 ## Running it
 
