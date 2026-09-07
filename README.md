@@ -132,6 +132,18 @@ notebooks/         the executed study
 tests/             what the theory claims, asserted
 ```
 
+## A standalone script
+
+[`examples/learning_curve_standalone.py`](examples/learning_curve_standalone.py) reproduces the
+accuracy learning curve end to end in one file — NumPy, pandas and matplotlib only, no torch and
+nothing from the `ands` package. It fetches the data, builds the target, samples, runs its own
+exact reference for the ceiling, and writes the figure:
+
+```bash
+python examples/learning_curve_standalone.py                # both datasets, ~3 min
+python examples/learning_curve_standalone.py --dataset titanic --walkers 500
+```
+
 ## Running it
 
 ```bash
