@@ -141,17 +141,25 @@ invariance is free for a constant skew, but the naive carry-over $\nabla\psi=-x$
 $\propto e^{U}x$ that overflows within 400 steps off a compact set, and the tempered choice
 $\psi=-e^{-U_0}$ collapses the update back to anchored non-reversible Langevin.
 
-Three findings from re-running it with twelve replicas instead of three:
+$\alpha$ is held fixed throughout — no annealing schedule — so the skew drift $\alpha J$ is constant in
+time as well as in space, and the strength has to be chosen outright. Findings from re-running with twelve
+replicas instead of three, and sweeping $\alpha$ over $\{1,2,4,8\}$:
 
+- **The best constant $\alpha$ is 8, not 2**, and at that strength the $\tau(0.06)$ speed-up is
+  2.73× [2.58, 2.89] on Lasso, 3.01× [2.82, 3.22] on MCP and 2.82× [2.69, 2.94] on SCAD. This
+  **overturns** the conclusion that removing the constraint reduces what the skew buys: that claim
+  (1.4–2.0× unconstrained against 2.8–3.1× on the ball) came from stopping the sweep at $\alpha=4$.
+  A properly tuned constant skew gets the constrained figure. Axis alignment matters more as $\alpha$
+  grows — at $\alpha=8$ the tridiagonal axis gives 1.26× where the aligned one gives 2.90×.
+- **At $\alpha=8$ the stationary cost is real**, and it is a measured trade-off rather than a worry: on
+  SCAD the intervals do not overlap (0.0234 [0.0215, 0.0252] against 0.0309 [0.0281, 0.0335]). At
+  $\alpha=2$ there is no measurable cost at all. Roughly 2.8× in mixing for roughly 30% in stationary
+  $W_1$.
 - **$a\le1$ is false for MCP and SCAD.** That bound is Jensen and needs convexity; both penalties are
   non-convex by construction. The replacement is proven from the heat-semigroup representation —
   $\max_t(p-p_0)\le\mu^2\max(0,-c_2^{\min})$, giving $a\le1.046$ and $1.070$ — and is attained, not
   merely valid. The tempering argument survives, but because $g-g_0$ is bounded, not because the anchor
   dominates.
-- **The speed-ups are real but smaller**, and one vanishes: SCAD annealed at $\tau(0.06)$ is
-  1.05× [0.93, 1.19], an interval straddling 1, where three seeds had suggested 1.3×.
-- **The "small stationary cost" was noise.** With intervals attached every pair overlaps and MCP runs the
-  other way; refining $\eta$ four-fold at fixed physical time separates neither scheme from the other.
 
 The smoothing lemma and the bound live in [`ands/penalties.py`](ands/penalties.py), with
 `tests/test_penalties.py` pinning both.
