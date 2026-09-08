@@ -132,6 +132,30 @@ notebooks/         the executed study
 tests/             what the theory claims, asserted
 ```
 
+## The unconstrained companion study
+
+[`notebooks/anchored_langevin_unconstrained_J.ipynb`](notebooks/anchored_langevin_unconstrained_J.ipynb)
+runs the same $J=0$ against constant-$J$ comparison with the constraint removed, on Lasso, MCP and SCAD
+with the closed-form Gaussian smoothing of a piecewise-quadratic penalty. Removing $K$ removes $\psi$:
+invariance is free for a constant skew, but the naive carry-over $\nabla\psi=-x$ gives a drift
+$\propto e^{U}x$ that overflows within 400 steps off a compact set, and the tempered choice
+$\psi=-e^{-U_0}$ collapses the update back to anchored non-reversible Langevin.
+
+Three findings from re-running it with twelve replicas instead of three:
+
+- **$a\le1$ is false for MCP and SCAD.** That bound is Jensen and needs convexity; both penalties are
+  non-convex by construction. The replacement is proven from the heat-semigroup representation —
+  $\max_t(p-p_0)\le\mu^2\max(0,-c_2^{\min})$, giving $a\le1.046$ and $1.070$ — and is attained, not
+  merely valid. The tempering argument survives, but because $g-g_0$ is bounded, not because the anchor
+  dominates.
+- **The speed-ups are real but smaller**, and one vanishes: SCAD annealed at $\tau(0.06)$ is
+  1.05× [0.93, 1.19], an interval straddling 1, where three seeds had suggested 1.3×.
+- **The "small stationary cost" was noise.** With intervals attached every pair overlaps and MCP runs the
+  other way; refining $\eta$ four-fold at fixed physical time separates neither scheme from the other.
+
+The smoothing lemma and the bound live in [`ands/penalties.py`](ands/penalties.py), with
+`tests/test_penalties.py` pinning both.
+
 ## Standalone, in one file
 
 [`examples/learning_curve_standalone.ipynb`](examples/learning_curve_standalone.ipynb) reproduces
