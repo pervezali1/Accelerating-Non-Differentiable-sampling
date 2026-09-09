@@ -132,6 +132,31 @@ notebooks/         the executed study
 tests/             what the theory claims, asserted
 ```
 
+## The ball-constrained study
+
+[`notebooks/Constrained_Sampling_ANDS_ball_constrained.ipynb`](notebooks/Constrained_Sampling_ANDS_ball_constrained.ipynb)
+compares four skew fields on the ball $K = \{\lVert x\rVert_2 \le R\}$: $J = 0$, the constant $J_a$, the
+cross-product field $s\,(x \times w)$, and an **alignable** admissible field
+$J_s(x) = \tfrac{s}{R^2}[\lVert x\rVert^2 A + x(Ax)^\top - (Ax)x^\top]$.
+
+The cross-product field is automatically tangential and divergence-free, but it rotates about $x$, so
+**there is no free axis** — its rotation plane is whatever is perpendicular to the current position rather
+than the plane the target mixes slowly in. The alignable field keeps $J_s(x)x = 0$ exactly while leaving
+$A$ free; the price is $\nabla\!\cdot J_s = -\tfrac{s}{R^2}(d-2)Ax \neq 0$, which has to be carried.
+
+Aiming turns out to be most of the effect. At the same strength, rotating in the plane of the two
+largest-variance eigenvectors gives 2.12× [1.79, 2.44] and 2.81× [2.68, 2.94] on the two targets, while the
+same field aimed at the two smallest gives 1.04× [0.96, 1.13] and 1.14× [1.08, 1.20] — nothing. At the best
+setting the aligned field reaches **4.49× [3.85, 5.14]** on the $\ell_1$ target while sitting closer to the
+sampling floor than the cross-product field. The cross-product field saturates near $s = 8$ and breaks
+above it.
+
+Constant $J_a$ still fails the way the theory says: it never reaches twice the floor, sits at 3.4–4.1× the
+floor at stationarity, and roughly doubles the projection atom on $\partial K$.
+
+All numbers are 8 replicas with bootstrap intervals, at a horizon where $J = 0$ actually reaches the floor
+(8000 iterations; at 1500 nothing has converged and a stationary reading is meaningless).
+
 ## The unconstrained companion study
 
 [`notebooks/anchored_langevin_unconstrained_J.ipynb`](notebooks/anchored_langevin_unconstrained_J.ipynb)
