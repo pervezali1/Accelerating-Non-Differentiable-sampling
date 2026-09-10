@@ -188,6 +188,26 @@ iterations at $J=0$ against 1012 at $\|J\|=2.47$, a measured **2.7×**.  The
 uniform prior starts closer to the target's scale, so there is less transient to
 save.  The direction and the location of the optimum are unchanged.
 
+### Higher dimension
+
+The same protocol at $d=5$, $\nu=8$, $\kappa=100$ (6 replications, floor
+0.029) tracks the exact prediction down to a smaller margin, as expected:
+
+| $\|J\|_2$ | $\eta$ | predicted rate | iterations to $2\times$ floor |
+|---|---|---|---|
+| 0 | 1.05e-3 | 0.00244 | 2233 |
+| 1.15 | 9.67e-4 | 0.00405 | 1503 |
+| 3.44 | 6.65e-4 | 0.00495 | **1234** |
+| 5.73 | 4.68e-4 | 0.00523 | 1503 |
+| 8.02 | 3.45e-4 | 0.00502 | 1503 |
+| 11.46 | 2.31e-4 | 0.00423 | 1832 |
+| 19.48 | 1.05e-4 | 0.00234 | 3316 |
+
+Measured **1.81×** against 2.14× predicted, with the optimum where the theory
+puts it and the curve turning over past it.  Note also that the Corollary 13
+condition here would need $\beta > 250$, i.e. $\nu > 495$, so this target too
+sits well outside the paper's Wasserstein theorem.
+
 ### Against tuned baselines
 
 Each method at its own best stepsize from a grid (2 000 particles, floor 0.089;
