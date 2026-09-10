@@ -126,6 +126,30 @@ skew variant reaches $2\times$ floor in 254 iterations against 2233 — 8.8× �
 but at a larger bias, which is precisely why the equal-bias protocol is the one
 to quote.
 
+### Against tuned baselines
+
+Each method at its own best stepsize from a grid (2 000 particles, floor 0.089;
+the whole grid is saved, not just the winner).  Selection is by iterations to
+$2\times$ floor, so it favours speed over final accuracy — both columns are
+shown for that reason.
+
+| method | best $\eta$ | iterations to $2\times$ floor | final $W_2$ |
+|---|---|---|---|
+| skew-anchored $\|J\|=4.95$ | 4.3e-3 | **169** | 0.224 |
+| MALA | 6.9e-2 | 516 | 0.101 |
+| anchored ($J=0$) | 4.3e-3 | 645 | 0.103 |
+| underdamped Langevin | 6.9e-2 | 1259 | 0.086 |
+| ULA | 1.7e-2 | 3841 | 0.130 |
+| skew-ULA | 1.7e-2 | never | 0.404 |
+
+Read honestly, this says three things.  The skew variant is the fastest to a
+given accuracy, by 3.8× over the reversible anchored method.  A **well-tuned
+MALA is a strong baseline** on this target — better than anchored at $J=0$ —
+so the anchored family's advantage over Metropolis-adjusted methods is smaller
+than a common-stepsize comparison suggests.  And the unscaled skew perturbation
+of ULA (drift $J\nabla U$ rather than $e^{U-U_0}J\nabla U_0$) is actively
+harmful here: it never reaches the floor.
+
 ---
 
 ## 5. Cost per iteration is identical
@@ -157,6 +181,17 @@ beside the gradient evaluation.
   covariance online; that is not studied here.
 * **Baselines.**  ULA, skew-ULA, MALA and underdamped Langevin are included, each
   at its own tuned stepsize with the full grid saved.  Well-tuned ULA is much
-  better than ULA at the anchored method's stepsize, so the paper's comparison
-  at a common stepsize flatters the anchored method; the tuned columns are the
-  honest ones.
+  better than ULA at the anchored method's stepsize, and tuned MALA beats
+  anchored at $J=0$, so a common-stepsize comparison flatters the anchored
+  family; the tuned columns are the honest ones.
+* **The transient gets worse before it gets better.**  Starting from
+  $\mathcal N(0,10I)$, the multiplicative noise $q^{1/2}$ inflates the ensemble
+  first, and the rotation mixes the badly scaled fast direction's excess into
+  the slow one, so a larger $\|J\|$ overshoots further before converging much
+  sooner.  The net effect is still a gain, but the curves are not monotone and
+  a summary taken early in the run would mislead.
+* **Detecting divergence needs a magnitude test.**  A mean-square-unstable
+  scheme can grow geometrically to $10^{29}$ and stay finite for a whole run.
+  The isotropic control at $\|J\|=8$ and the paper's $\eta = 0.01$ does exactly
+  this, as the exact analysis predicts; runs are now flagged by magnitude as
+  well as by non-finiteness.
