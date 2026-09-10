@@ -1,0 +1,272 @@
+#!/usr/bin/env python3
+"""Render every figure from the JSON produced by the experiment scripts.
+
+Missing inputs are skipped with a note, so this can be run at any point.
+"""
+
+import argparse
+import glob
+import os
+import sys
+
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+
+import numpy as np  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import matplotlib.pyplot as plt  # noqa: E402
+
+from skewanchor import plotting, runner  # noqa: E402
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(HERE, "results", "data")
+FIGS = os.path.join(HERE, "results", "figures")
+
+
+def _load(name):
+    path = os.path.join(DATA, name)
+    if not os.path.exists(path):
+        print(f"  skip: {name} not found")
+        return None
+    return runner.load_json(path)
+
+
+# ------------------------------------------------------------------ fig 1
+
+
+def fig_speedup_scaling(mode):
+    res = _load("exp1_theory_sweeps.json")
+    if res is None:
+        return
+    p = plotting.use_style(mode)
+    rows = res["scaling"]
+    dims = sorted({r["d"] for r in rows})
+    fig, axes = plt.subplots(1, 2, figsize=(9.2, 3.6))
+
+    for i, d in enumerate(dims):
+        sub = sorted([r for r in rows if r["d"] == d], key=lambda r: r["kappa"])
+        k = [r["kappa"] for r in sub]
+        color = p["categorical"][i % len(p["categorical"])]
+        axes[0].plot(k, [r["speedup"] for r in sub], "-o", color=color, label=f"d = {d}")
+        plotting.label_line(axes[0], k[-1], sub[-1]["speedup"], f"d={d}", color)
+        axes[1].plot(k, [r["gap_ceiling_ratio"] for r in sub], "-o", color=color, label=f"d = {d}")
+        plotting.label_line(axes[1], k[-1], sub[-1]["gap_ceiling_ratio"], f"d={d}", color)
+
+    for ax, title, ylab in [
+        (axes[0], "Realised speed-up at equal bias and equal cost",
+         "iterations saved  (rate ratio)"),
+        (axes[1], "What the continuous-time spectral gap alone would promise",
+         "gap ceiling / gap at J = 0"),
+    ]:
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("condition number of $\\Sigma$")
+        ax.set_ylabel(ylab)
+        ax.set_title(title, loc="left")
+        ax.axhline(1.0, color=p["reference"], lw=0.9, ls="--")
+        ax.margins(x=0.12)
+    axes[0].legend(loc="upper left", ncols=2)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig1_speedup_scaling_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 2
+
+
+def fig_tuning_curve(mode):
+    res = _load("exp1_theory_sweeps.json")
+    if res is None:
+        return
+    p = plotting.use_style(mode)
+    fig, ax = plt.subplots(figsize=(5.4, 3.8))
+    keep = [s for s in res["sweeps"] if s["target"]["d"] in (2, 3, 5, 10)][:5]
+    for i, sw in enumerate(keep):
+        rows = [r for r in sw["rows"] if r["kind"] in ("none", "optimal_direction")]
+        rows.sort(key=lambda r: r["delta"])
+        x = [r["delta"] for r in rows]
+        y = [r["speedup"] for r in rows]
+        t = sw["target"]
+        color = p["categorical"][i % len(p["categorical"])]
+        lab = f"d={t['d']}, $\\nu$={t['nu']:g}, $\\kappa$={t['kappa']:g}"
+        ax.plot(x, y, "-o", color=color, label=lab)
+        best = max(rows, key=lambda r: r["speedup"])
+        ax.plot([best["delta"]], [best["speedup"]], "o", color=color, ms=8,
+                markerfacecolor="none", markeredgewidth=1.6)
+    ax.axhline(1.0, color=p["reference"], lw=0.9, ls="--")
+    ax.set_xlabel("$\\|J\\|_2$  (along the optimal direction)")
+    ax.set_ylabel("speed-up at equal bias")
+    ax.set_title("Too little J does nothing; too much forces a smaller step", loc="left")
+    ax.set_yscale("log")
+    ax.legend(loc="upper left")
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig2_tuning_curve_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 3
+
+
+def fig_w2_curves(mode):
+    for path in sorted(glob.glob(os.path.join(DATA, "exp2_*.json"))):
+        res = runner.load_json(path)
+        tag = os.path.basename(path)[5:-5]
+        p = plotting.use_style(mode)
+        fig, axes = plt.subplots(1, 2, figsize=(9.4, 3.8))
+        runs = [r for r in res["equalbias"] if r.get("iters")]
+        colors = plotting.ramp(len(runs), mode)
+        for run, color in zip(runs, colors):
+            it = np.asarray(run["iters"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5) if len(it) > 1 else 1.0
+            for ax, key, in ((axes[0], "w2"), (axes[1], "slow")):
+                m = np.asarray(run[key]["mean"])
+                lo = np.asarray(run[key]["lo"])
+                hi = np.asarray(run[key]["hi"])
+                ax.plot(it, m, color=color, label=run["label"])
+                ax.fill_between(it, lo, hi, color=color, alpha=0.13, linewidth=0)
+        floor = res["w2_floor"]
+        axes[0].axhspan(0, floor + res["w2_floor_std"], color=p["reference"], alpha=0.16,
+                        linewidth=0)
+        axes[0].annotate("estimator floor (exact draws)", xy=(it[1], floor),
+                         color=p["text_secondary"], fontsize=8, va="bottom")
+        axes[1].axhline(0.10, color=p["reference"], lw=0.9, ls="--")
+        axes[0].set_ylabel("sliced 2-Wasserstein distance")
+        axes[0].set_title("Distance to the exact target", loc="left")
+        axes[1].set_ylabel("relative variance error, slow direction")
+        axes[1].set_title("Slow direction of $\\Sigma$ (higher resolution)", loc="left")
+        for ax in axes:
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlabel("iteration")
+        axes[0].legend(loc="lower left", ncols=1)
+        fig.suptitle(f"{tag}: equal discretisation bias, equal cost per iteration",
+                     x=0.01, ha="left", fontsize=10.5, color=p["text"])
+        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig3_w2_{tag}_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 4
+
+
+def fig_method_comparison(mode):
+    for path in sorted(glob.glob(os.path.join(DATA, "exp2_*.json"))):
+        res = runner.load_json(path)
+        if not res.get("tuned"):
+            continue
+        tag = os.path.basename(path)[5:-5]
+        p = plotting.use_style(mode)
+        fig, ax = plt.subplots(figsize=(6.0, 4.0))
+        for i, e in enumerate(res["tuned"]):
+            if "curve_iters" not in e:
+                continue
+            it = np.asarray(e["curve_iters"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            color = p["categorical"][i % len(p["categorical"])]
+            ax.plot(it, e["curve_w2"], color=color,
+                    label=f"{e['label']}  ($\\eta$={e['eta']:.1e})")
+        floor = res["w2_floor"]
+        ax.axhspan(0, floor + res["w2_floor_std"], color=p["reference"], alpha=0.16,
+                   linewidth=0)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_ylabel("sliced 2-Wasserstein distance")
+        ax.set_title(f"{tag}: every method at its own best stepsize", loc="left")
+        ax.legend(loc="lower left")
+        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig4_methods_{tag}_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 5
+
+
+def fig_isotropic_control(mode):
+    res = _load("exp1_theory_sweeps.json")
+    if res is None or not res.get("isotropic_control"):
+        return
+    p = plotting.use_style(mode)
+    fig, ax = plt.subplots(figsize=(5.2, 3.4))
+    ctrl = res["isotropic_control"]
+    labels = [f"d={c['target']['d']}\n$\\iota$={c['target']['iota']:g}" for c in ctrl]
+    vals = [c["speedup"] for c in ctrl]
+    ax.bar(labels, vals, color=p["categorical"][0], width=0.55)
+    for x, v in zip(labels, vals):
+        ax.annotate(f"{v:.3f}", (x, v), textcoords="offset points", xytext=(0, 3),
+                    ha="center", fontsize=8, color=p["text_secondary"])
+    ax.axhline(1.0, color=p["reference"], lw=1.0, ls="--")
+    ax.set_ylim(0, 1.35)
+    ax.set_ylabel("best speed-up over all skew $J$")
+    ax.set_title("Negative control: on an isotropic heavy tail no $J$ can help",
+                 loc="left")
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig5_isotropic_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 6
+
+
+def fig_iact(mode):
+    for path in sorted(glob.glob(os.path.join(DATA, "exp3_*.json"))):
+        res = runner.load_json(path)
+        if not res.get("rows"):
+            continue
+        p = plotting.use_style(mode)
+        fig, ax = plt.subplots(figsize=(5.2, 3.6))
+        x = [r["J_norm"] for r in res["rows"]]
+        y = [r["iact_mean"] for r in res["rows"]]
+        lo = [r["iact_lo"] for r in res["rows"]]
+        hi = [r["iact_hi"] for r in res["rows"]]
+        c = p["categorical"][0]
+        ax.plot(x, y, "-o", color=c)
+        ax.fill_between(x, lo, hi, color=c, alpha=0.15, linewidth=0)
+        ax.set_xlabel("$\\|J\\|_2$")
+        ax.set_ylabel("integrated autocorrelation time (iterations)")
+        ax.set_yscale("log")
+        ax.set_title("Autocorrelation of the slow coordinate, single chain", loc="left")
+        tag = os.path.basename(path)[:-5]
+        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig6_{tag}_{mode}.png")))
+
+
+# ------------------------------------------------------------------ fig 7
+
+
+def fig_nonsmooth(mode):
+    for path in sorted(glob.glob(os.path.join(DATA, "exp4_*.json"))):
+        res = runner.load_json(path)
+        if not res.get("rows"):
+            continue
+        p = plotting.use_style(mode)
+        fig, ax = plt.subplots(figsize=(5.8, 3.9))
+        colors = plotting.ramp(len(res["rows"]), mode)
+        for row, color in zip(res["rows"], colors):
+            it = np.asarray(row["iters"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            ax.plot(it, row["w2"], color=color, label=f"$\\|J\\|$ = {row['J_norm']:.2f}")
+        for e in res.get("ula", [])[:1]:
+            it = np.asarray(e["iters"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            ax.plot(it, e["w2"], color=p["categorical"][1], ls=":",
+                    label="subgradient ULA")
+        ax.axhspan(0, res["floor"] * 1.15, color=p["reference"], alpha=0.16, linewidth=0)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_ylabel("sliced 2-Wasserstein distance")
+        ax.set_title("Heavy tailed and non-differentiable (MCP penalty)", loc="left")
+        ax.legend(loc="lower left", ncols=2)
+        tag = os.path.basename(path)[:-5]
+        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig7_{tag}_{mode}.png")))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--modes", nargs="*", default=["light", "dark"])
+    args = ap.parse_args()
+    os.makedirs(FIGS, exist_ok=True)
+    for mode in args.modes:
+        print(f"[{mode}]")
+        fig_speedup_scaling(mode)
+        fig_tuning_curve(mode)
+        fig_w2_curves(mode)
+        fig_method_comparison(mode)
+        fig_isotropic_control(mode)
+        fig_iact(mode)
+        fig_nonsmooth(mode)
+
+
+if __name__ == "__main__":
+    main()

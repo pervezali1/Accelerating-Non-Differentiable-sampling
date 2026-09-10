@@ -32,6 +32,7 @@ __all__ = [
     "w2_squared_1d_two_sample",
     "w2_squared_1d_midpoint",
     "sliced_w2_midpoint",
+    "sliced_w2_two_sample",
     "axis_directions",
     "random_directions",
     "sliced_w2",
@@ -208,6 +209,17 @@ def w2_reference_floor(target, n, rng, n_rep=20, directions=None):
 # ------------------------------------------------------- robust companions
 
 
+def sliced_w2_two_sample(x, y, directions):
+    """Sliced ``W_2`` between two empirical samples, for targets whose projected
+    quantiles are not available in closed form (exact reference draws instead)."""
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    total = 0.0
+    for theta in directions:
+        total += w2_squared_1d_two_sample(x @ theta, y @ theta)
+    return float(np.sqrt(total / len(directions)))
+
+
 def energy_distance(x, y):
     """Squared energy distance ``2 E|X-Y| - E|X-X'| - E|Y-Y'|`` (unbiased-ish)."""
     x = np.asarray(x, dtype=np.float64)
@@ -295,7 +307,8 @@ def slow_direction_error(samples, target):
         return np.nan
     v = target.Sigma_evecs[:, int(np.argmax(target.Sigma_evals))]
     proj = samples @ v
-    truth = (target.nu / (target.nu - 2.0)) * float(v @ target.Sigma @ v)
+    C = target.cov()
+    truth = float(v @ C @ v)
     return float(abs(proj.var() - truth) / truth)
 
 

@@ -40,6 +40,7 @@ __all__ = [
     "ula_step",
     "skew_ula_step",
     "skew_anchored_step",
+    "generic_skew_anchored_step",
     "make_step",
     "run",
     "run_time_changed",
@@ -104,6 +105,7 @@ def ula_step(target, eta):
 
 def skew_ula_step(target, eta, J):
     sq = np.sqrt(2.0 * eta)
+    J = np.zeros((target.d, target.d)) if J is None else np.asarray(J, dtype=np.float64)
     M = (J - np.eye(target.d)).T  # so that x @ M == ((J - I) x^T)^T rowwise
 
     def step(x, rng):
@@ -126,6 +128,27 @@ def skew_anchored_step(target, eta, J=None):
         q = 1.0 + np.einsum("ni,ij,nj->n", z, target.Sigma_inv, z) / target.nu
         drift = (coef * q ** (s - 1.0))[:, None] * (z @ M)
         noise = (q ** (0.5 * s))[:, None] * rng.standard_normal(x.shape)
+        return x + eta * drift + sq * noise
+
+    return step
+
+
+def generic_skew_anchored_step(target, eta, J=None):
+    """Euler-Maruyama for any target exposing ``anchor_scale`` and ``grad_U0``.
+
+    Slower than :func:`skew_anchored_step` (which hard-codes the log-quadratic
+    algebra) but works for composite potentials such as the heavy-tailed MCP
+    target in :mod:`skewanchor.nonsmooth`.
+    """
+    d = target.d
+    J = np.zeros((d, d)) if J is None else np.asarray(J, dtype=np.float64)
+    Jm = (J - np.eye(d)).T
+    sq = np.sqrt(2.0 * eta)
+
+    def step(x, rng):
+        scale = target.anchor_scale(x)
+        drift = scale[:, None] * (target.grad_U0(x) @ Jm)
+        noise = np.sqrt(scale)[:, None] * rng.standard_normal(x.shape)
         return x + eta * drift + sq * noise
 
     return step
@@ -185,10 +208,12 @@ def make_step(name, target, eta, J=None, rng=None, gamma=2.0, n=None):
         if J is None:
             raise ValueError("skew_ula needs J")
         return skew_ula_step(target, eta, J), None
+    fast = hasattr(target, "Sigma_inv") and getattr(target, "s", None) is not None \
+        and type(target).__name__ == "LogQuadraticTarget"
     if name == "anchored":
-        return skew_anchored_step(target, eta, None), None
+        return (skew_anchored_step if fast else generic_skew_anchored_step)(target, eta, None), None
     if name == "skew_anchored":
-        return skew_anchored_step(target, eta, J), None
+        return (skew_anchored_step if fast else generic_skew_anchored_step)(target, eta, J), None
     if name == "mala":
         return mala_step(target, eta), None
     if name == "underdamped":

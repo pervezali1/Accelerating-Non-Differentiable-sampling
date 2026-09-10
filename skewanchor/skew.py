@@ -39,6 +39,7 @@ __all__ = [
     "commuting",
     "eigenbasis_cyclic",
     "optimal",
+    "lnp_optimal",
     "scale_to_norm",
     "spectral_abscissa",
     "gap_upper_bound",
@@ -144,6 +145,86 @@ def commuting(Sigma, delta=1.0, tol=1e-9):
     return scale_to_norm(J, delta)
 
 
+def _constant_diagonal_basis(A, tol=1e-12):
+    """Orthogonal ``Q`` with ``diag(Q A Q^T)`` constant (= Tr(A)/d).
+
+    Bendel-Mickey / Davies-Higham sweep: repeatedly pick a diagonal entry below
+    the mean and one above, and rotate in that plane so one of them lands
+    exactly on the mean.  Each rotation fixes one entry, so ``d-1`` rotations
+    suffice.
+    """
+    A = np.asarray(A, dtype=np.float64)
+    d = A.shape[0]
+    target = np.trace(A) / d
+    N = A.copy()
+    Q = np.eye(d)
+    fixed = np.zeros(d, dtype=bool)
+    for _ in range(d - 1):
+        free = np.where(~fixed)[0]
+        diag = np.diag(N)[free]
+        if np.all(np.abs(diag - target) < tol):
+            break
+        i = free[int(np.argmin(diag))]
+        j = free[int(np.argmax(diag))]
+        p, q, r = N[i, i], N[j, j], N[i, j]
+        if abs(p - target) < tol:
+            fixed[i] = True
+            continue
+        # (q - target) t^2 + 2 r t + (p - target) = 0, rotate so N[i,i] -> target
+        a2, b2, c2 = q - target, 2.0 * r, p - target
+        if abs(a2) < tol:
+            t = -c2 / b2 if abs(b2) > tol else 0.0
+        else:
+            disc = max(b2 * b2 - 4.0 * a2 * c2, 0.0)
+            roots = [(-b2 + np.sqrt(disc)) / (2 * a2), (-b2 - np.sqrt(disc)) / (2 * a2)]
+            t = min(roots, key=abs)
+        c = 1.0 / np.sqrt(1.0 + t * t)
+        s = t * c
+        G = np.eye(d)
+        G[i, i] = c
+        G[j, j] = c
+        G[i, j] = s
+        G[j, i] = -s
+        N = G @ N @ G.T
+        Q = G @ Q
+        fixed[i] = True
+    return Q
+
+
+def lnp_optimal(A):
+    r"""Skew ``J`` making every eigenvalue of ``(I - J) A`` equal to ``Tr(A)/d``.
+
+    This attains the ceiling of :func:`gap_upper_bound`, so it is the optimal
+    non-reversible perturbation for the linear (Ornstein-Uhlenbeck) surrogate
+    in the sense of Hwang, Hwang-Sheu and Sheu (1993, 2005) and Lelievre, Nier
+    and Pavliotis (2013).
+
+    Construction.  ``(I + K) A`` is similar to ``A^{1/2}(I + K)A^{1/2} = A + K'``
+    with ``K' = A^{1/2} K A^{1/2}`` skew, and ``K -> K'`` is a bijection of the
+    skew matrices.  Rotate to a basis where ``A`` has constant diagonal
+    ``abar = Tr(A)/d``; there, subtracting the strictly lower triangle and
+    adding its transpose (a skew move) leaves an upper-triangular matrix with
+    diagonal ``abar``, hence spectrum ``{abar}``.  Undo the two changes of
+    basis and set ``J = -K``.
+    """
+    A = np.asarray(A, dtype=np.float64)
+    d = A.shape[0]
+    if d < 2:
+        return np.zeros((d, d))
+    evals, evecs = np.linalg.eigh(A)
+    A_half = (evecs * np.sqrt(evals)) @ evecs.T
+    A_inv_half = (evecs * (1.0 / np.sqrt(evals))) @ evecs.T
+
+    Q = _constant_diagonal_basis(A)
+    N = Q @ A @ Q.T
+    L = np.tril(N, -1)
+    Kpp = L.T - L                      # skew, in the constant-diagonal basis
+    Kprime = Q.T @ Kpp @ Q             # skew, in the original basis
+    K = A_inv_half @ Kprime @ A_inv_half
+    K = 0.5 * (K - K.T)                # clean up round-off
+    return -K
+
+
 # ------------------------------------------------------------- optimisation
 
 
@@ -240,6 +321,10 @@ def build(kind, target, delta=1.0, rng=None):
         return eigenbasis_cyclic(target.Sigma, delta)
     if kind == "commuting":
         return commuting(target.Sigma, delta)
+    if kind == "lnp":
+        return lnp_optimal(A)
+    if kind == "lnp_scaled":
+        return scale_to_norm(lnp_optimal(A), delta)
     if kind == "optimal":
         return optimal(A, delta=None if delta is None else delta)
     raise ValueError(f"unknown J kind {kind!r}")

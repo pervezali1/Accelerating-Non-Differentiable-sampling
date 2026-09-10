@@ -46,6 +46,7 @@ __all__ = [
     "eta_for_bias",
     "deterministic_stepsize_limit",
     "summary",
+    "optimize_J",
 ]
 
 
@@ -70,32 +71,23 @@ def ou_gap_ceiling(target):
 # ------------------------------------------------- second-moment operator
 
 
-def _basis(d):
-    """Orthonormal basis of the symmetric matrices, as a (d*(d+1)/2, d, d) array."""
-    mats = []
-    for i in range(d):
-        for j in range(i, d):
-            E = np.zeros((d, d))
-            if i == j:
-                E[i, i] = 1.0
-            else:
-                E[i, j] = E[j, i] = 1.0 / np.sqrt(2.0)
-            mats.append(E)
-    return np.array(mats)
-
-
 def second_moment_operator(target, J, eta):
-    """Matrix of ``L(C) = M C M^T + (2 eta/nu) Tr(Sigma^{-1} C) I`` on symmetric ``C``."""
+    r"""Matrix of ``L(C) = M C M^T + (2 eta/nu) Tr(Sigma^{-1} C) I``.
+
+    Vectorised, ``L = M (x) M + (2 eta / nu) vec(I) vec(Sigma^{-1})^T``, a
+    ``d^2 x d^2`` matrix.  The operator maps symmetric matrices to symmetric
+    matrices and the rank-one term annihilates the antisymmetric part, so the
+    spectral radius over the whole space equals the one over the symmetric part:
+    the antisymmetric block is a sub-block of ``M (x) M``, whose eigenvalues
+    ``lambda_i lambda_j`` are dominated by the ``lambda_i^2`` already present in
+    the symmetric block.
+    """
     d = target.d
     M = np.eye(d) - eta * drift_matrix(target, J)
     A = target.Sigma_inv
-    basis = _basis(d)
-    k = basis.shape[0]
-    out = np.zeros((k, k))
-    for c, E in enumerate(basis):
-        img = M @ E @ M.T + (2.0 * eta / target.nu) * np.trace(A @ E) * np.eye(d)
-        out[:, c] = np.einsum("kij,ij->k", basis, img)
-    return out
+    return np.kron(M, M) + (2.0 * eta / target.nu) * np.outer(
+        np.eye(d).ravel(), A.ravel()
+    )
 
 
 def ms_factor(target, J, eta):
@@ -117,7 +109,7 @@ def is_ms_stable(target, J, eta):
     return ms_factor(target, J, eta) < 1.0
 
 
-def max_stable_stepsize(target, J=None, hi=10.0, tol=1e-12):
+def max_stable_stepsize(target, J=None, hi=10.0, tol=1e-8):
     """Largest ``eta`` with ``rho(L) < 1``, by bisection.
 
     Returns 0.0 when no positive stepsize is stable, which happens when the
@@ -154,11 +146,10 @@ def stationary_covariance(target, J, eta):
     d = target.d
     if not is_ms_stable(target, J, eta):
         return None
-    basis = _basis(d)
-    Lmat = second_moment_operator(target, J, eta)
-    rhs = np.einsum("kij,ij->k", basis, 2.0 * eta * np.eye(d))
-    coef = np.linalg.solve(np.eye(Lmat.shape[0]) - Lmat, rhs)
-    return np.einsum("k,kij->ij", coef, basis)
+    K = second_moment_operator(target, J, eta)
+    rhs = (2.0 * eta * np.eye(d)).ravel()
+    C = np.linalg.solve(np.eye(d * d) - K, rhs).reshape(d, d)
+    return 0.5 * (C + C.T)
 
 
 def covariance_bias(target, J, eta, relative=True):
@@ -171,7 +162,7 @@ def covariance_bias(target, J, eta, relative=True):
     return float(err / np.linalg.norm(truth)) if relative else float(err)
 
 
-def eta_for_bias(target, J, bias, tol=1e-10):
+def eta_for_bias(target, J, bias, tol=1e-6):
     """Largest ``eta`` whose stationary covariance bias equals ``bias``.
 
     The equal-bias stepsize is the basis of the fair comparison: methods are run
@@ -192,6 +183,62 @@ def eta_for_bias(target, J, bias, tol=1e-10):
         else:
             hi = mid
     return lo
+
+
+def optimize_J(target, bias, n_restarts=4, seed=0, maxiter=400, delta_cap=None):
+    """Maximise the equal-bias per-iteration rate over all skew ``J``.
+
+    This optimises the quantity the experiment actually reports -- the
+    convergence rate at a *fixed* discretisation bias -- rather than the
+    continuous-time spectral gap, which ignores the stepsize the bias allows.
+    Returns ``(J, rate, eta)``.
+    """
+    from scipy.optimize import minimize
+
+    d = target.d
+    if d < 2:
+        return np.zeros((d, d)), ms_rate(target, None, eta_for_bias(target, None, bias)), \
+            eta_for_bias(target, None, bias)
+    n_par = d * (d - 1) // 2
+    rng = np.random.default_rng(seed)
+
+    def objective(v):
+        J = _vec_to_skew(v, d)
+        if delta_cap is not None and np.linalg.norm(J, 2) > delta_cap:
+            return 1e6
+        e = eta_for_bias(target, J, bias, tol=1e-4)
+        if e <= 0:
+            return 1e6
+        r = ms_rate(target, J, e)
+        return -r if np.isfinite(r) else 1e6
+
+    best_J = np.zeros((d, d))
+    best_eta = eta_for_bias(target, None, bias)
+    best_rate = ms_rate(target, None, best_eta) if best_eta > 0 else float("-inf")
+    scale = float(np.linalg.norm(target.Sigma_inv, 2)) ** 0.5
+    for r in range(n_restarts):
+        v0 = np.zeros(n_par) if r == 0 else rng.standard_normal(n_par) * scale * 0.5 * r
+        res = minimize(objective, v0, method="Nelder-Mead",
+                       options={"maxiter": maxiter, "xatol": 1e-8, "fatol": 1e-10})
+        J = _vec_to_skew(res.x, d)
+        if delta_cap is not None:
+            nrm = np.linalg.norm(J, 2)
+            if nrm > delta_cap:
+                J = J * (delta_cap / nrm)
+        e = eta_for_bias(target, J, bias)
+        if e <= 0:
+            continue
+        rate = ms_rate(target, J, e)
+        if rate > best_rate:
+            best_J, best_rate, best_eta = J, rate, e
+    return best_J, float(best_rate), float(best_eta)
+
+
+def _vec_to_skew(v, d):
+    J = np.zeros((d, d))
+    iu = np.triu_indices(d, 1)
+    J[iu] = v
+    return J - J.T
 
 
 def summary(target, J=None, eta=None, bias=None):
