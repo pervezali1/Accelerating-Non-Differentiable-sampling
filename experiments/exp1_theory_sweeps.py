@@ -93,6 +93,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bias", type=float, default=0.02)
     ap.add_argument("--biases", type=float, nargs="*", default=[0.005, 0.02, 0.05])
+    ap.add_argument("--dims", type=int, nargs="*", default=[2, 3, 5, 10],
+                    help="dimensions for the scaling sweep; d=20 costs roughly 10x d=10")
     args = ap.parse_args()
 
     results = {"bias": args.bias, "sweeps": [], "scaling": [], "isotropic_control": [],
@@ -111,10 +113,11 @@ def main():
         print(f"d={d:2d} nu={nu:4g} kappa={kappa:6g}: rate {entry['base_rate']:.5f} -> "
               f"{best['rate']:.5f} ({best['speedup']:5.2f}x) via {best['kind']} "
               f"||J||={best['delta']:.2f}; stepsize {entry['base_eta']:.2e} -> {best['eta']:.2e}; "
-              f"continuous-gap ceiling {entry['gap_ceiling_ratio']:.1f}x")
+              f"continuous-gap ceiling {entry['gap_ceiling_ratio']:.1f}x", flush=True)
 
     print("\n=== scaling in dimension and condition number ===")
-    for d in (2, 3, 5, 10, 20):
+    out_path = os.path.join(OUT, "exp1_theory_sweeps.json")
+    for d in args.dims:
         for kappa in (1.0, 3.0, 10.0, 30.0, 100.0, 300.0, 1000.0):
             nu = max(5.0, 2.0 * d)
             t = anisotropic_student_t(d, nu, kappa)
@@ -127,7 +130,8 @@ def main():
                    "gap_ceiling_ratio": sw["gap_ceiling_ratio"]}
             results["scaling"].append(row)
             print(f"d={d:2d} kappa={kappa:7g}: speedup {row['speedup']:6.2f}x "
-                  f"(gap ceiling would allow {row['gap_ceiling_ratio']:6.1f}x)")
+                  f"(gap ceiling would allow {row['gap_ceiling_ratio']:6.1f}x)", flush=True)
+            runner.save_json(results, out_path)   # checkpoint after every row
 
     print("\n=== negative control: isotropic targets (the paper's Section 6.4) ===")
     for d, iota in [(1, 2.0), (3, 3.0), (5, 4.0), (10, 7.0)]:
@@ -152,7 +156,7 @@ def main():
                                             "best_rate": best["rate"]})
         print(f"bias={b:.3g}: speedup={best['speedup']:.2f}x at ||J||={best['delta']:.2f}")
 
-    path = runner.save_json(results, os.path.join(OUT, "exp1_theory_sweeps.json"))
+    path = runner.save_json(results, out_path)
     print(f"\nwrote {path}")
 
 

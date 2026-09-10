@@ -57,8 +57,10 @@ optimises, overstates what a practitioner gets by roughly an order of magnitude.
 
 Proved for every constant skew $J$: invariance of $\pi$; the random-time-change
 representation and the exact equivalence of the two discretisations (the paper's
-Theorems 11 and 15); geometric ergodicity, under any Lyapunov function of the
-form $\Psi\circ U_0$, with **no** smallness condition on $J$; the ceiling
+Theorems 11 and 15); that every Lyapunov drift condition
+established with a function of the form $\Psi\circ U_0$ transfers to every skew
+$J$ unchanged, with **no** smallness condition (and for the paper's own radial
+target its Assumption 1 and Theorems 2 and 3 hold verbatim); the ceiling
 $\operatorname{Tr}(A)/d$ on the attainable rate, together with an explicit $J$
 attaining it; and the no-go theorem for radial targets.
 

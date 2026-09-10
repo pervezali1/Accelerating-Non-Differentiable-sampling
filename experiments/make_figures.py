@@ -95,9 +95,10 @@ def fig_tuning_curve(mode):
     ax.axhline(1.0, color=p["reference"], lw=0.9, ls="--")
     ax.set_xlabel("$\\|J\\|_2$  (along the optimal direction)")
     ax.set_ylabel("speed-up at equal bias")
-    ax.set_title("Too little J does nothing; too much forces a smaller step", loc="left")
+    ax.set_title("Too little $J$ does nothing; too much forces a smaller step",
+                 loc="left")
     ax.set_yscale("log")
-    ax.legend(loc="upper left")
+    ax.legend(loc="lower left", fontsize=8)
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig2_tuning_curve_{mode}.png")))
 
 

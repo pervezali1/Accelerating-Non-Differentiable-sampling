@@ -92,10 +92,21 @@ The clean repair is to use a Lyapunov function **built from the anchor**:
 > the skew drift contributes exactly zero to $\mathcal L_J V$, because
 > $\langle J\nabla U_0, \nabla V\rangle = \Psi'(U_0)\,\langle J\nabla U_0,\nabla U_0\rangle = 0$.
 
-So any drift condition the paper verifies with such a $V$ transfers to every
-skew $J$ unchanged.  For the anisotropic Student-t the same conclusion follows
-from the geometry-adapted $V_\Sigma(x) = 1 + (x-\mu)^\top\Sigma^{-1}(x-\mu)$,
-since $\Sigma^{-1}J\Sigma^{-1}$ is again skew.
+In fact $\mathcal L_J(\Psi\circ U_0) = \mathcal L(\Psi\circ U_0)$ identically, so
+any drift condition the paper verifies with such a $V$ **transfers to every skew
+$J$ unchanged**.  What is proved is the transfer, not the drift condition
+itself: whichever $(c_0, c_1, r)$ work at $J=0$ work for all $J$.
+
+Two consequences worth stating separately.
+
+* For the paper's own radial target (T1), $\nabla U_0 \parallel x$, so
+  $\langle x, J\nabla U_0\rangle = 0$ exactly even for the Euclidean $V$:
+  **Assumption 1 and Theorems 2 and 3 hold verbatim for every skew $J$.**
+* For the anisotropic Student-t the same conclusion follows from the
+  geometry-adapted $V_\Sigma(x) = 1 + (x-\mu)^\top\Sigma^{-1}(x-\mu)$, since
+  $\Sigma^{-1}J\Sigma^{-1}$ is again skew.  With the *Euclidean* $V$ instead one
+  needs a genuine smallness condition on $J$ — that condition is an artefact of
+  the Lyapunov function, not of the dynamics.
 
 ## 5. What does **not** transfer: the 2-Wasserstein bound
 
