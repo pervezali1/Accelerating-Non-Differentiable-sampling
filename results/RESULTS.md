@@ -128,7 +128,21 @@ to quote.
 
 ---
 
-## 5. Threats to validity
+## 5. Cost per iteration is identical
+
+For the log-quadratic family the step folds ``J`` into a precomputed matrix,
+``M = ((J - I) Sigma^{-1})^T``, and then does one ``z @ M`` per iteration --
+exactly the operation the ``J = 0`` step already does.  Adding the skew matrix
+costs nothing per step, so "per iteration" and "per unit work" are the same
+comparison here.  The measured wall-clock times bear this out: across the seven
+equal-bias configurations the per-run times were 59-81 s with no trend in
+``||J||``.
+
+For a general anchored potential (`samplers.generic_skew_anchored_step`) the
+skew term does add one matrix-vector product per step, which is negligible
+beside the gradient evaluation.
+
+## 6. Threats to validity
 
 * **Equal covariance bias is not equal bias in every functional.**  The protocol
   equalises the second moment exactly; higher moments are only equalised to the

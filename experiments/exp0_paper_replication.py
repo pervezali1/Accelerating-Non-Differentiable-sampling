@@ -16,6 +16,14 @@ targets in exp1, exp2 and exp5.
 Also reported: the estimator floor.  The paper's target has nu = 3, whose
 2-Wasserstein estimator floor decays only like n^{-1/6}; at n = 5000 it sits
 around 0.23, so curves below that are reading noise.
+
+One more measurement caveat, which changes how the numbers must be read.  The
+sampling distribution of the estimator is itself heavy tailed: on *exact* draws
+from the nu = 3 target at n = 5000 it has median 0.221, standard deviation
+0.079 and maximum 1.12 over 200 repetitions -- individual repetitions differ by
+a factor of five.  Averaging it over runs, as the paper does, is therefore
+dominated by outliers, and the **median** across repetitions is the summary to
+compare.  Both are printed below and both are saved.
 """
 
 import argparse
@@ -79,9 +87,12 @@ def main():
                 agg["final_w2"] = agg["w2"]["mean"][-1]
                 agg["final_w2_mid"] = agg["w2_mid"]["mean"][-1]
             results["settingA"].append(agg)
+            med = agg["w2"]["median"][-1] if agg.get("iters") else float("nan")
+            agg["final_w2_median"] = med
             print(f"  {prior:9s} {method:9s} iters_to_2xfloor="
-                  f"{agg.get('iters_to_2xfloor', -1):5d} final_W2={agg.get('final_w2', float('nan')):.4f} "
-                  f"(midpoint {agg.get('final_w2_mid', float('nan')):.4f}) "
+                  f"{agg.get('iters_to_2xfloor', -1):5d} "
+                  f"final_W2 median={med:.4f} mean={agg.get('final_w2', float('nan')):.4f} "
+                  f"(midpoint mean {agg.get('final_w2_mid', float('nan')):.4f}) "
                   f"diverged={agg['n_diverged']}/{args.reps}")
 
     # ------------------------------- B: same target in d=3, where J is not zero
@@ -108,16 +119,18 @@ def main():
             agg["iters_to_2xfloor"] = crossing(agg["iters"], agg["w2"]["mean"], 2 * floor3)
             agg["final_w2"] = agg["w2"]["mean"][-1]
         results["settingB"].append(agg)
+        med = agg["w2"]["median"][-1] if agg.get("iters") else float("nan")
+        agg["final_w2_median"] = med
         print(f"  {label:32s} iters_to_2xfloor={agg.get('iters_to_2xfloor', -1):5d} "
-              f"final_W2={agg.get('final_w2', float('nan')):.4f} "
+              f"final_W2 median={med:.4f} mean={agg.get('final_w2', float('nan')):.4f} "
               f"diverged={agg['n_diverged']}/{args.reps}")
 
     skewed = [a for a in results["settingB"] if a["method"] == "skew_anchored" and a.get("iters")]
     base = next((a for a in results["settingB"] if a["method"] == "anchored" and a.get("iters")),
                 None)
     if base and skewed:
-        spread = max(abs(a["final_w2"] - base["final_w2"]) for a in skewed)
-        print(f"\n  largest deviation of any skew variant from J=0: {spread:.4f}, "
+        spread = max(abs(a["final_w2_median"] - base["final_w2_median"]) for a in skewed)
+        print(f"\n  largest deviation of any skew variant from J=0 (medians): {spread:.4f}, "
               f"against a Monte Carlo spread of {fstd3:.4f}")
         print("  -> on a radial heavy-tailed target the skew matrix does nothing, "
               "as the unitary-rotation argument predicts")
