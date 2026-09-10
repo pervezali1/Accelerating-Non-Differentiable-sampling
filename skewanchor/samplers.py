@@ -66,12 +66,21 @@ class Result:
         return np.array([r[key] for r in self.records], dtype=np.float64)
 
 
-def simulate(step, x0, n_steps, rng, record_at=None, recorder=None):
+def simulate(step, x0, n_steps, rng, record_at=None, recorder=None,
+             blowup_threshold=1e10):
     """Advance ``x0`` for ``n_steps`` iterations, recording along the way.
 
-    A run that produces a non-finite state is *not* silently dropped: the
-    iteration at which it happened is reported in ``Result.diverged_at`` and the
-    records collected up to that point are returned.
+    A run that diverges is *not* silently dropped: the iteration at which it
+    happened is reported in ``Result.diverged_at`` and the records collected up
+    to that point are returned.
+
+    Divergence means a non-finite state *or* one exceeding
+    ``blowup_threshold``.  The magnitude test matters: a mean-square-unstable
+    scheme grows geometrically but can sit at, say, ``1e29`` for the whole run
+    without ever reaching infinity, and a finite-but-absurd state would
+    otherwise be reported as a successful run.  A Student-t ensemble of a few
+    thousand points does not come close to ``1e10``, so the test cannot fire on
+    a legitimate heavy tail.
     """
     x = np.array(x0, dtype=np.float64, copy=True)
     record_at = None if record_at is None else set(int(k) for k in record_at)
@@ -82,7 +91,7 @@ def simulate(step, x0, n_steps, rng, record_at=None, recorder=None):
     diverged_at = None
     for k in range(1, n_steps + 1):
         x = step(x, rng)
-        if not np.all(np.isfinite(x)):
+        if not np.all(np.isfinite(x)) or np.max(np.abs(x)) > blowup_threshold:
             diverged_at = k
             break
         if recorder is not None and (record_at is None or k in record_at):

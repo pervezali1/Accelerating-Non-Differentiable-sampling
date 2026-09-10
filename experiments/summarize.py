@@ -52,12 +52,21 @@ def summarize_exp0():
               f"final W2 median={med:.4f} mean={_stat(a, 'w2', 'mean'):.4f} "
               f"diverged={a['n_diverged']}/{a['n_rep']}")
     if base is not None:
-        devs = [abs(_stat(a, "w2", "median") - base) for a in r["settingB"]
-                if a["method"] == "skew_anchored" and a["n_diverged"] < a["n_rep"]]
-        if devs:
-            print(f"    largest median deviation of a skew variant from J=0: "
+        # exclude variants that blew up: a mean-square-unstable scheme can stay
+        # finite for the whole run yet reach absurd magnitudes
+        ok = [a for a in r["settingB"] if a["method"] == "skew_anchored"
+              and a["n_diverged"] < a["n_rep"]
+              and _stat(a, "w2", "median") < 100 * r["settingB_floor"]]
+        blew = [a for a in r["settingB"] if a["method"] == "skew_anchored" and a not in ok]
+        if ok:
+            devs = [abs(_stat(a, "w2", "median") - base) for a in ok]
+            print(f"    largest median deviation of a stable skew variant from J=0: "
                   f"{max(devs):.4f}, against a floor spread of "
                   f"{r['settingB_floor_std']:.4f}")
+        for a in blew:
+            print(f"    {a.get('label', '')}: blew up (median W2 "
+                  f"{_stat(a, 'w2', 'median'):.3g}) -- the exact analysis predicts "
+                  f"mean-square instability at this stepsize")
     print()
 
 

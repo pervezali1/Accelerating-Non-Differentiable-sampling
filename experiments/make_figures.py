@@ -123,9 +123,12 @@ def fig_w2_curves(mode):
                 ax.plot(it, m, color=color, label=run["label"])
                 ax.fill_between(it, lo, hi, color=color, alpha=0.13, linewidth=0)
         floor = res["w2_floor"]
-        axes[0].axhspan(0, floor + res["w2_floor_std"], color=p["reference"], alpha=0.16,
-                        linewidth=0)
-        axes[0].annotate("estimator floor (exact draws)", xy=(it[1], floor),
+        lo_lim = max(floor * 0.35, 1e-4)
+        axes[0].set_ylim(bottom=lo_lim)
+        axes[0].axhspan(lo_lim, floor + res["w2_floor_std"], color=p["reference"],
+                        alpha=0.16, linewidth=0)
+        axes[0].annotate("estimator floor (exact draws)", xy=(it[-1], floor),
+                         xytext=(-4, 3), textcoords="offset points", ha="right",
                          color=p["text_secondary"], fontsize=8, va="bottom")
         axes[1].axhline(0.10, color=p["reference"], lw=0.9, ls="--")
         axes[0].set_ylabel("sliced 2-Wasserstein distance")
@@ -136,7 +139,7 @@ def fig_w2_curves(mode):
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("iteration")
-        axes[0].legend(loc="lower left", ncols=1)
+        axes[0].legend(loc="lower left", ncols=1, fontsize=7.5)
         fig.suptitle(f"{tag}: equal discretisation bias, equal cost per iteration",
                      x=0.01, ha="left", fontsize=10.5, color=p["text"])
         print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig3_w2_{tag}_{mode}.png")))
@@ -166,7 +169,9 @@ def fig_method_comparison(mode):
         floor = res.get("grid_w2_floor", res["w2_floor"])
         fstd = res.get("grid_w2_floor_std", res["w2_floor_std"])
         gc = res.get("grid_config", {})
-        ax.axhspan(0, floor + fstd, color=p["reference"], alpha=0.16, linewidth=0)
+        lo_lim = max(floor * 0.35, 1e-4)
+        ax.set_ylim(bottom=lo_lim)
+        ax.axhspan(lo_lim, floor + fstd, color=p["reference"], alpha=0.16, linewidth=0)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("iteration")
@@ -246,7 +251,10 @@ def fig_nonsmooth(mode):
             it[0] = max(it[1] * 0.5, 0.5)
             ax.plot(it, e["w2"], color=p["categorical"][1], ls=":",
                     label="subgradient ULA")
-        ax.axhspan(0, res["floor"] * 1.15, color=p["reference"], alpha=0.16, linewidth=0)
+        lo_lim = max(res["floor"] * 0.35, 1e-4)
+        ax.set_ylim(bottom=lo_lim)
+        ax.axhspan(lo_lim, res["floor"] * 1.15, color=p["reference"], alpha=0.16,
+                   linewidth=0)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("iteration")
