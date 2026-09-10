@@ -1,0 +1,109 @@
+== exp1: exact equal-bias speed-up ==
+    kappa        d=2       d=3       d=5      d=10
+        1       1.00      1.00      1.00      1.00
+        3       1.00      1.01      1.02      1.03
+       10       1.20      1.19      1.13      1.16
+       30       2.38      1.82      1.35      1.21
+      100       6.83      3.57      2.08      1.53
+      300      19.55      7.41      3.82      2.01
+     1000      64.22     20.32      9.49      4.91
+    isotropic d= 1: best speedup 1.0000x
+    isotropic d= 3: best speedup 1.0000x
+    isotropic d= 5: best speedup 1.0000x
+    isotropic d=10: best speedup 1.0000x
+
+== exp5: SDE gain vs realisable gain ==
+    d= 2 kappa=   100: SDE up to   40.0x, per iteration up to  6.83x at |J|=4.95
+    d= 2 kappa=  1000: SDE up to  395.9x, per iteration up to 64.22x at |J|=15.80
+    d= 3 kappa=   100: SDE up to   15.9x, per iteration up to  3.57x at |J|=3.52
+    d= 5 kappa=   100: SDE up to   10.6x, per iteration up to  2.14x at |J|=5.73
+    d=10 kappa=   100: SDE up to    8.9x, per iteration up to  1.57x at |J|=4.62
+    isotropic d=3: SDE rate 2.0000 (J=0) vs 2.0000 (|J|=4)
+    isotropic d=5: SDE rate 2.0000 (J=0) vs 2.0000 (|J|=4)
+
+== exp0: the paper's Section 6.4 target ==
+  Setting A floor (mean) 0.2368, midpoint estimator 0.1400
+    normal10  ula       iters_to_2xfloor= 2085 final W2 median=0.3472 mean=0.3473
+    normal10  anchored  iters_to_2xfloor=  136 final W2 median=0.2178 mean=0.2907
+    uniform5  ula       iters_to_2xfloor=  839 final W2 median=0.2429 mean=0.2490
+    uniform5  anchored  iters_to_2xfloor=  113 final W2 median=0.2178 mean=0.2907
+  Setting B (d=3, still radial) floor (mean) 0.2738 +- 0.1017
+    anchored (J=0)                   iters_to_2xfloor=  163 final W2 median=0.2226 mean=0.6428 diverged=0/20
+    ULA                              iters_to_2xfloor= 2501 final W2 median=0.4659 mean=0.4573 diverged=0/20
+    skew-anchored |J|=0.5            iters_to_2xfloor=  163 final W2 median=0.2323 mean=0.2781 diverged=0/20
+    skew-anchored |J|=2              iters_to_2xfloor=  235 final W2 median=0.2786 mean=0.3232 diverged=0/20
+    skew-anchored |J|=8              iters_to_2xfloor=   -1 final W2 median=241681649019355582685322936320.0000 mean=728656228849723676388264771584.0000 diverged=0/20
+    skew-anchored |J|=2 (random J)   iters_to_2xfloor=  196 final W2 median=0.2760 mean=0.3223 diverged=0/20
+    largest median deviation of a stable skew variant from J=0: 0.0560, against a floor spread of 0.1017
+    skew-anchored |J|=8: blew up (median W2 2.42e+29) -- the exact analysis predicts mean-square instability at this stepsize
+
+== exp2_d2_nu5_k100_normal10.json ==
+  floor 0.0749 +- 0.0180; |J_opt| = 4.950
+    anchored (J=0)               eta=1.07e-03 predicted_rate=0.00160 iters_to_slow10=  3316 speedup= 1.00x final W2 median=0.0652
+    skew-anchored |J|=0.49       eta=1.05e-03 predicted_rate=0.00195 iters_to_slow10=  2721 speedup= 1.22x final W2 median=0.0741
+    skew-anchored |J|=1.48       eta=8.97e-04 predicted_rate=0.00428 iters_to_slow10=  1503 speedup= 2.21x final W2 median=0.0736
+    skew-anchored |J|=2.47       eta=6.95e-04 predicted_rate=0.00731 iters_to_slow10=  1012 speedup= 3.28x final W2 median=0.0679
+    skew-anchored |J|=3.46       eta=5.18e-04 predicted_rate=0.00967 iters_to_slow10=   831 speedup= 3.99x final W2 median=0.0668
+    skew-anchored |J|=4.95       eta=3.36e-04 predicted_rate=0.01092 iters_to_slow10=   831 speedup= 3.99x final W2 median=0.0705
+    skew-anchored |J|=8.41       eta=1.45e-04 predicted_rate=0.00729 iters_to_slow10=  1234 speedup= 2.69x final W2 median=0.0663
+    tuned ULA                    eta=1.72e-02 iters_to_2xfloor=  3841 final W2=0.1303
+    tuned skew-ULA               eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.4035
+    tuned MALA                   eta=6.86e-02 iters_to_2xfloor=   516 final W2=0.1009
+    tuned underdamped Langevin   eta=6.86e-02 iters_to_2xfloor=  1259 final W2=0.0863
+    tuned anchored (J=0)         eta=4.29e-03 iters_to_2xfloor=   645 final W2=0.1026
+    tuned skew-anchored |J|=4.95 eta=4.29e-03 iters_to_2xfloor=   169 final W2=0.2238
+
+== exp2_d2_nu5_k100_uniform5.json ==
+  floor 0.0749 +- 0.0180; |J_opt| = 4.950
+    anchored (J=0)               eta=1.07e-03 predicted_rate=0.00160 iters_to_slow10=  2721 speedup= 1.00x final W2 median=0.0665
+    skew-anchored |J|=0.49       eta=1.05e-03 predicted_rate=0.00195 iters_to_slow10=  2233 speedup= 1.22x final W2 median=0.0701
+    skew-anchored |J|=1.48       eta=8.97e-04 predicted_rate=0.00428 iters_to_slow10=  1503 speedup= 1.81x final W2 median=0.0687
+    skew-anchored |J|=2.47       eta=6.95e-04 predicted_rate=0.00731 iters_to_slow10=  1012 speedup= 2.69x final W2 median=0.0704
+    skew-anchored |J|=3.46       eta=5.18e-04 predicted_rate=0.00967 iters_to_slow10=  1012 speedup= 2.69x final W2 median=0.0678
+    skew-anchored |J|=4.95       eta=3.36e-04 predicted_rate=0.01092 iters_to_slow10=  1012 speedup= 2.69x final W2 median=0.0705
+    skew-anchored |J|=8.41       eta=1.45e-04 predicted_rate=0.00729 iters_to_slow10=  1234 speedup= 2.21x final W2 median=0.0659
+    tuned ULA                    eta=1.72e-02 iters_to_2xfloor=  1007 final W2=0.1303
+    tuned skew-ULA               eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.4035
+    tuned MALA                   eta=6.86e-02 iters_to_2xfloor=   413 final W2=0.1143
+    tuned underdamped Langevin   eta=6.86e-02 iters_to_2xfloor=   413 final W2=0.0863
+    tuned anchored (J=0)         eta=4.29e-03 iters_to_2xfloor=   516 final W2=0.1026
+    tuned skew-anchored |J|=4.95 eta=4.29e-03 iters_to_2xfloor=   169 final W2=0.2238
+
+== exp2_d5_nu8_k100_normal10.json ==
+  floor 0.0293 +- 0.0034; |J_opt| = 11.460
+    anchored (J=0)               eta=1.05e-03 predicted_rate=0.00244 iters_to_slow10=  2233 speedup= 1.00x final W2 median=0.0281
+    skew-anchored |J|=1.15       eta=9.67e-04 predicted_rate=0.00405 iters_to_slow10=  1503 speedup= 1.49x final W2 median=0.0331
+    skew-anchored |J|=3.44       eta=6.65e-04 predicted_rate=0.00495 iters_to_slow10=  1503 speedup= 1.49x final W2 median=0.0300
+    skew-anchored |J|=5.73       eta=4.68e-04 predicted_rate=0.00523 iters_to_slow10=  1503 speedup= 1.49x final W2 median=0.0330
+    skew-anchored |J|=8.02       eta=3.45e-04 predicted_rate=0.00502 iters_to_slow10=  1503 speedup= 1.49x final W2 median=0.0318
+    skew-anchored |J|=11.46      eta=2.31e-04 predicted_rate=0.00423 iters_to_slow10=  1832 speedup= 1.22x final W2 median=0.0339
+    skew-anchored |J|=19.48      eta=1.05e-04 predicted_rate=0.00234 iters_to_slow10=  3316 speedup= 0.67x final W2 median=0.0291
+    tuned ULA                    eta=4.21e-03 iters_to_2xfloor=  6000 final W2=0.0769
+    tuned skew-ULA               eta=1.68e-02 iters_to_2xfloor=    -1 final W2=0.3408
+    tuned MALA                   eta=6.74e-02 iters_to_2xfloor=   413 final W2=0.0421
+    tuned underdamped Langevin   eta=6.74e-02 iters_to_2xfloor=  1259 final W2=0.0490
+    tuned anchored (J=0)         eta=4.21e-03 iters_to_2xfloor=   516 final W2=0.0525
+    tuned skew-anchored |J|=11.46 eta=1.05e-03 iters_to_2xfloor=   413 final W2=0.0468
+
+== exp3_single_chain_d2_k100.json ==
+    |J|=   0.00 eta=1.07e-03 IACT=   1456.2 [1382.7, 1531.5] speedup= 1.00x
+    |J|=   0.49 eta=1.05e-03 IACT=   1222.8 [1143.5, 1304.6] speedup= 1.19x
+    |J|=   1.48 eta=8.97e-04 IACT=    645.5 [601.9, 692.7] speedup= 2.26x
+    |J|=   2.47 eta=6.95e-04 IACT=    396.4 [373.2, 422.7] speedup= 3.67x
+    |J|=   3.46 eta=5.18e-04 IACT=    301.2 [284.5, 319.0] speedup= 4.84x
+    |J|=   4.95 eta=3.36e-04 IACT=    239.1 [227.6, 251.7] speedup= 6.09x
+    |J|=   8.41 eta=1.45e-04 IACT=    221.5 [216.7, 227.2] speedup= 6.58x
+
+== exp4_nonsmooth_d2_k100.json ==
+  two-sample floor 0.0677; |J_opt| = 4.950
+    |J|=   0.00 eta=1.07e-03 iters_to_2xfloor=  3073 iters_to_slow10=  3841 speedup= 1.00x diverged=0
+    |J|=   0.49 eta=1.05e-03 iters_to_2xfloor=  2458 iters_to_slow10=  3073 speedup= 1.25x diverged=0
+    |J|=   1.48 eta=8.97e-04 iters_to_2xfloor=  1259 iters_to_slow10=  1574 speedup= 2.44x diverged=0
+    |J|=   2.47 eta=6.95e-04 iters_to_2xfloor=  1007 iters_to_slow10=  1007 speedup= 3.81x diverged=0
+    |J|=   3.46 eta=5.18e-04 iters_to_2xfloor=   806 iters_to_slow10=  1007 speedup= 3.81x diverged=0
+    |J|=   4.95 eta=3.36e-04 iters_to_2xfloor=   806 iters_to_slow10=   806 speedup= 4.77x diverged=0
+    |J|=   8.41 eta=1.45e-04 iters_to_2xfloor=  1259 iters_to_slow10=  1574 speedup= 2.44x diverged=0
+    subgradient ULA eta=1.07e-03 iters_to_2xfloor=    -1 final W2=0.8396
+    subgradient ULA eta=4.29e-03 iters_to_2xfloor=    -1 final W2=0.2062
+    subgradient ULA eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.1562
+

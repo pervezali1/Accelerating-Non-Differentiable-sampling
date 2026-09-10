@@ -208,6 +208,12 @@ puts it and the curve turning over past it.  Note also that the Corollary 13
 condition here would need $\beta > 250$, i.e. $\nu > 495$, so this target too
 sits well outside the paper's Wasserstein theorem.
 
+Under tuned stepsizes at $d=5$ the picture is the same as at $d=2$, and just as
+unflattering to a naive reading: skew-anchored reaches $2\times$ floor in 413
+iterations, but **tuned MALA ties it at 413**, with anchored at $J=0$ needing
+516 and ULA 6000.  At this dimension the skew perturbation buys back the
+anchored method's deficit against MALA rather than opening a lead.
+
 ### Against tuned baselines
 
 Each method at its own best stepsize from a grid (2 000 particles, floor 0.089;
@@ -224,7 +230,8 @@ shown for that reason.
 | ULA | 1.7e-2 | 3841 | 0.130 |
 | skew-ULA | 1.7e-2 | never | 0.404 |
 
-Read honestly, this says three things.  The skew variant is the fastest to a
+Read honestly, this says three things (and see the $d=5$ figures for the same
+comparison there).  The skew variant is the fastest to a
 given accuracy, by 3.8× over the reversible anchored method.  A **well-tuned
 MALA is a strong baseline** on this target — better than anchored at $J=0$ —
 so the anchored family's advantage over Metropolis-adjusted methods is smaller

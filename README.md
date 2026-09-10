@@ -57,7 +57,9 @@ Confirmed by simulation, three independent ways at $d=2$, $\nu=5$, $\kappa=100$:
   ULA fails to reach the measurement floor at any stepsize tried.
 
 At $d=5$ the measured margin drops to **1.8×**, against 2.1× predicted — the
-dimension trend in the table above, confirmed rather than assumed.
+dimension trend in the table above, confirmed rather than assumed.  There a
+well-tuned MALA ties the skew variant, so the perturbation buys back the
+anchored method's deficit rather than opening a lead.
 
 **The continuous-time gain is far larger than the realisable one.**  The SDE's
 second-moment rate improves by up to 396×; the per-iteration rate improves by at
