@@ -180,6 +180,14 @@ skew variant reaches $2\times$ floor in 254 iterations against 2233 — 8.8× �
 but at a larger bias, which is precisely why the equal-bias protocol is the one
 to quote.
 
+### The other prior
+
+The same experiment from $\mathrm{Uniform}(-5,5)$ instead of
+$\mathcal N(0,10I)$ gives the same picture with a smaller margin: 2721
+iterations at $J=0$ against 1012 at $\|J\|=2.47$, a measured **2.7×**.  The
+uniform prior starts closer to the target's scale, so there is less transient to
+save.  The direction and the location of the optimum are unchanged.
+
 ### Against tuned baselines
 
 Each method at its own best stepsize from a grid (2 000 particles, floor 0.089;
@@ -206,7 +214,69 @@ harmful here: it never reaches the floor.
 
 ---
 
-## 5. Figures
+## 5. Single-chain efficiency (`exp3`)
+
+The ensemble experiments measure how fast the law of the chain reaches the
+target.  Classical non-reversible theory makes a second, independent prediction:
+the asymptotic variance of a time average falls.  Measured on the slow direction
+of $\Sigma$, from 48 chains of 60 000 iterations started at stationarity, at the
+same equal-bias stepsizes ($d=2$, $\nu=5$, $\kappa=100$).
+
+| $\|J\|_2$ | integrated autocorrelation time | 95 % interval | effective samples per iteration | reduction |
+|---|---|---|---|---|
+| 0 | 1456 | [1383, 1532] | 6.9e-4 | 1.00× |
+| 0.49 | 1223 | [1144, 1305] | 8.2e-4 | 1.19× |
+| 1.48 | 646 | [602, 693] | 1.5e-3 | 2.26× |
+| 2.47 | 396 | [373, 423] | 2.5e-3 | 3.67× |
+| 3.46 | 301 | [285, 319] | 3.3e-3 | 4.83× |
+| 4.95 | 239 | [228, 252] | 4.2e-3 | 6.09× |
+| 8.41 | **221** | [217, 227] | 4.5e-3 | **6.58×** |
+
+The intervals do not overlap, so this is the cleanest measurement in the study,
+and its 6.6× sits right on the 6.8× the exact second-moment analysis predicts.
+
+One honest discrepancy: the ensemble measure peaks at $\|J\| \approx 5$ and
+degrades after, while the autocorrelation keeps improving out to $\|J\| = 8.4$.
+They are different functionals — a second-moment convergence rate against an
+asymptotic variance — and there is no reason for their optima to coincide.  The
+autocorrelation is the quantity classical non-reversible theory speaks to.
+
+## 6. Heavy tailed *and* non-differentiable (`exp4`)
+
+The anchored framework exists to handle a non-smooth $U$; heavy tails are the
+paper's other motivation.  Combining them is the case it is really for.  We take
+
+$$U(x) = \iota\log q(x) + \sum_i \mathrm{MCP}_\lambda(x_i),\qquad
+  U_0(x) = \beta\log q(x) + \sum_i \mathrm{MCP}^\varepsilon_\lambda(x_i),$$
+
+with $q$ the anisotropic Student-t quadratic form ($d=2$, $\nu=5$,
+$\kappa=100$), $\mathrm{MCP}$ the minimax concave penalty of the paper's
+Section 6.2 ($\lambda=1$, $a=2$) and $\mathrm{MCP}^\varepsilon$ its smoothing from
+the paper's Eq. (67) ($\varepsilon = 0.1$).  The penalty is bounded, so the
+polynomial tail survives and exact reference draws come from rejection sampling
+off the Student-t core (acceptance rate 0.54).  Estimator floor 0.068.
+
+| $\|J\|_2$ | $\eta$ | iterations to $2\times$ floor | iterations to 10 % slow-direction error | speed-up |
+|---|---|---|---|---|
+| 0 | 1.07e-3 | 3073 | 3841 | 1.00× |
+| 0.49 | 1.05e-3 | 2458 | 3073 | 1.25× |
+| 1.48 | 8.97e-4 | 1259 | 1574 | 2.44× |
+| 2.47 | 6.95e-4 | 1007 | 1007 | 3.81× |
+| 3.46 | 5.18e-4 | 806 | 1007 | 3.81× |
+| 4.95 | 3.36e-4 | **806** | **806** | **4.77×** |
+| 8.41 | 1.45e-4 | 1259 | 1574 | 2.44× |
+
+The acceleration survives the non-smoothness intact — 4.77×, slightly better
+than the 4.0× on the smooth target — and the optimum sits at the same
+$\|J\|$.  Subgradient ULA, which is what one would otherwise reach for when
+$\nabla U$ does not exist at $x_i = 0$, fails to reach $2\times$ floor within
+6 000 iterations at any of three stepsizes spanning 16×.
+
+Stepsizes here are taken from the Student-t core's exact analysis; the composite
+potential is not log-quadratic, so its second-moment recursion is not exact and
+the equal-bias property is approximate.
+
+## 7. Figures
 
 Regenerate with `python experiments/make_figures.py`; a dark-mode variant of
 each is written alongside.
@@ -237,7 +307,15 @@ converging sooner.  The shaded band is the estimator floor.
 
 ![isotropic control](figures/fig5_isotropic_light.png)
 
-## 6. Cost per iteration is identical
+**Autocorrelation of the slow coordinate.**
+
+![autocorrelation](figures/fig6_exp3_single_chain_d2_k100_light.png)
+
+**Heavy tailed and non-differentiable together.**
+
+![non-smooth heavy tailed](figures/fig7_exp4_nonsmooth_d2_k100_light.png)
+
+## 8. Cost per iteration is identical
 
 For the log-quadratic family the step folds ``J`` into a precomputed matrix,
 ``M = ((J - I) Sigma^{-1})^T``, and then does one ``z @ M`` per iteration --
@@ -251,7 +329,7 @@ For a general anchored potential (`samplers.generic_skew_anchored_step`) the
 skew term does add one matrix-vector product per step, which is negligible
 beside the gradient evaluation.
 
-## 7. Threats to validity
+## 9. Threats to validity
 
 * **Equal covariance bias is not equal bias in every functional.**  The protocol
   equalises the second moment exactly; higher moments are only equalised to the

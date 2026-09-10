@@ -43,11 +43,18 @@ targets with condition number $\kappa(\Sigma)$:
 | 100 | **6.83×** | 3.57× | 2.08× | 1.53× |
 | 1000 | **64.2×** | 20.3× | 9.49× | 4.91× |
 
-Confirmed by simulation.  With 5 000 particles on $d=2$, $\nu=5$,
-$\kappa=100$, started from $\mathcal N(0,10I)$ and averaged over 10
-replications, the iterations needed to bring the slow direction's variance
-within 10 % of the truth fall from **3 316** at $J=0$ to **831** at
-$\|J\|_2 = 3.46$ — a measured **4.0×**, against 6.8× predicted asymptotically.
+Confirmed by simulation, three independent ways at $d=2$, $\nu=5$, $\kappa=100$:
+
+* **Ensemble.**  5 000 particles from $\mathcal N(0,10I)$, 10 replications: the
+  iterations needed to bring the slow direction's variance within 10 % of the
+  truth fall from **3 316** at $J=0$ to **831** at $\|J\|_2 = 3.46$ — a measured
+  **4.0×**.  From $\mathrm{Uniform}(-5,5)$ the margin is 2.7×.
+* **Single chain.**  The integrated autocorrelation time of the slow coordinate
+  falls from **1 456** to **221** — a **6.6×** reduction with non-overlapping
+  confidence intervals, sitting right on the 6.8× the exact analysis predicts.
+* **Heavy tailed *and* non-differentiable.**  On a Student-t core plus the
+  paper's MCP penalty, the same measurement gives **4.8×**, while subgradient
+  ULA fails to reach the measurement floor at any stepsize tried.
 
 **The continuous-time gain is far larger than the realisable one.**  The SDE's
 second-moment rate improves by up to 396×; the per-iteration rate improves by at
