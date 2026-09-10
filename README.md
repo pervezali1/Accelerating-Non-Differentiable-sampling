@@ -50,7 +50,7 @@ within 10 % of the truth fall from **3 316** at $J=0$ to **831** at
 $\|J\|_2 = 3.46$ — a measured **4.0×**, against 6.8× predicted asymptotically.
 
 **The continuous-time gain is far larger than the realisable one.**  The SDE's
-second-moment rate improves by up to 380×; the per-iteration rate improves by at
+second-moment rate improves by up to 396×; the per-iteration rate improves by at
 most 64×, because a larger drift forces a smaller stable stepsize.  The
 classical spectral-gap criterion, which is what the non-reversible literature
 optimises, overstates what a practitioner gets by roughly an order of magnitude.
@@ -109,10 +109,19 @@ skewanchor/
   metrics.py     sliced W2 with tail-resolving quadrature, the estimator floor, MMD, energy, IACT
   runner.py      repeated ensemble runs, bootstrap bands, divergence reporting
   plotting.py    figure style on a colour-vision-validated palette
-experiments/     exp1 theory sweeps, exp2 main simulation, exp3 single chain,
-                 exp4 non-smooth + heavy tailed, exp5 rate decomposition, make_figures
+experiments/
+  exp0_paper_replication.py   the paper's Figure 8, then the same target where J exists
+  exp1_theory_sweeps.py       exact equal-bias sweeps over ||J||, dimension, condition number
+  exp2_anisotropic.py         the main simulation, under three fairness protocols
+  exp3_single_chain.py        autocorrelation time of the slow coordinate
+  exp4_nonsmooth_heavy.py     heavy tailed and non-differentiable at once
+  exp5_rate_decomposition.py  the SDE's gain versus the realisable one
+  exp6_estimator_noise.py     how trustworthy the Wasserstein number is on a heavy tail
+  make_figures.py             all figures, light and dark
+  summarize.py                every result file in one place, quoting medians
+docs/            THEORY.md, paper_section.tex, derivations/
 tests/           15 correctness tests
-results/         data (JSON) and figures (PNG)
+results/         data (JSON), figures (PNG), RESULTS.md
 ```
 
 ## Running it
@@ -123,10 +132,13 @@ python -m pytest tests -q                       # 15 correctness tests, ~4 min
 
 python experiments/exp1_theory_sweeps.py        # exact sweeps, no simulation
 python experiments/exp5_rate_decomposition.py   # SDE gain vs realisable gain
+python experiments/exp6_estimator_noise.py      # is the metric trustworthy here?
+python experiments/exp0_paper_replication.py    # the paper's Figure 8 + the control
 python experiments/exp2_anisotropic.py --setting d2_nu5_k100
 python experiments/exp3_single_chain.py
 python experiments/exp4_nonsmooth_heavy.py
 python experiments/make_figures.py
+python experiments/summarize.py                 # read everything back
 ```
 
 `exp2` accepts `--setting`, `--prior {normal10,uniform5}`, `--n`, `--steps`,

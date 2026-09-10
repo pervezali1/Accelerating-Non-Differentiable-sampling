@@ -144,7 +144,7 @@ For $d=2$, $\nu=5$, $\kappa=100$, along the optimal $J$ direction:
 | 14.85 | 57.78 | 38.5 | 4.6e-5 | 0.00289 | 1.81 |
 
 The **dynamics** keeps getting faster as $\|J\|$ grows — up to 38× here, and up
-to 380× at $\kappa = 1000$.  The **algorithm** does not, because the larger
+to 396× at $\kappa = 1000$.  The **algorithm** does not, because the larger
 drift shrinks the mean-square-stable stepsize.  There is an interior optimum,
 and a criterion that ignores the stepsize will sit far to the right of it.
 
