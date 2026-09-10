@@ -135,27 +135,37 @@ tests/             what the theory claims, asserted
 ## The ball-constrained study
 
 [`notebooks/Constrained_Sampling_ANDS_ball_constrained.ipynb`](notebooks/Constrained_Sampling_ANDS_ball_constrained.ipynb)
-compares four skew fields on the ball $K = \{\lVert x\rVert_2 \le R\}$: $J = 0$, the constant $J_a$, the
-cross-product field $s\,(x \times w)$, and an **alignable** admissible field
-$J_s(x) = \tfrac{s}{R^2}[\lVert x\rVert^2 A + x(Ax)^\top - (Ax)x^\top]$.
+compares $J = 0$ against the admissible state-dependent skew
 
-The cross-product field is automatically tangential and divergence-free, but it rotates about $x$, so
-**there is no free axis** — its rotation plane is whatever is perpendicular to the current position rather
-than the plane the target mixes slowly in. The alignable field keeps $J_s(x)x = 0$ exactly while leaving
-$A$ free; the price is $\nabla\!\cdot J_s = -\tfrac{s}{R^2}(d-2)Ax \neq 0$, which has to be carried.
+$$J_s(x) = \frac{s}{R^2}\Bigl[\lVert x\rVert^2 A + x(Ax)^\top - (Ax)x^\top\Bigr]$$
 
-Aiming turns out to be most of the effect. At the same strength, rotating in the plane of the two
-largest-variance eigenvectors gives 2.12× [1.79, 2.44] and 2.81× [2.68, 2.94] on the two targets, while the
-same field aimed at the two smallest gives 1.04× [0.96, 1.13] and 1.14× [1.08, 1.20] — nothing. At the best
-setting the aligned field reaches **4.49× [3.85, 5.14]** on the $\ell_1$ target while sitting closer to the
-sampling floor than the cross-product field. The cross-product field saturates near $s = 8$ and breaks
-above it.
+on the ball $K = \{\lVert x\rVert_2 \le R\}$, at $s = 4, 8, 16$. The constant $J_a$ does not appear: on a
+constrained problem it is not a candidate, since it fails $J\nu = 0$ on $\partial K$ by construction.
 
-Constant $J_a$ still fails the way the theory says: it never reaches twice the floor, sits at 3.4–4.1× the
-floor at stationarity, and roughly doubles the projection atom on $\partial K$.
+$J_s$ annihilates $x$ identically, so tangency at the wall is structural rather than tuned — it holds to
+machine precision at every strength. The price is $\nabla\!\cdot J_s = -\tfrac{s}{R^2}(d-2)Ax \neq 0$,
+carried in the drift and checked against autograd.
 
-All numbers are 8 replicas with bootstrap intervals, at a horizon where $J = 0$ actually reaches the floor
-(8000 iterations; at 1500 nothing has converged and a stationary reading is meaningless).
+| | $\tau$ | speed-up | stationary $W_1$ | mass on $\partial K$ |
+|---|---|---|---|---|
+| **A** $J = 0$ | 3831 [3634, 4075] | — | 0.0137 [0.0122, 0.0155] | 2.62% |
+| A $J_s$, $s=8$ | 2191 [2109, 2275] | 1.75× [1.64, 1.88] | 0.0136 [0.0119, 0.0155] | 2.62% |
+| A $J_s$, $s=16$ | 1809 [1600, 2106] | **2.12× [1.79, 2.44]** | 0.0141 [0.0126, 0.0159] | 2.58% |
+| **B** $J = 0$ | 4200 [4069, 4341] | — | 0.0116 [0.0104, 0.0128] | 2.09% |
+| B $J_s$, $s=8$ | 2806 [2662, 2956] | 1.50× [1.41, 1.59] | 0.0125 [0.0111, 0.0140] | 2.08% |
+| B $J_s$, $s=16$ | 1494 [1447, 1550] | **2.81× [2.68, 2.94]** | 0.0130 [0.0110, 0.0152] | 2.10% |
+
+At these strengths the acceleration is **free**: every stationary $W_1$ interval overlaps $J = 0$'s and
+straddles the sampling floor, and the projection atom on $\partial K$ is flat to within 0.07 percentage
+points across all four schemes.
+
+Aiming is most of the effect. At the same $s = 16$, rotating in the plane of the two largest-variance
+eigenvectors gives 2.12× and 2.81×; the two smallest gives 1.04× [0.96, 1.13] and 1.14× [1.08, 1.20] —
+nothing. That is the argument for this field over the cross product $s\,(x \times w)$, which is equally
+admissible but rotates about $x$, so its plane is set by position rather than by $\Sigma$.
+
+All numbers are 8 replicas with bootstrap intervals at a horizon where $J = 0$ reaches the floor
+(8000 iterations).
 
 ## The unconstrained companion study
 
