@@ -165,7 +165,7 @@ FIELDS = [
 ]
 
 
-def write_summary(runs: list) -> None:
+def write_summary(runs: list, suffix: str = "") -> None:
     rows = []
     for run in runs:
         meta = run["meta"]
@@ -173,7 +173,7 @@ def write_summary(runs: list) -> None:
             row = {k: entry[k] for k in FIELDS}
             row["reference_accuracy"] = meta["reference_accuracy"]
             rows.append(row)
-    csv_path = os.path.join(RESULTS, "summary.csv")
+    csv_path = os.path.join(RESULTS, f"summary{suffix}.csv")
     with open(csv_path, "w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=FIELDS + ["reference_accuracy"])
         writer.writeheader()
@@ -193,7 +193,7 @@ def write_summary(runs: list) -> None:
                 f"{entry['accuracy_final']:.4f} | {reach if reach >= 0 else 'not reached'} | "
                 f"{entry['mean_error_final']:.3f} | {entry['ess_potential_second_half']:.0f} |"
             )
-    md_path = os.path.join(RESULTS, "summary.md")
+    md_path = os.path.join(RESULTS, f"summary{suffix}.md")
     with open(md_path, "w") as handle:
         handle.write("\n".join(md) + "\n")
     print("wrote", md_path)
@@ -206,7 +206,10 @@ def main() -> None:
     )
     parser.add_argument("--geometry", default="warmup")
     parser.add_argument("--alpha", type=float, default=1.0)
-    parser.add_argument("--suffix", default="")
+    parser.add_argument(
+        "--suffix", default="", help="appended to every output name; set it when "
+        "plotting a non-default geometry so the default outputs are not overwritten"
+    )
     args = parser.parse_args()
 
     os.makedirs(FIGURES, exist_ok=True)
@@ -223,7 +226,7 @@ def main() -> None:
     accuracy_figure(runs, os.path.join(FIGURES, f"accuracy_four_datasets{sfx}.png"))
     accuracy_figure(runs, os.path.join(FIGURES, f"accuracy_four_datasets_logx{sfx}.png"), log_x=True)
     error_figure(runs, os.path.join(FIGURES, f"posterior_mean_error{sfx}.png"))
-    write_summary(runs)
+    write_summary(runs, suffix=sfx)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,77 @@
+{
+  "dataset": "breast_cancer",
+  "pretty_name": "Breast Cancer Wisconsin",
+  "reference_accuracy": 0.9649122807017544,
+  "step_size": 0.00125,
+  "alpha": 1.0,
+  "rho": 4.945090017596907,
+  "length_scale": 1.0,
+  "n_iter": 6000,
+  "n_walkers": 24,
+  "field_strength": {
+    "radial": {
+      "gamma_norm": 0.00617650570290557,
+      "reversible_drift_norm": 1.4592814391062188,
+      "rotation_norm": 0.47734315114878145
+    },
+    "directional": {
+      "gamma_norm": 0.30134415165633893,
+      "reversible_drift_norm": 1.4592814391062188,
+      "rotation_norm": 0.016799294988486535
+    }
+  },
+  "rows": [
+    {
+      "dataset": "breast_cancer",
+      "profile": "shared",
+      "variant": "zero",
+      "step_size": 0.00125,
+      "bias_whitened": 3.0505304928881376,
+      "accuracy_final": 0.9629629629629629,
+      "potential_final": 25.211754680821283
+    },
+    {
+      "dataset": "breast_cancer",
+      "profile": "radial",
+      "variant": "with_correction",
+      "step_size": 0.00125,
+      "bias_whitened": 3.0312760510345376,
+      "accuracy_final": 0.9622319688109161,
+      "potential_final": 25.495374341912413
+    },
+    {
+      "dataset": "breast_cancer",
+      "profile": "radial",
+      "variant": "no_correction",
+      "step_size": 0.00125,
+      "bias_whitened": 3.0296458870732574,
+      "accuracy_final": 0.962475633528265,
+      "potential_final": 25.489327956893685
+    },
+    {
+      "dataset": "breast_cancer",
+      "profile": "directional",
+      "variant": "with_correction",
+      "step_size": 0.00125,
+      "bias_whitened": 3.067329069702754,
+      "accuracy_final": 0.9641812865497075,
+      "potential_final": 25.35897126769664
+    },
+    {
+      "dataset": "breast_cancer",
+      "profile": "directional",
+      "variant": "no_correction",
+      "step_size": 0.00125,
+      "bias_whitened": 3.0558805396231588,
+      "accuracy_final": 0.9622319688109163,
+      "potential_final": 25.26717241087838
+    }
+  ],
+  "curves": [
+    "shared_zero",
+    "radial_with_correction",
+    "radial_no_correction",
+    "directional_with_correction",
+    "directional_no_correction"
+  ]
+}

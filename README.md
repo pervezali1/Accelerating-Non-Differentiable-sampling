@@ -213,6 +213,20 @@ figure,
 [`figures/accuracy_four_datasets_logx.png`](figures/accuracy_four_datasets_logx.png),
 is the readable one for the first few dozen iterations.
 
+### Without the preconditioner, same story
+
+Everything above runs with the warm-up preconditioner `D`.  Dropping it
+(`--geometry identity`, Titanic and Breast Cancer, in
+[`results/summary_identity.md`](results/summary_identity.md) and
+[`figures/accuracy_four_datasets_identity.png`](figures/accuracy_four_datasets_identity.png))
+slows every variant down, as expected, and leaves the ranking untouched: the
+constant field's step size is still 65 times smaller on Titanic, its accuracy is
+worse by 0.013 +/- 0.002, and the state-dependent field is again
+indistinguishable from the baseline (0.0000 +/- 0.0004).  It also removes the
+one apparent win in the main table: with `D = I` the constant field's advantage
+on Breast Cancer is gone (-0.0005 +/- 0.0015), which is the second reason to
+read that column as noise.
+
 ### The correction term only matters without the Metropolis step
 
 The two state-dependent curves in the accuracy figure coincide because the
@@ -241,6 +255,12 @@ scale of the posterior instead -- `J_c(w) = alpha tanh(c . (w - w_bulk)) A`,
 with `c` a whitened direction -- and `Gamma` becomes as large as the drift.
 Then dropping it inflates the bias by half again over the baseline
 discretisation error and costs a visible 0.003 of test accuracy.
+
+The same run on Breast Cancer resolves nothing: at this step size the
+uncorrected chain has not equilibrated within 6000 iterations, so every field
+sits at a whitened error of about 3.05 and the correction is buried in the
+transient.  The committed figure is therefore Titanic only, though
+`results/bias_breast_cancer.npz` holds the other run.
 
 So "the correction term does not matter" is only true of a slowly varying `J`.
 The lesson for a state-dependent field is to compare the size of `Gamma` with
@@ -272,7 +292,21 @@ python3 experiments/plot_accuracy.py         # figures + results/summary.{csv,md
 python3 experiments/paired_comparison.py     # per-walker paired differences
 python3 experiments/acceptance_scaling.py --dataset titanic   # the step-size mechanism
 python3 experiments/run_alpha_sweep.py && python3 experiments/plot_alpha_sweep.py
-python3 experiments/run_correction_bias.py && python3 experiments/plot_correction_bias.py
+python3 experiments/run_correction_bias.py
+python3 experiments/plot_correction_bias.py --datasets titanic
+```
+
+The unpreconditioned robustness check, whose outputs are suffixed so that they
+do not overwrite the defaults:
+
+```bash
+for ds in titanic breast_cancer; do
+  python3 experiments/run_accuracy.py --datasets $ds --geometry identity
+done
+python3 experiments/plot_accuracy.py --datasets titanic breast_cancer \
+    --geometry identity --suffix _identity
+python3 experiments/paired_comparison.py --datasets titanic breast_cancer \
+    --geometry identity
 ```
 
 Single runs are configurable, for instance

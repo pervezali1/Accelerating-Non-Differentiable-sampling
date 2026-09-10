@@ -38,7 +38,8 @@ def main() -> None:
     args = parser.parse_args()
 
     lines = [
-        "Paired differences against the J = 0 baseline at the final iteration "
+        f"Paired differences against the J = 0 baseline at the final iteration, "
+        f"{args.geometry} geometry, alpha = {args.alpha:g} "
         "(same walker seeds, so differences are paired).",
         "A difference is only meaningful if it is a few standard errors from zero.",
         "",
@@ -60,7 +61,8 @@ def main() -> None:
             lines.append(
                 f"| {name} | {variant} | {da:+.4f} +/- {sa:.4f} | {de:+.3f} +/- {se:.3f} |"
             )
-    out = os.path.join(ROOT, "results", "paired_comparison.md")
+    suffix = "" if args.geometry == "warmup" else f"_{args.geometry}"
+    out = os.path.join(ROOT, "results", f"paired_comparison{suffix}.md")
     with open(out, "w") as handle:
         handle.write("\n".join(lines) + "\n")
     print("\n".join(lines))

@@ -1,0 +1,90 @@
+{
+  "dataset": "breast_cancer",
+  "pretty_name": "Breast Cancer Wisconsin",
+  "dim": 31,
+  "n_train": 398,
+  "n_test": 171,
+  "reference_accuracy": 0.9649122807017544,
+  "reference_accuracy_halves": [
+    0.9649122807017544,
+    0.9649122807017544
+  ],
+  "alpha": 1.0,
+  "rho": 5.5677643628300215,
+  "geometry": "identity",
+  "n_iter": 600,
+  "n_walkers": 32,
+  "prior_scale": 2.0,
+  "warmup_step_size": null,
+  "whitened_radius": null,
+  "condition_number": 1.0,
+  "summary": [
+    {
+      "dataset": "breast_cancer",
+      "variant": "zero",
+      "label": "J = 0",
+      "step_size": 0.0031622776601683794,
+      "pilot_acceptance": 0.6491292704553442,
+      "acceptance": 0.8944248049007437,
+      "accuracy_final": 0.9674707602339181,
+      "accuracy_at_100": 0.9246162280701754,
+      "iters_to_ref_0.005": 358,
+      "iters_to_ref_0.01": 251,
+      "mean_error_final": 3.742446115269225,
+      "potential_final": 26.614051159956063,
+      "ess_potential_second_half": 398.1214641921802
+    },
+    {
+      "dataset": "breast_cancer",
+      "variant": "constant",
+      "label": "constant $J_a$",
+      "step_size": 0.0020535250264571464,
+      "pilot_acceptance": 0.6759076275076672,
+      "acceptance": 0.8027234955013651,
+      "accuracy_final": 0.966922514619883,
+      "accuracy_at_100": 0.9636330409356725,
+      "iters_to_ref_0.005": 83,
+      "iters_to_ref_0.01": 83,
+      "mean_error_final": 3.920073413482872,
+      "potential_final": 25.392185951403505,
+      "ess_potential_second_half": 342.67090854485093
+    },
+    {
+      "dataset": "breast_cancer",
+      "variant": "state",
+      "label": "state-dependent $J_s$",
+      "step_size": 0.0031622776601683794,
+      "pilot_acceptance": 0.6207462415907045,
+      "acceptance": 0.8272221893737476,
+      "accuracy_final": 0.9672880116959064,
+      "accuracy_at_100": 0.9255299707602339,
+      "iters_to_ref_0.005": 384,
+      "iters_to_ref_0.01": 251,
+      "mean_error_final": 3.766612944029907,
+      "potential_final": 26.280942074511874,
+      "ess_potential_second_half": 392.96445798343444
+    },
+    {
+      "dataset": "breast_cancer",
+      "variant": "state_nocorr",
+      "label": "$J_s$, correction dropped",
+      "step_size": 0.0031622776601683794,
+      "pilot_acceptance": 0.6208646387133655,
+      "acceptance": 0.8272546684717302,
+      "accuracy_final": 0.9674707602339181,
+      "accuracy_at_100": 0.9255299707602339,
+      "iters_to_ref_0.005": 391,
+      "iters_to_ref_0.01": 251,
+      "mean_error_final": 3.763924385850554,
+      "potential_final": 26.28424958704191,
+      "ess_potential_second_half": 399.84466112097857
+    }
+  ],
+  "runtime_seconds": 77.40533328056335,
+  "variant_order": [
+    "zero",
+    "constant",
+    "state",
+    "state_nocorr"
+  ]
+}

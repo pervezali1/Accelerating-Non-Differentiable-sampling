@@ -76,8 +76,9 @@ def main() -> None:
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="outside lower center", ncols=3, frameon=False, fontsize=9.5)
     fig.suptitle(
-        "Uncorrected diffusion: the plateau is the bias in the invariant law",
-        fontsize=13.5, color=INK,
+        "Uncorrected diffusion: the correction bites only when $J$ varies "
+        "on the scale of the posterior",
+        fontsize=13, color=INK,
     )
     out = os.path.join(ROOT, "figures", "correction_bias.png")
     fig.savefig(out, dpi=200)
