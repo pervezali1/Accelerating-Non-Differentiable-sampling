@@ -235,15 +235,28 @@ def axis_sliced_w2(samples, target):
     return sliced_w2(samples, target, axis_directions(target.d))
 
 
-def w2_reference_floor(target, n, rng, n_rep=20, directions=None):
+def w2_reference_floor(target, n, rng, n_rep=20, directions=None, full=False):
     """Value of the sliced-W2 statistic on *exact* draws -- the noise floor.
 
     Returns ``(mean, std)`` over ``n_rep`` independent exact samples of size
-    ``n``.  Convergence curves cannot go below this.
+    ``n``; convergence curves cannot go below this.
+
+    With ``full=True`` returns a dict that also carries the median, the maximum
+    and the ratio between them.  That ratio matters: on a ``nu = 3`` target the
+    estimator's own sampling distribution is heavy tailed, with single
+    repetitions landing about five times the median, so the mean floor is
+    inflated by the same tail that makes the metric hard to use.  The median is
+    the robust summary -- see ``experiments/exp6_estimator_noise.py``.
     """
     directions = axis_directions(target.d) if directions is None else directions
-    vals = [sliced_w2(target.sample(n, rng), target, directions) for _ in range(n_rep)]
-    return float(np.mean(vals)), float(np.std(vals))
+    vals = np.array([sliced_w2(target.sample(n, rng), target, directions)
+                     for _ in range(n_rep)])
+    if full:
+        return {"mean": float(vals.mean()), "median": float(np.median(vals)),
+                "std": float(vals.std()), "max": float(vals.max()),
+                "max_over_median": float(vals.max() / np.median(vals)),
+                "values": vals.tolist()}
+    return float(vals.mean()), float(vals.std())
 
 
 # ------------------------------------------------------- robust companions
