@@ -79,6 +79,13 @@ def main():
     ap.add_argument("--bias", type=float, default=0.02)
     ap.add_argument("--prior", default="normal10", choices=["normal10", "uniform5"])
     ap.add_argument("--fracs", type=float, nargs="*", default=[0.1, 0.3, 0.5, 0.7, 1.0, 1.7])
+    ap.add_argument("--grid", type=float, nargs="*",
+                    default=[0.25, 1.0, 4.0, 16.0, 64.0, 256.0],
+                    help="stepsize multipliers for the tuned protocol")
+    ap.add_argument("--grid-n", type=int, default=2000,
+                    help="particles for the tuned-stepsize grid (cheaper than the main runs)")
+    ap.add_argument("--grid-steps", type=int, default=None)
+    ap.add_argument("--grid-reps", type=int, default=2)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -130,6 +137,9 @@ def main():
               f"final_W2={agg.get('final_w2', float('nan')):.4f} "
               f"diverged={agg['n_diverged']}/{args.reps} ({time.time() - t0:.0f}s)")
 
+    out_path = args.out or os.path.join(OUT, f"exp2_{args.setting}_{args.prior}.json")
+    runner.save_json(results, out_path)
+
     # ------------------------------------------------------- common stepsize
     print("\n--- protocol: one common stepsize for every method ---")
     eta_common = eta0
@@ -150,22 +160,32 @@ def main():
               f"{agg.get('iters_to_2xfloor', -1):6d} final_W2={agg.get('final_w2', float('nan')):.4f} "
               f"diverged={agg['n_diverged']}/{args.pilot_reps}")
 
+    runner.save_json(results, out_path)
+
     # ------------------------------------------------- per-method tuned eta
-    print("\n--- protocol: each method at its own best stepsize (grid reported in full) ---")
-    grid = [0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 64.0, 256.0]
+    grid_steps = args.grid_steps or args.steps
+    grid_record = runner.log_schedule(grid_steps, 40)
+    # the floor depends on the sample size, so the grid needs its own
+    grid_floor, grid_floor_std = metrics.w2_reference_floor(target, args.grid_n, rng, n_rep=20)
+    results["grid_w2_floor"] = grid_floor
+    results["grid_w2_floor_std"] = grid_floor_std
+    print(f"\n--- protocol: each method at its own best stepsize "
+          f"(grid reported in full; {args.grid_n} particles, {grid_steps} steps, "
+          f"{args.grid_reps} replications) ---")
+    print(f"    grid floor at n={args.grid_n}: {grid_floor:.4f} +- {grid_floor_std:.4f}")
     for name, label, J in common:
         best = None
-        for mult in grid:
+        for mult in args.grid:
             eta = eta0 * mult
-            agg = runner.run_repeated(target, name, eta, args.n, args.steps,
-                                      args.pilot_reps, prior=args.prior, J=J, base_seed=31,
-                                      record_at=record_at)
+            agg = runner.run_repeated(target, name, eta, args.grid_n, grid_steps,
+                                      args.grid_reps, prior=args.prior, J=J, base_seed=31,
+                                      record_at=grid_record)
             entry = {"method": name, "label": label, "eta": eta, "mult": mult,
                      "n_diverged": agg["n_diverged"]}
             if agg["iters"]:
                 entry["final_w2"] = agg["w2"]["mean"][-1]
                 entry["iters_to_2xfloor"] = iterations_to(agg["iters"], agg["w2"]["mean"],
-                                                          2 * floor_mean)
+                                                          2 * grid_floor)
                 entry["curve_iters"] = agg["iters"]
                 entry["curve_w2"] = agg["w2"]["mean"]
             else:
@@ -177,12 +197,14 @@ def main():
             if best is None or key < best[0]:
                 best = (key, entry)
         results["tuned"].append(best[1])
+        runner.save_json(results, out_path)
         e = best[1]
         print(f"  {label:28s} best eta={e['eta']:.2e} ({e['mult']}x) "
               f"iters_to_2xfloor={e['iters_to_2xfloor']:6d} final_W2={e['final_w2']:.4f}")
 
-    out = args.out or os.path.join(OUT, f"exp2_{args.setting}_{args.prior}.json")
-    print("\nwrote", runner.save_json(results, out))
+    results["grid_config"] = {"n": args.grid_n, "steps": grid_steps,
+                              "reps": args.grid_reps, "multipliers": args.grid}
+    print("\nwrote", runner.save_json(results, out_path))
 
 
 if __name__ == "__main__":

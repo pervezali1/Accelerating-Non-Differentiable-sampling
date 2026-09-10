@@ -161,14 +161,18 @@ def fig_method_comparison(mode):
             color = p["categorical"][i % len(p["categorical"])]
             ax.plot(it, e["curve_w2"], color=color,
                     label=f"{e['label']}  ($\\eta$={e['eta']:.1e})")
-        floor = res["w2_floor"]
-        ax.axhspan(0, floor + res["w2_floor_std"], color=p["reference"], alpha=0.16,
-                   linewidth=0)
+        # the tuned grid runs at its own (smaller) particle count, so it has its
+        # own estimator floor -- using the main one would mis-place the band
+        floor = res.get("grid_w2_floor", res["w2_floor"])
+        fstd = res.get("grid_w2_floor_std", res["w2_floor_std"])
+        gc = res.get("grid_config", {})
+        ax.axhspan(0, floor + fstd, color=p["reference"], alpha=0.16, linewidth=0)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("iteration")
         ax.set_ylabel("sliced 2-Wasserstein distance")
-        ax.set_title(f"{tag}: every method at its own best stepsize", loc="left")
+        n_txt = f", {gc['n']} particles" if gc.get("n") else ""
+        ax.set_title(f"{tag}: every method at its own best stepsize{n_txt}", loc="left")
         ax.legend(loc="lower left")
         print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig4_methods_{tag}_{mode}.png")))
 
