@@ -21,13 +21,16 @@ into the anchored framework where it also reaches heavy tails.
 
 ## Headline results
 
-**The anisotropy is the whole story.**  On the paper's own Section 6.4 target,
-$\pi \propto (1+\|x\|^2)^{-\iota}$, no skew matrix can help at all: the target is
-radial, the added drift generates rotations that act unitarily on $L^2(\pi)$, and
-in the paper's own parameters ($\iota = 2$, hence $d = 1$) the only skew matrix
-is zero.  We reproduce that as a **negative control** — the measured speed-up is
-1.000× — and then move to anisotropic heavy-tailed targets, where the
-perturbation does work.
+**The paper's Section 6.4 experiment reproduces**, and it is where the skew
+extension stops.  At $\iota=2$, $\beta=1$, $\eta=0.01$ and 5 000 particles the
+anchored method reaches the measurement floor in 136 iterations against ULA's
+2085 — a 15× margin, in line with the paper's Figure 8.  But
+$\pi \propto (1+\|x\|^2)^{-\iota}$ is radial, so the added drift generates
+rotations that act unitarily on $L^2(\pi)$ and no skew matrix can help; and
+$\iota > 1 + d/2$ with $\iota = 2$ forces $d = 1$, where the only skew matrix is
+zero anyway.  We keep that as a **negative control** — measured speed-up
+1.000×, and at $\|J\| = 8$ the scheme blows up outright — and then move to
+anisotropic heavy-tailed targets, where the perturbation does work.
 
 **Speed-up at equal discretisation bias and equal cost per iteration**, computed
 exactly from the second-moment analysis (no Monte Carlo error), on Student-t
@@ -86,10 +89,13 @@ are reported:
 
 Every convergence curve is plotted against the **estimator floor**: the same
 Wasserstein statistic evaluated on exact i.i.d. draws.  For the paper's own
-$\nu=3$ target that floor is $\approx 0.23$ at $n = 5\,000$ and decays only like
-$n^{-1/6}$, so a curve below it is measuring noise, not convergence.  A naive
-midpoint quantile estimator understates the true distance by 1.7× there, because
-it truncates the tail cells; both estimators are implemented.
+$\nu=3$ target that floor is $\approx 0.22$ at $n = 5\,000$ and decays like
+$n^{-1/6}$ (fitted exponent $-0.166$ against $-0.167$ predicted), so a curve
+below it is measuring noise, not convergence.  The estimator's own sampling
+distribution is heavy tailed too — single repetitions land five times the
+median — so **averaging it over runs is dominated by outliers**, and the tables
+here quote medians.  A naive midpoint quantile estimator understates the
+distance by 1.9× because it truncates the tail cells; both are implemented.
 
 ## Layout
 

@@ -33,6 +33,43 @@ Exact (`exp1`):
 This is a negative control, not a failure: it says the skew extension has to be
 tested on **anisotropic** heavy-tailed targets, which is what the rest does.
 
+### Measured (`exp0`)
+
+Setting A is the paper's Figure 8 exactly: $d=1$, $\iota=2$, $\beta=1$,
+$\eta=0.01$, 5 000 particles, 20 replications.  Medians across replications,
+since the estimator's sampling distribution is heavy tailed (below).
+
+| prior | method | iterations to $2\times$ floor | final $W_2$ (median) |
+|---|---|---|---|
+| $\mathcal N(0,10I)$ | ULA | 2085 | 0.347 |
+| $\mathcal N(0,10I)$ | anchored | **136** | 0.218 |
+| $\mathrm{Uniform}(-5,5)$ | ULA | 839 | 0.243 |
+| $\mathrm{Uniform}(-5,5)$ | anchored | **113** | 0.218 |
+
+This reproduces the paper's claim: anchored Langevin reaches the measurement
+floor about 15× sooner than ULA, and its final value equals the floor's own
+median (0.221), i.e. it has converged as far as the metric can see.
+
+Setting B lifts the same family to $d=3$ ($\iota=3$, so $\nu=3$ again), where
+skew matrices exist but the target is still radial.
+
+| variant | iterations to $2\times$ floor | final $W_2$ (median) |
+|---|---|---|
+| anchored ($J=0$) | 163 | 0.223 |
+| skew-anchored $\|J\|=0.5$ | 163 | 0.232 |
+| skew-anchored $\|J\|=2$ | 235 | 0.279 |
+| skew-anchored $\|J\|=2$, random $J$ | 196 | 0.276 |
+| skew-anchored $\|J\|=8$ | — | blew up to $\sim10^{29}$ |
+| ULA | 2501 | 0.466 |
+
+So on a radial heavy-tailed target the skew matrix does not help, and at large
+enough magnitude it destroys the scheme.  The exact analysis says the same and
+says it more sharply: at $\eta=0.01$ the continuous-time second-moment rate is
+2.0000 for **every** $J$, while the per-iteration rate falls from 0.01857 at
+$J=0$ to 0.01830 at $\|J\|=0.5$ and 0.01409 at $\|J\|=2$, the covariance bias
+rises from 8.7 % to 10.3 % to 43 %, and mean-square stability fails outright
+at $\|J\|=8$.
+
 ### Measuring on this target at all is hard
 
 The $\nu = 3$ tail makes the empirical 2-Wasserstein distance a slow estimator.
@@ -42,12 +79,29 @@ Its floor — the same statistic evaluated on exact i.i.d. draws — is
 |---|---|---|---|---|
 | $W_2$ floor | 0.337 | 0.316 | 0.265 | 0.186 |
 
-decaying like $n^{-1/6}$, exactly the rate the tail index predicts.  At the
-paper's $n = 5\,000$ nothing below $\approx 0.23$ is signal.  A naive midpoint
-quantile estimator reports 0.138 for the same samples — 1.7× smaller — because
-it truncates the two tail cells.  Both estimators are implemented
-(`metrics.axis_sliced_w2` and `metrics.sliced_w2_midpoint`); the tail-resolving
-one is the default.
+decaying like $n^{-1/6}$.  Fitting the exponent over $n$ from 500 to 50 000
+gives $-0.166$ against the $-(1/2 - 1/\nu) = -0.167$ the tail index predicts
+(`exp6`).  At the paper's $n = 5\,000$ nothing below $\approx 0.22$ is signal,
+and quadrupling the sample size buys about 20 %.
+
+Worse, the estimator's own sampling distribution is heavy tailed.  On exact
+draws from the $\nu=3$ target at $n=5\,000$, over 200 repetitions:
+
+| | median | mean | std | max | max / median |
+|---|---|---|---|---|---|
+| $d=1$, $\iota=2$ (paper) | 0.221 | 0.239 | 0.079 | 1.121 | 5.1 |
+| $d=3$, $\iota=3$ | 0.225 | 0.246 | 0.076 | 0.941 | 4.2 |
+| $d=2$, $\nu=5$, $\kappa=100$ | 0.068 | 0.074 | 0.029 | 0.295 | 4.4 |
+| $d=2$, $\nu=8$, $\kappa=100$ | 0.035 | 0.037 | 0.011 | 0.126 | 3.6 |
+
+Single repetitions land five times the median.  **Averaging this statistic over
+runs, as the paper does, is dominated by outliers**; the median across
+replications is the summary to compare, and it is what the tables here quote.
+
+A naive midpoint quantile estimator reports about half the true value on the
+$\nu=3$ targets (ratio 1.9×) because it truncates the two tail cells.  Both
+estimators are implemented (`metrics.axis_sliced_w2` and
+`metrics.sliced_w2_midpoint`); the tail-resolving one is the default.
 
 ---
 
@@ -152,7 +206,38 @@ harmful here: it never reaches the floor.
 
 ---
 
-## 5. Cost per iteration is identical
+## 5. Figures
+
+Regenerate with `python experiments/make_figures.py`; a dark-mode variant of
+each is written alongside.
+
+**Speed-up against the condition number, and what the spectral gap alone would
+promise.**  The two panels use the same axes, so the vertical gap between them
+is the price of the smaller stepsize.
+
+![speed-up scaling](figures/fig1_speedup_scaling_light.png)
+
+**The tuning curve.**  Every target has an interior optimum in $\|J\|$; past it
+the equal-bias stepsize falls faster than the rate rises.
+
+![tuning curve](figures/fig2_tuning_curve_light.png)
+
+**Convergence at equal bias.**  Note the transient hump: the multiplicative
+noise inflates the ensemble first and the rotation mixes the badly scaled fast
+direction into the slow one, so a larger $\|J\|$ overshoots further before
+converging sooner.  The shaded band is the estimator floor.
+
+![equal-bias convergence](figures/fig3_w2_d2_nu5_k100_normal10_light.png)
+
+**Against tuned baselines.**
+
+![method comparison](figures/fig4_methods_d2_nu5_k100_normal10_light.png)
+
+**The negative control.**
+
+![isotropic control](figures/fig5_isotropic_light.png)
+
+## 6. Cost per iteration is identical
 
 For the log-quadratic family the step folds ``J`` into a precomputed matrix,
 ``M = ((J - I) Sigma^{-1})^T``, and then does one ``z @ M`` per iteration --
@@ -166,7 +251,7 @@ For a general anchored potential (`samplers.generic_skew_anchored_step`) the
 skew term does add one matrix-vector product per step, which is negligible
 beside the gradient evaluation.
 
-## 6. Threats to validity
+## 7. Threats to validity
 
 * **Equal covariance bias is not equal bias in every functional.**  The protocol
   equalises the second moment exactly; higher moments are only equalised to the
