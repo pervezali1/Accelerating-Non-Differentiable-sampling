@@ -63,6 +63,10 @@ classical spectral-gap criterion, which is what the non-reversible literature
 optimises, overstates what a practitioner gets by roughly an order of magnitude.
 `experiments/exp5_rate_decomposition.py` quantifies the split.
 
+Full numbers, figures and threats to validity: [`results/RESULTS.md`](results/RESULTS.md).
+
+![speed-up scaling](results/figures/fig1_speedup_scaling_light.png)
+
 ## What is proved, and what is not
 
 Proved for every constant skew $J$: invariance of $\pi$; the random-time-change
