@@ -37,9 +37,8 @@ def main() -> None:
         ):
             ax = axes[row][col]
             for kind, style in STYLE.items():
-                pts = sorted(
-                    [(r["alpha"], r[field]) for r in rows if r["kind"] == kind or r["alpha"] == 0.0]
-                )
+                # alpha = 0 is the reversible baseline and is stored under both kinds
+                pts = sorted((r["alpha"], r[field]) for r in rows if r["kind"] == kind)
                 xs = [p[0] for p in pts]
                 ys = [p[1] for p in pts]
                 ax.plot(xs, ys, markersize=5, **style)

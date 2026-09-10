@@ -1,0 +1,90 @@
+{
+  "dataset": "spambase",
+  "pretty_name": "Spambase",
+  "dim": 58,
+  "n_train": 3221,
+  "n_test": 1380,
+  "reference_accuracy": 0.941304347826087,
+  "reference_accuracy_halves": [
+    0.941304347826087,
+    0.9427536231884058
+  ],
+  "alpha": 1.0,
+  "rho": 18.23048659565428,
+  "geometry": "warmup",
+  "n_iter": 600,
+  "n_walkers": 32,
+  "prior_scale": 2.0,
+  "warmup_step_size": 0.020535250264571463,
+  "whitened_radius": 36.46097319130856,
+  "condition_number": 473.4478074030395,
+  "summary": [
+    {
+      "dataset": "spambase",
+      "variant": "zero",
+      "label": "J = 0",
+      "step_size": 0.01778279410038923,
+      "pilot_acceptance": 0.6294155590247936,
+      "acceptance": 0.6571081098487632,
+      "accuracy_final": 0.9238677536231884,
+      "accuracy_at_100": 0.6312273550724637,
+      "iters_to_ref_0.005": -1,
+      "iters_to_ref_0.01": -1,
+      "mean_error_final": 12.837933077331982,
+      "potential_final": 585.0589382892922,
+      "ess_potential_second_half": 215.6927668188614
+    },
+    {
+      "dataset": "spambase",
+      "variant": "constant",
+      "label": "constant $J_a$",
+      "step_size": 2.0535250264571462e-05,
+      "pilot_acceptance": 0.4995821101208546,
+      "acceptance": 0.6115301320476682,
+      "accuracy_final": 0.8849864130434784,
+      "accuracy_at_100": 0.8291440217391304,
+      "iters_to_ref_0.005": -1,
+      "iters_to_ref_0.01": -1,
+      "mean_error_final": 26.004138537296598,
+      "potential_final": 1561.9778224068455,
+      "ess_potential_second_half": 92.8489051282952
+    },
+    {
+      "dataset": "spambase",
+      "variant": "state",
+      "label": "state-dependent $J_s$",
+      "step_size": 0.01778279410038923,
+      "pilot_acceptance": 0.5032526625913207,
+      "acceptance": 0.5681397381202262,
+      "accuracy_final": 0.9379528985507246,
+      "accuracy_at_100": 0.6841938405797101,
+      "iters_to_ref_0.005": 452,
+      "iters_to_ref_0.01": 379,
+      "mean_error_final": 11.651922708873165,
+      "potential_final": 531.5815909997609,
+      "ess_potential_second_half": 214.44372264199305
+    },
+    {
+      "dataset": "spambase",
+      "variant": "state_nocorr",
+      "label": "$J_s$, correction dropped",
+      "step_size": 0.01778279410038923,
+      "pilot_acceptance": 0.5043339883075154,
+      "acceptance": 0.5680943372212234,
+      "accuracy_final": 0.9379302536231884,
+      "accuracy_at_100": 0.6842164855072463,
+      "iters_to_ref_0.005": 449,
+      "iters_to_ref_0.01": 379,
+      "mean_error_final": 11.647911899150756,
+      "potential_final": 531.6464678813987,
+      "ess_potential_second_half": 217.29911831379596
+    }
+  ],
+  "runtime_seconds": 1572.8777182102203,
+  "variant_order": [
+    "zero",
+    "constant",
+    "state",
+    "state_nocorr"
+  ]
+}

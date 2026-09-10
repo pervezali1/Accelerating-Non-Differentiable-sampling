@@ -1,0 +1,27 @@
+Acceptance-ratio scaling: slope of std(log alpha) against the step size h.
+Reversible schemes lose the O(sqrt(h)) term (slope 3/2); a rotation keeps it (slope 1/2).
+
+
+titanic: proposals from w = 0 (cold start)
+field                    slope of std(log alpha) vs h   acceptance at h=1e-3
+J = 0                                            1.50   1.000
+constant J_a                                     0.50   0.589
+state-dependent J_s                              1.50   1.000
+
+titanic: proposals from posterior mean
+field                    slope of std(log alpha) vs h   acceptance at h=1e-3
+J = 0                                            0.79   1.000
+constant J_a                                     0.50   0.995
+state-dependent J_s                              0.50   0.996
+
+breast_cancer: proposals from w = 0 (cold start)
+field                    slope of std(log alpha) vs h   acceptance at h=1e-3
+J = 0                                            1.32   1.000
+constant J_a                                     0.48   0.336
+state-dependent J_s                              1.32   1.000
+
+breast_cancer: proposals from posterior mean
+field                    slope of std(log alpha) vs h   acceptance at h=1e-3
+J = 0                                            1.16   1.000
+constant J_a                                     0.50   0.986
+state-dependent J_s                              0.50   0.986

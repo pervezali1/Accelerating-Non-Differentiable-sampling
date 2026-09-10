@@ -150,3 +150,59 @@ class LocalizedSkew(SkewField):
         sign = 1.0 if self.profile == "grow" else -1.0
         grad_s = sign * self._bump(W) * self._metric_apply(W) / self.rho**2
         return self.alpha * (self.A @ grad_s)
+
+
+class DirectionalSkew(SkewField):
+    r"""``J(w) = alpha s(w) A`` with ``s(w) = tanh(c . w / ell)``.
+
+    ``s`` is measured from ``center``, i.e. ``s(w) = tanh(c . (w - center) / ell)``.
+    Centring matters: the posterior bulk of these problems sits many whitened
+    standard deviations away from ``w = 0``, so any profile centred at the origin
+    is saturated where the chain actually lives, its gradient is ~0, and
+    ``Gamma`` is numerically negligible.  Centred on the bulk with ``ell`` of the
+    order of one posterior standard deviation, ``s`` varies by order one across
+    the posterior and ``Gamma`` is comparable to the reversible drift -- which is
+    the regime in which dropping it can be seen to bias the uncorrected
+    diffusion.
+
+        Gamma(w) = alpha A grad s(w),   grad s(w) = (1 - s(w)^2) c / ell.
+    """
+
+    label = "directional $J_c$"
+
+    def __init__(
+        self,
+        A: np.ndarray,
+        alpha: float = 1.0,
+        direction: np.ndarray | None = None,
+        length_scale: float = 1.0,
+        drop_correction: bool = False,
+        center: np.ndarray | None = None,
+    ) -> None:
+        self.A = np.ascontiguousarray(A)
+        self.alpha = float(alpha)
+        d = len(self.A)
+        c = np.zeros(d) if direction is None else np.asarray(direction, float).ravel()
+        if direction is None:
+            c[0] = 1.0
+        self.c = c.reshape(d, 1)
+        self.length_scale = float(length_scale)
+        self.center = (
+            np.zeros((d, 1)) if center is None else np.asarray(center, float).reshape(d, 1)
+        )
+        self.drop_correction = bool(drop_correction)
+        if drop_correction:
+            self.label = "$J_c$, correction dropped"
+
+    def scale(self, W: np.ndarray) -> np.ndarray:
+        proj = (self.c * (W - self.center)).sum(axis=0, keepdims=True)
+        return np.tanh(proj / self.length_scale)
+
+    def apply(self, W: np.ndarray, G: np.ndarray) -> np.ndarray:
+        return self.alpha * self.scale(W) * (self.A @ G)
+
+    def divergence(self, W: np.ndarray) -> np.ndarray:
+        if self.drop_correction:
+            return np.zeros_like(W)
+        grad_s = (1.0 - self.scale(W) ** 2) * self.c / self.length_scale
+        return self.alpha * (self.A @ grad_s)

@@ -1,0 +1,90 @@
+{
+  "dataset": "magic",
+  "pretty_name": "MAGIC Gamma Telescope",
+  "dim": 11,
+  "n_train": 13314,
+  "n_test": 5706,
+  "reference_accuracy": 0.7947774272695408,
+  "reference_accuracy_halves": [
+    0.7947774272695408,
+    0.7949526813880127
+  ],
+  "alpha": 1.0,
+  "rho": 32.775608561642535,
+  "geometry": "warmup",
+  "n_iter": 600,
+  "n_walkers": 32,
+  "prior_scale": 2.0,
+  "warmup_step_size": 0.3651741272548377,
+  "whitened_radius": 65.55121712328507,
+  "condition_number": 60.85379259224065,
+  "summary": [
+    {
+      "dataset": "magic",
+      "variant": "zero",
+      "label": "J = 0",
+      "step_size": 0.27384196342643613,
+      "pilot_acceptance": 0.54080297860179,
+      "acceptance": 0.5493716524151853,
+      "accuracy_final": 0.7951334121976865,
+      "accuracy_at_100": 0.7947993340343498,
+      "iters_to_ref_0.005": 9,
+      "iters_to_ref_0.01": 5,
+      "mean_error_final": 0.5937925339578085,
+      "potential_final": 6088.48261097485,
+      "ess_potential_second_half": 1676.044625417381
+    },
+    {
+      "dataset": "magic",
+      "variant": "constant",
+      "label": "constant $J_a$",
+      "step_size": 0.00020535250264571464,
+      "pilot_acceptance": 0.49728079271291564,
+      "acceptance": 0.5413185164555949,
+      "accuracy_final": 0.7757623554153523,
+      "accuracy_at_100": 0.7584012443042412,
+      "iters_to_ref_0.005": -1,
+      "iters_to_ref_0.01": -1,
+      "mean_error_final": 56.885920082518595,
+      "potential_final": 8322.059068207818,
+      "ess_potential_second_half": 92.67384796673706
+    },
+    {
+      "dataset": "magic",
+      "variant": "state",
+      "label": "state-dependent $J_s$",
+      "step_size": 0.1778279410038923,
+      "pilot_acceptance": 0.5020862739585317,
+      "acceptance": 0.516787078212234,
+      "accuracy_final": 0.7951498422712934,
+      "accuracy_at_100": 0.794711706975114,
+      "iters_to_ref_0.005": 7,
+      "iters_to_ref_0.01": 3,
+      "mean_error_final": 0.9392400973766979,
+      "potential_final": 6088.65914830758,
+      "ess_potential_second_half": 1175.3657903289486
+    },
+    {
+      "dataset": "magic",
+      "variant": "state_nocorr",
+      "label": "$J_s$, correction dropped",
+      "step_size": 0.1778279410038923,
+      "pilot_acceptance": 0.5021856571053881,
+      "acceptance": 0.5165566502462915,
+      "accuracy_final": 0.7951334121976867,
+      "accuracy_at_100": 0.7947007535927094,
+      "iters_to_ref_0.005": 7,
+      "iters_to_ref_0.01": 3,
+      "mean_error_final": 0.9425010914939889,
+      "potential_final": 6088.696457986207,
+      "ess_potential_second_half": 1152.3710494207555
+    }
+  ],
+  "runtime_seconds": 1472.5216698646545,
+  "variant_order": [
+    "zero",
+    "constant",
+    "state",
+    "state_nocorr"
+  ]
+}

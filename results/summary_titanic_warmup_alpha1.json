@@ -1,0 +1,90 @@
+{
+  "dataset": "titanic",
+  "pretty_name": "Titanic (survival)",
+  "dim": 10,
+  "n_train": 623,
+  "n_test": 268,
+  "reference_accuracy": 0.7835820895522388,
+  "reference_accuracy_halves": [
+    0.7835820895522388,
+    0.7835820895522388
+  ],
+  "alpha": 1.0,
+  "rho": 6.654228767595196,
+  "geometry": "warmup",
+  "n_iter": 600,
+  "n_walkers": 32,
+  "prior_scale": 2.0,
+  "warmup_step_size": 0.6493816315762113,
+  "whitened_radius": 13.308457535190392,
+  "condition_number": 11.7665714206225,
+  "summary": [
+    {
+      "dataset": "titanic",
+      "variant": "zero",
+      "label": "J = 0",
+      "step_size": 0.6493816315762113,
+      "pilot_acceptance": 0.47690622170088515,
+      "acceptance": 0.482110879749742,
+      "accuracy_final": 0.7821828358208955,
+      "accuracy_at_100": 0.7824160447761194,
+      "iters_to_ref_0.005": 3,
+      "iters_to_ref_0.01": 3,
+      "mean_error_final": 0.26395434315503563,
+      "potential_final": 276.2026161091004,
+      "ess_potential_second_half": 1798.8052739653642
+    },
+    {
+      "dataset": "titanic",
+      "variant": "constant",
+      "label": "constant $J_a$",
+      "step_size": 0.004869675251658632,
+      "pilot_acceptance": 0.4989776420638848,
+      "acceptance": 0.7494641662034595,
+      "accuracy_final": 0.78125,
+      "accuracy_at_100": 0.7702891791044777,
+      "iters_to_ref_0.005": 478,
+      "iters_to_ref_0.01": 139,
+      "mean_error_final": 5.083993841220065,
+      "potential_final": 275.91380928706707,
+      "ess_potential_second_half": 209.4041432027816
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state",
+      "label": "state-dependent $J_s$",
+      "step_size": 0.23713737056616555,
+      "pilot_acceptance": 0.5127031784752503,
+      "acceptance": 0.521633924932099,
+      "accuracy_final": 0.7825326492537313,
+      "accuracy_at_100": 0.783115671641791,
+      "iters_to_ref_0.005": 13,
+      "iters_to_ref_0.01": 1,
+      "mean_error_final": 0.43584546228563814,
+      "potential_final": 276.6850905200231,
+      "ess_potential_second_half": 1423.1556286647117
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state_nocorr",
+      "label": "$J_s$, correction dropped",
+      "step_size": 0.23713737056616555,
+      "pilot_acceptance": 0.5092048970968217,
+      "acceptance": 0.5214936502758948,
+      "accuracy_final": 0.7826492537313433,
+      "accuracy_at_100": 0.7829990671641791,
+      "iters_to_ref_0.005": 13,
+      "iters_to_ref_0.01": 1,
+      "mean_error_final": 0.4326462244105844,
+      "potential_final": 276.6890017772,
+      "ess_potential_second_half": 1456.3706216739383
+    }
+  ],
+  "runtime_seconds": 69.36708807945251,
+  "variant_order": [
+    "zero",
+    "constant",
+    "state",
+    "state_nocorr"
+  ]
+}

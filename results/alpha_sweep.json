@@ -1,0 +1,261 @@
+{
+  "datasets": [
+    {
+      "dataset": "titanic",
+      "pretty_name": "Titanic (survival)",
+      "reference_accuracy": 0.7835820895522388,
+      "rho": 6.654228767595196,
+      "rows": [
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 0.0,
+          "step_size": 0.6493816315762113,
+          "acceptance": 0.47732299306749276,
+          "accuracy_final": 0.7831156716417911,
+          "iters_to_ref_0.005": 4,
+          "mean_error_final": 0.2663736606313055
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 0.0,
+          "step_size": 0.6493816315762113,
+          "acceptance": 0.47732299306749276,
+          "accuracy_final": 0.7831156716417911,
+          "iters_to_ref_0.005": 4,
+          "mean_error_final": 0.2663736606313055
+        },
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 0.25,
+          "step_size": 0.5623413251903491,
+          "acceptance": 0.5192196585069911,
+          "accuracy_final": 0.7821828358208955,
+          "iters_to_ref_0.005": 1,
+          "mean_error_final": 0.27401632049007496
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 0.25,
+          "step_size": 0.5623413251903491,
+          "acceptance": 0.5272292635025414,
+          "accuracy_final": 0.7824160447761195,
+          "iters_to_ref_0.005": 1,
+          "mean_error_final": 0.26851027087042983
+        },
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 0.5,
+          "step_size": 0.4216965034285823,
+          "acceptance": 0.532200200705199,
+          "accuracy_final": 0.7828824626865671,
+          "iters_to_ref_0.005": 11,
+          "mean_error_final": 0.35168418256531675
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 0.5,
+          "step_size": 0.4869675251658631,
+          "acceptance": 0.5049959539702727,
+          "accuracy_final": 0.7826492537313433,
+          "iters_to_ref_0.005": 8,
+          "mean_error_final": 0.29341219122107787
+        },
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 1.0,
+          "step_size": 0.004869675251658632,
+          "acceptance": 0.7527228822709244,
+          "accuracy_final": 0.7805503731343283,
+          "iters_to_ref_0.005": 161,
+          "mean_error_final": 4.993521585883093
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 1.0,
+          "step_size": 0.23713737056616555,
+          "acceptance": 0.5225246494178427,
+          "accuracy_final": 0.7817164179104479,
+          "iters_to_ref_0.005": 7,
+          "mean_error_final": 0.49840698931248717
+        },
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 2.0,
+          "step_size": 0.0004216965034285823,
+          "acceptance": 0.5646732050172221,
+          "accuracy_final": 0.7721548507462687,
+          "iters_to_ref_0.005": -1,
+          "mean_error_final": 12.094263578132672
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 2.0,
+          "step_size": 0.07498942093324559,
+          "acceptance": 0.4674909607293141,
+          "accuracy_final": 0.7826492537313432,
+          "iters_to_ref_0.005": 42,
+          "mean_error_final": 1.0405003069120244
+        },
+        {
+          "dataset": "titanic",
+          "kind": "constant",
+          "alpha": 4.0,
+          "step_size": 0.0001,
+          "acceptance": 0.5013170508474164,
+          "accuracy_final": 0.7451026119402986,
+          "iters_to_ref_0.005": -1,
+          "mean_error_final": 13.46641052044919
+        },
+        {
+          "dataset": "titanic",
+          "kind": "state",
+          "alpha": 4.0,
+          "step_size": 0.006493816315762114,
+          "acceptance": 0.5844272773057533,
+          "accuracy_final": 0.7793843283582089,
+          "iters_to_ref_0.005": 228,
+          "mean_error_final": 4.1387358167026855
+        }
+      ]
+    },
+    {
+      "dataset": "breast_cancer",
+      "pretty_name": "Breast Cancer Wisconsin",
+      "reference_accuracy": 0.9649122807017544,
+      "rho": 4.945090017596907,
+      "rows": [
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 0.0,
+          "step_size": 0.01,
+          "acceptance": 0.936796460923278,
+          "accuracy_final": 0.9649122807017543,
+          "iters_to_ref_0.005": 92,
+          "mean_error_final": 3.235454371369816
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 0.0,
+          "step_size": 0.01,
+          "acceptance": 0.936796460923278,
+          "accuracy_final": 0.9649122807017543,
+          "iters_to_ref_0.005": 92,
+          "mean_error_final": 3.235454371369816
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 0.25,
+          "step_size": 0.01,
+          "acceptance": 0.867430732922457,
+          "accuracy_final": 0.9641812865497076,
+          "iters_to_ref_0.005": 297,
+          "mean_error_final": 3.441105428454404
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 0.25,
+          "step_size": 0.01,
+          "acceptance": 0.9137479491164261,
+          "accuracy_final": 0.9649122807017543,
+          "iters_to_ref_0.005": 92,
+          "mean_error_final": 3.260208100532048
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 0.5,
+          "step_size": 0.008659643233600654,
+          "acceptance": 0.9186781296603821,
+          "accuracy_final": 0.9652777777777777,
+          "iters_to_ref_0.005": 125,
+          "mean_error_final": 3.239526912235651
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 0.5,
+          "step_size": 0.01,
+          "acceptance": 0.8875617582701193,
+          "accuracy_final": 0.9649122807017543,
+          "iters_to_ref_0.005": 92,
+          "mean_error_final": 3.2701551348272853
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 1.0,
+          "step_size": 0.006493816315762114,
+          "acceptance": 0.8559642885630179,
+          "accuracy_final": 0.9656432748538011,
+          "iters_to_ref_0.005": 114,
+          "mean_error_final": 3.4573567194819947
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 1.0,
+          "step_size": 0.01,
+          "acceptance": 0.8345053653504014,
+          "accuracy_final": 0.9656432748538012,
+          "iters_to_ref_0.005": 92,
+          "mean_error_final": 3.295852799763337
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 2.0,
+          "step_size": 1.3335214321633242e-05,
+          "acceptance": 0.638163656910726,
+          "accuracy_final": 0.9480994152046783,
+          "iters_to_ref_0.005": -1,
+          "mean_error_final": 6.7063265436439305
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 2.0,
+          "step_size": 0.01,
+          "acceptance": 0.729215754060179,
+          "accuracy_final": 0.9641812865497076,
+          "iters_to_ref_0.005": 373,
+          "mean_error_final": 3.335567878852772
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "constant",
+          "alpha": 4.0,
+          "step_size": 2.3713737056616552e-06,
+          "acceptance": 0.522623060093944,
+          "accuracy_final": 0.9342105263157894,
+          "iters_to_ref_0.005": -1,
+          "mean_error_final": 6.968739219342449
+        },
+        {
+          "dataset": "breast_cancer",
+          "kind": "state",
+          "alpha": 4.0,
+          "step_size": 0.01,
+          "acceptance": 0.5337332060464948,
+          "accuracy_final": 0.9634502923976609,
+          "iters_to_ref_0.005": 110,
+          "mean_error_final": 3.432163771172886
+        }
+      ]
+    }
+  ],
+  "n_iter": 600
+}

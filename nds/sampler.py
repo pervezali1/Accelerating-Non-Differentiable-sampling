@@ -231,6 +231,52 @@ def mean_acceptance(
     return res.acceptance
 
 
+def acceptance_diagnostics(
+    target: LogisticPosterior,
+    skew: SkewField | None,
+    step_size: float,
+    W: np.ndarray,
+    n_draws: int = 512,
+    seed: int = 0,
+    geometry: Geometry | None = None,
+    fd_eps: float = 1e-2,
+) -> dict:
+    """Acceptance statistics for proposals made from the *fixed* point ``W``.
+
+    Useful for seeing where the step-size ceiling comes from.  In the reversible
+    case the ``O(sqrt(h))`` term of the log acceptance ratio cancels and the
+    spread of ``log alpha`` decays like ``h^{3/2}``; with ``J != 0`` a term
+    ``sqrt(2h) (J ghat) . xi`` survives, so the spread decays only like
+    ``h^{1/2}`` and the step size has to shrink quadratically in ``|J ghat|``
+    to keep the same acceptance rate.
+    """
+    skew = ZeroSkew() if skew is None else skew
+    geo = Geometry.identity(target.d) if geometry is None else geometry
+    stepper = _Stepper(target, skew, geo, fd_eps, True)
+    rng = np.random.default_rng(seed)
+    h = float(step_size)
+
+    W0 = np.repeat(np.asarray(W, float).reshape(-1, 1), n_draws, axis=1)
+    Z, U, G = stepper.state(W0)
+    mu = stepper.drift(W0, G, h)
+    Wp = mu + np.sqrt(2.0 * h) * (geo.L @ rng.standard_normal(W0.shape))
+    Zp, Up, Gp = stepper.state(Wp)
+    mu_back = stepper.drift(Wp, Gp, h)
+    scale = 1.0 / (4.0 * h)
+    fwd, bwd = Wp - mu, W0 - mu_back
+    log_ratio = (
+        -(Up - U)
+        - scale * (bwd * (geo.D_inv @ bwd)).sum(axis=0)
+        + scale * (fwd * (geo.D_inv @ fwd)).sum(axis=0)
+    )
+    return {
+        "step_size": h,
+        "acceptance": float(np.exp(np.minimum(log_ratio, 0.0)).mean()),
+        "log_ratio_std": float(log_ratio.std()),
+        "log_ratio_mean": float(log_ratio.mean()),
+    }
+
+
 def calibrate_step_size(
     target: LogisticPosterior,
     skew: SkewField | None,
