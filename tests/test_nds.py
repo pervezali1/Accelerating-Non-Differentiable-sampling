@@ -16,6 +16,7 @@ from nds.reference import reference_posterior  # noqa: E402
 from nds.sampler import Geometry, calibrate_step_size, run_chain  # noqa: E402
 from nds.skew import (  # noqa: E402
     ConstantSkew,
+    DirectionalSkew,
     LocalizedSkew,
     ZeroSkew,
     cyclic_skew,
@@ -77,6 +78,28 @@ def test_divergence_matches_finite_differences():
         0.0,
     )
     assert np.allclose(ConstantSkew(A, alpha).divergence(np.ones((d, 1))), 0.0)
+
+
+def test_directional_divergence_matches_finite_differences():
+    d, eps, alpha = 6, 1e-6, 0.9
+    rng = np.random.default_rng(7)
+    B = rng.normal(size=(d, d))
+    D = B @ B.T + np.eye(d)
+    L = np.linalg.cholesky(D)
+    A = whiten(random_skew(d, 8), L)
+    direction = np.linalg.solve(L.T, np.eye(d)[:, 0])
+    center = rng.normal(size=d) * 3.0
+    field = DirectionalSkew(A, alpha, direction=direction, length_scale=1.3, center=center)
+    w = center.reshape(d, 1) + rng.normal(size=(d, 1)) * 0.5
+    numeric = np.zeros((d, 1))
+    for j in range(d):
+        wp, wm = w.copy(), w.copy()
+        wp[j] += eps
+        wm[j] -= eps
+        numeric[:, 0] += alpha * (field.scale(wp)[0, 0] - field.scale(wm)[0, 0]) / (2 * eps) * A[:, j]
+    assert np.abs(numeric - field.divergence(w)).max() < 1e-6
+    # the profile is centred on the bulk, so the correction is not negligible there
+    assert np.linalg.norm(field.divergence(center.reshape(d, 1))) > 0.1
 
 
 def test_every_variant_samples_the_same_posterior():

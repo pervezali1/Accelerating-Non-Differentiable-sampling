@@ -1,0 +1,77 @@
+{
+  "dataset": "titanic",
+  "pretty_name": "Titanic (survival)",
+  "reference_accuracy": 0.7835820895522388,
+  "step_size": 0.08117270394702641,
+  "alpha": 1.0,
+  "rho": 6.654228767595196,
+  "length_scale": 1.0,
+  "n_iter": 6000,
+  "n_walkers": 24,
+  "field_strength": {
+    "radial": {
+      "gamma_norm": 0.005535242780632753,
+      "reversible_drift_norm": 0.0606970781968667,
+      "rotation_norm": 0.03917875579720088
+    },
+    "directional": {
+      "gamma_norm": 0.05965106181239238,
+      "reversible_drift_norm": 0.0606970781968667,
+      "rotation_norm": 0.0008147071925387771
+    }
+  },
+  "rows": [
+    {
+      "dataset": "titanic",
+      "profile": "shared",
+      "variant": "zero",
+      "step_size": 0.08117270394702641,
+      "bias_whitened": 0.20402817384862101,
+      "accuracy_final": 0.7823383084577115,
+      "potential_final": 276.4601346341129
+    },
+    {
+      "dataset": "titanic",
+      "profile": "radial",
+      "variant": "with_correction",
+      "step_size": 0.08117270394702641,
+      "bias_whitened": 0.17839047226079952,
+      "accuracy_final": 0.7824937810945274,
+      "potential_final": 276.5531688736582
+    },
+    {
+      "dataset": "titanic",
+      "profile": "radial",
+      "variant": "no_correction",
+      "step_size": 0.08117270394702641,
+      "bias_whitened": 0.18062478978811872,
+      "accuracy_final": 0.7826492537313433,
+      "potential_final": 276.55102816450875
+    },
+    {
+      "dataset": "titanic",
+      "profile": "directional",
+      "variant": "with_correction",
+      "step_size": 0.08117270394702641,
+      "bias_whitened": 0.19162989572511574,
+      "accuracy_final": 0.7824937810945274,
+      "potential_final": 276.5071967175864
+    },
+    {
+      "dataset": "titanic",
+      "profile": "directional",
+      "variant": "no_correction",
+      "step_size": 0.08117270394702641,
+      "bias_whitened": 0.28853850993527214,
+      "accuracy_final": 0.7798507462686567,
+      "potential_final": 276.4862373282296
+    }
+  ],
+  "curves": [
+    "shared_zero",
+    "radial_with_correction",
+    "radial_no_correction",
+    "directional_with_correction",
+    "directional_no_correction"
+  ]
+}

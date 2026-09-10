@@ -6,9 +6,10 @@ reasonable default for the samplers in :mod:`nds.sampler`.
 
 Raw files are cached under ``data/``.  The canonical homes of these datasets are
 the UCI repository and the Kaggle Titanic competition; the URLs below are public
-mirrors, because UCI and OpenML are not reachable from every environment.  SHA256
-digests of the cached files are recorded in ``data/checksums.txt`` on download so
-that a mirror change is visible.
+mirrors, because UCI and OpenML are not reachable from every environment.  Every
+cached file is checked against the SHA256 digest recorded in ``EXPECTED_SHA256``
+below, so a mirror that changes its contents is an error rather than a silent
+change of dataset.
 """
 
 from __future__ import annotations
@@ -31,6 +32,14 @@ MIRRORS = {
     "magic04.data": "https://raw.githubusercontent.com/mikeizbicki/datasets/master/csv/uci/magic04.data",
     # UCI Spambase (4601 e-mails, 57 features).
     "spambase.data": "https://raw.githubusercontent.com/mikeizbicki/datasets/master/csv/uci/spambase.data",
+}
+
+
+# Digests of the mirrored files these experiments were run on.
+EXPECTED_SHA256 = {
+    "titanic.csv": "81787d320d7f7b03df935e91de8bd19e11d45c5bbcab86ef4d4a76dc91b7d4f2",
+    "magic04.data": "e9314b7ebd4b4b59a3b3d65f7316663963777b16a46786877651dbbaa640b36a",
+    "spambase.data": "b1ef93de71f97714d3d7d4f58fc9f718da7bbc8ac8a150eff2778616a8097b12",
 }
 
 
@@ -58,16 +67,21 @@ class Dataset:
 
 
 def _cached(fname: str) -> str:
-    """Return the local path of ``fname``, downloading it from its mirror once."""
+    """Return the local path of ``fname``, downloading and verifying it once."""
     os.makedirs(DATA_DIR, exist_ok=True)
     path = os.path.join(DATA_DIR, fname)
+    url = MIRRORS[fname]
     if not os.path.exists(path):
-        url = MIRRORS[fname]
         with urllib.request.urlopen(url) as response, open(path, "wb") as handle:
             handle.write(response.read())
-        digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
-        with open(os.path.join(DATA_DIR, "checksums.txt"), "a") as handle:
-            handle.write(f"{digest}  {fname}  {url}\n")
+    digest = hashlib.sha256(open(path, "rb").read()).hexdigest()
+    expected = EXPECTED_SHA256[fname]
+    if digest != expected:
+        raise ValueError(
+            f"{path} has SHA256 {digest}, expected {expected}. The mirror "
+            f"{url} may have changed; delete the file to re-download, and update "
+            "EXPECTED_SHA256 in nds/data.py only after checking what changed."
+        )
     return path
 
 

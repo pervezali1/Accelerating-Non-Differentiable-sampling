@@ -133,9 +133,15 @@ strength `alpha = 1`.  Full numbers: [`results/summary.md`](results/summary.md),
 
 The table counts iterations until the mean accuracy curve settles within 0.005
 of the reference.  The same iteration budget is much easier for the two
-low-dimensional problems than for the two high-dimensional ones, where 600
-iterations of a derivative-free chain is not enough to settle the posterior mean
-at all.
+low-dimensional problems (Titanic, MAGIC) than for the two higher-dimensional
+ones, where 600 iterations of a derivative-free chain is not enough to settle
+the posterior mean at all.
+
+The Breast Cancer column is the one number in this table not to lean on.  There
+the accuracy curve advances in visible steps, as individual test points cross
+the 0.5 threshold, so the crossing iteration swings with the walker count: in
+the strength sweep, run with 16 walkers instead of 32, the baseline settles at
+92 iterations and the constant field at 114 -- the opposite order.
 
 Since every variant shares walker seeds, the differences can be paired walker by
 walker.  At the final iteration, against the `J = 0` baseline:
@@ -207,6 +213,40 @@ figure,
 [`figures/accuracy_four_datasets_logx.png`](figures/accuracy_four_datasets_logx.png),
 is the readable one for the first few dozen iterations.
 
+### The correction term only matters without the Metropolis step
+
+The two state-dependent curves in the accuracy figure coincide because the
+accept/reject step already makes `exp(-U)` invariant; `Gamma` cannot change
+that, only the efficiency with which the chain gets there.  To see what the
+correction is actually for, `experiments/run_correction_bias.py` runs the same
+fields as an **uncorrected** diffusion at one shared step size, where the
+`J = 0` curve is the pure Euler discretisation bias to compare against.
+
+![the divergence correction](figures/correction_bias.png)
+
+On Titanic, in units of reference posterior standard deviations:
+
+| field | correction size relative to the drift, in the bulk | bias with `Gamma` | bias without `Gamma` |
+|---|---|---|---|
+| `J = 0` | - | 0.204 (discretisation only) | - |
+| radial `J_s`, centred on `w = 0` | 0.09 | 0.178 | 0.181 |
+| directional `J_c`, centred on the bulk | 0.98 | 0.192 | 0.289 |
+
+The radial field is the one in the accuracy figure, and dropping its correction
+is harmless *even without the Metropolis step*, for a reason worth knowing: the
+posterior bulk of these problems sits 10 to 66 whitened standard deviations from
+`w = 0` (13 on Titanic), where a profile centred on the origin has all but
+saturated, so `Gamma` is under a tenth of the reversible drift.  Make the profile vary on the
+scale of the posterior instead -- `J_c(w) = alpha tanh(c . (w - w_bulk)) A`,
+with `c` a whitened direction -- and `Gamma` becomes as large as the drift.
+Then dropping it inflates the bias by half again over the baseline
+discretisation error and costs a visible 0.003 of test accuracy.
+
+So "the correction term does not matter" is only true of a slowly varying `J`.
+The lesson for a state-dependent field is to compare the size of `Gamma` with
+the size of the reversible drift `D ghat` where the chain actually spends its
+time, before deciding the term is negligible.
+
 ## Datasets
 
 | dataset | n (train/test) | d | source |
@@ -216,18 +256,21 @@ is the readable one for the first few dozen iterations.
 | Breast Cancer Wisconsin | 398 / 171 | 31 | shipped with scikit-learn (`load_breast_cancer`) |
 | Spambase | 3221 / 1380 | 58 | UCI `spambase.data`, features `log1p`-scaled |
 
-`nds/data.py` caches the raw files under `data/` and appends their SHA256 digest
-to `data/checksums.txt` on download.  UCI and OpenML are unreachable from some
-environments, including the one this was run in, so the two UCI files are fetched
-from a public GitHub mirror; the digests make a mirror change visible.
+`nds/data.py` caches the raw files under `data/` (git-ignored) and checks each
+one against the SHA256 digest in `EXPECTED_SHA256`, so a mirror that changes its
+contents raises rather than silently changing the dataset.  UCI and OpenML are
+unreachable from some environments, including the one this was run in, which is
+why the two UCI files come from a public GitHub mirror.
 
 ## Reproducing
 
 ```bash
 pip install -r requirements.txt
-python3 tests/test_nds.py                 # correctness checks, ~2 minutes
-./experiments/run_all.sh                  # four datasets, one process each
-python3 experiments/plot_accuracy.py      # figures + results/summary.{csv,md}
+python3 tests/test_nds.py                    # correctness checks, ~2 minutes
+./experiments/run_all.sh                     # four datasets, one process each, ~30 min
+python3 experiments/plot_accuracy.py         # figures + results/summary.{csv,md}
+python3 experiments/paired_comparison.py     # per-walker paired differences
+python3 experiments/acceptance_scaling.py --dataset titanic   # the step-size mechanism
 python3 experiments/run_alpha_sweep.py && python3 experiments/plot_alpha_sweep.py
 python3 experiments/run_correction_bias.py && python3 experiments/plot_correction_bias.py
 ```
@@ -270,10 +313,11 @@ Euler proposal mean: that is what breaks the acceptance-ratio cancellation and
 forces the step size down.  Two ways around it, neither implemented here:
 
 1. Apply the rotation as a **separate volume-preserving flow** composed with a
-   reversible Metropolis step, rather than as a term in the same proposal --
-   the flow along `J grad U` conserves `U` to leading order for constant skew
-   `J`, so it can be integrated with its own accept/reject and does not have to
-   share the reversible step size.
+   reversible Metropolis step, rather than as a term in the same proposal.  For
+   constant skew `J` the flow `dw/dt = J grad U(w)` conserves `U` exactly
+   (`grad U . J grad U = 0`) and preserves volume, so its exact solution leaves
+   the target invariant and a discretisation of it needs only its own
+   accept/reject step -- it does not have to share the reversible step size.
 2. Build irreversibility from a **lifted or guided chain** (a velocity flag that
    persists until a rejection), which buys directed motion without a rotation
    term in the proposal mean at all.
@@ -283,11 +327,12 @@ forces the step size down.  Two ways around it, neither implemented here:
 ```
 nds/data.py        dataset loaders, caching, standardisation, splits
 nds/target.py      logistic posterior, central-difference surrogate, prediction
-nds/skew.py        J = 0, constant, state-dependent fields and their divergence
+nds/skew.py        J = 0, constant, radial and directional fields, and their divergence
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference
-experiments/       runners and plotting scripts
+experiments/       runners, plotting scripts, diagnostics
+tests/test_nds.py  divergence identities, surrogate accuracy, invariance
 results/           traces (.npz), per-dataset summaries, summary.csv
 figures/           the figures referenced above
 ```
