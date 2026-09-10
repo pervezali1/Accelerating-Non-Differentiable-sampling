@@ -231,21 +231,33 @@ resolvable.
 
 ## Standalone, in one file
 
-[`examples/learning_curve_standalone.ipynb`](examples/learning_curve_standalone.ipynb) reproduces
-the accuracy learning curve end to end — NumPy, pandas and matplotlib only, no torch and nothing
-from the `ands` package. It fetches the data, builds the target, checks both closed-form
-divergences by central differences, samples, runs its own exact reference for the ceiling, and
-draws the curve. Run top to bottom, about two minutes. The same thing as a command-line script is
-[`learning_curve_standalone.py`](examples/learning_curve_standalone.py):
+[`examples/learning_curve_standalone.ipynb`](examples/learning_curve_standalone.ipynb) asks whether the
+skew field speeds up the *accuracy* learning curve, with NumPy, pandas and matplotlib only — no torch and
+nothing from the `ands` package. The same thing as a command-line script is
+[`learning_curve_standalone.py`](examples/learning_curve_standalone.py).
 
-```bash
-python examples/learning_curve_standalone.py                # both datasets, ~3 min
-python examples/learning_curve_standalone.py --dataset titanic --walkers 500
-```
+**$J_s$ is a real speed-up; $J_a$ is not.** Iterations to 99% of the exact posterior's accuracy, 6
+replicas with bootstrap intervals:
 
-Either one is an independent reimplementation, and the main results survive it: run from scratch
-the ceiling comes out at 0.7895 on Titanic and 0.7828 on MAGIC, against 0.7895 and 0.7832 from
-the cached study.
+| | $J_s$, $s=8$ | $J_s$, $s=16$ | $J_a$, $s=8$ |
+|---|---|---|---|
+| Titanic | **1.51× [1.45, 1.56]** | **1.77× [1.70, 1.84]** | 0.85× [0.83, 0.88] |
+| MAGIC | **1.33× [1.29, 1.38]** | **1.43× [1.37, 1.49]** | *2.57×, but overshoots* |
+
+At $s \le 8$ the $J_s$ gain is free — it lands on the ceiling to within 0.0007. $J_a$ is slower than
+$J = 0$ on Titanic, and on MAGIC its apparent 1.8-4× is an artefact: its final accuracy sits *above* the
+exact posterior's, so it crosses the threshold on its way past. That is the constrained study's bias
+showing up as speed.
+
+Two of the three fixes were about measurement: the strength had never been swept ($s = 4$ was the weakest
+setting on the grid), and accuracy saturates near 0.79 within ~100 iterations so a linear axis buries every
+difference in the top 2% of the panel. Plotting $\text{ceiling} - \text{accuracy}$ on a log axis separates
+the same runs by two orders of magnitude.
+
+The notebook also records a negative result: aiming the rotation at the posterior's two largest-variance
+directions, worth 2-3× on $W_1$, is worth **nothing** here (0.98× and 1.00×) and loses to an arbitrary
+tridiagonal generator. $W_1$ is dominated by the large-variance directions; accuracy reads only the
+direction of $w$, so a generator that couples all coordinates serves it better.
 
 ## Running it
 
