@@ -1,1 +1,136 @@
-# Accelerating-Non-Differentiable-sampling
+# Accelerating anchored Langevin sampling with a skew-symmetric drift
+
+An extension of **Anchored Langevin Algorithms** (Gürbüzbalaban, Nguyen, Zhang
+and Zhu, [arXiv:2509.19455](https://arxiv.org/abs/2509.19455)) to *non-reversible*
+anchored dynamics, applied to heavy-tailed targets.
+
+The paper's anchored Langevin SDE replaces the potential $U$ by a smooth
+reference $U_0$ and corrects with a multiplicative scaling:
+
+$$dX_t = -\nabla U_0(X_t)e^{(U-U_0)(X_t)}dt + \sqrt2\,e^{(U-U_0)(X_t)/2}dW_t .$$
+
+We insert a constant **skew-symmetric** matrix $J = -J^\top$ into the drift:
+
+$$dX_t = e^{(U-U_0)(X_t)}\,(J-I)\,\nabla U_0(X_t)\,dt
+        + \sqrt2\,e^{(U-U_0)(X_t)/2}\,dW_t .$$
+
+The added field $e^{U-U_0}J\nabla U_0$ is $\pi$-divergence free, so the target is
+untouched while the dynamics becomes non-reversible — the classical acceleration
+mechanism of Hwang–Hwang-Sheu–Sheu and Lelièvre–Nier–Pavliotis, transplanted
+into the anchored framework where it also reaches heavy tails.
+
+## Headline results
+
+**The anisotropy is the whole story.**  On the paper's own Section 6.4 target,
+$\pi \propto (1+\|x\|^2)^{-\iota}$, no skew matrix can help at all: the target is
+radial, the added drift generates rotations that act unitarily on $L^2(\pi)$, and
+in the paper's own parameters ($\iota = 2$, hence $d = 1$) the only skew matrix
+is zero.  We reproduce that as a **negative control** — the measured speed-up is
+1.000× — and then move to anisotropic heavy-tailed targets, where the
+perturbation does work.
+
+**Speed-up at equal discretisation bias and equal cost per iteration**, computed
+exactly from the second-moment analysis (no Monte Carlo error), on Student-t
+targets with condition number $\kappa(\Sigma)$:
+
+| $\kappa$ | $d=2$ | $d=3$ | $d=5$ | $d=10$ |
+|---|---|---|---|---|
+| 1 | 1.00× | 1.00× | 1.00× | 1.00× |
+| 10 | 1.20× | 1.19× | 1.13× | 1.16× |
+| 100 | **6.83×** | 3.57× | 2.08× | 1.53× |
+| 1000 | **64.2×** | 20.3× | 9.49× | 4.91× |
+
+Confirmed by simulation.  With 5 000 particles on $d=2$, $\nu=5$,
+$\kappa=100$, started from $\mathcal N(0,10I)$ and averaged over 10
+replications, the iterations needed to bring the slow direction's variance
+within 10 % of the truth fall from **3 316** at $J=0$ to **831** at
+$\|J\|_2 = 3.46$ — a measured **4.0×**, against 6.8× predicted asymptotically.
+
+**The continuous-time gain is far larger than the realisable one.**  The SDE's
+second-moment rate improves by up to 380×; the per-iteration rate improves by at
+most 64×, because a larger drift forces a smaller stable stepsize.  The
+classical spectral-gap criterion, which is what the non-reversible literature
+optimises, overstates what a practitioner gets by roughly an order of magnitude.
+`experiments/exp5_rate_decomposition.py` quantifies the split.
+
+## What is proved, and what is not
+
+Proved for every constant skew $J$: invariance of $\pi$; the random-time-change
+representation and the exact equivalence of the two discretisations (the paper's
+Theorems 11 and 15); geometric ergodicity, under any Lyapunov function of the
+form $\Psi\circ U_0$, with **no** smallness condition on $J$; the ceiling
+$\operatorname{Tr}(A)/d$ on the attainable rate, together with an explicit $J$
+attaining it; and the no-go theorem for radial targets.
+
+Not proved: any extension of the paper's Theorem 14 (2-Wasserstein).  Its
+Assumption 12 requires $\beta > \tfrac d2 \kappa(\Sigma)$, which already fails at
+$J = 0$ for the ill-conditioned targets of interest — for $d=2,\kappa=100$ it
+would need $\nu > 200$.  In its place we derive an **exact** second-moment
+recursion for the discretisation, which gives the mean-square stability
+threshold, the stationary bias and the per-iteration rate in closed form rather
+than as bounds.  Details and the full list of non-claims: [`docs/THEORY.md`](docs/THEORY.md).
+
+## Fairness
+
+Adding $J$ makes the drift larger, so it needs a smaller stepsize.  Comparing at
+a common stepsize would be meaningless, so three protocols are run and all three
+are reported:
+
+* **common** — every method at one stepsize;
+* **equal bias** — each variant at the stepsize putting its stationary
+  covariance at the same relative error, solved from the exact analysis;
+* **tuned** — each method at its own best stepsize from a grid, with the whole
+  grid saved, not just the winner.
+
+Every convergence curve is plotted against the **estimator floor**: the same
+Wasserstein statistic evaluated on exact i.i.d. draws.  For the paper's own
+$\nu=3$ target that floor is $\approx 0.23$ at $n = 5\,000$ and decays only like
+$n^{-1/6}$, so a curve below it is measuring noise, not convergence.  A naive
+midpoint quantile estimator understates the true distance by 1.7× there, because
+it truncates the tail cells; both estimators are implemented.
+
+## Layout
+
+```
+skewanchor/
+  targets.py     log-quadratic (Student-t) targets: exact sampler, exact projected quantiles
+  nonsmooth.py   heavy-tailed and non-differentiable at once (Student-t core + MCP penalty)
+  skew.py        constructions of J, including the one attaining the Tr(A)/d ceiling
+  samplers.py    ULA, skew-ULA, anchored, skew-anchored, time-changed, MALA, underdamped
+  analysis.py    exact second-moment theory: stability, bias, rate; the rho_J diagnostic
+  metrics.py     sliced W2 with tail-resolving quadrature, the estimator floor, MMD, energy, IACT
+  runner.py      repeated ensemble runs, bootstrap bands, divergence reporting
+  plotting.py    figure style on a colour-vision-validated palette
+experiments/     exp1 theory sweeps, exp2 main simulation, exp3 single chain,
+                 exp4 non-smooth + heavy tailed, exp5 rate decomposition, make_figures
+tests/           15 correctness tests
+results/         data (JSON) and figures (PNG)
+```
+
+## Running it
+
+```bash
+pip install -r requirements.txt
+python -m pytest tests -q                       # 15 correctness tests, ~4 min
+
+python experiments/exp1_theory_sweeps.py        # exact sweeps, no simulation
+python experiments/exp5_rate_decomposition.py   # SDE gain vs realisable gain
+python experiments/exp2_anisotropic.py --setting d2_nu5_k100
+python experiments/exp3_single_chain.py
+python experiments/exp4_nonsmooth_heavy.py
+python experiments/make_figures.py
+```
+
+`exp2` accepts `--setting`, `--prior {normal10,uniform5}`, `--n`, `--steps`,
+`--reps` and `--bias`.  The paper's protocol is `--n 5000 --reps 100`.
+
+## Correctness
+
+The tests are the argument that the implementation is right, not that the method
+is good.  They check, among other things, that the paper's Section 6.4 target is
+reproduced exactly; that gradients match finite differences; that the
+Euler–Maruyama and time-changed discretisations agree to $10^{-15}$; that every
+sampler started at stationarity stays there; that the predicted stationary
+covariance matches a 150 000-particle simulation; that the mean-square stepsize
+limit really is where the scheme blows up; and that an isotropic target is inert
+to $J$.

@@ -46,6 +46,10 @@ __all__ = [
     "eta_for_bias",
     "deterministic_stepsize_limit",
     "summary",
+    "rho_J",
+    "continuous_ms_rate",
+    "continuous_second_moment_operator",
+    "assumption12",
     "optimize_J",
 ]
 
@@ -71,6 +75,53 @@ def ou_gap_ceiling(target):
 # ------------------------------------------------- second-moment operator
 
 
+def rho_J(target, J=None):
+    r"""``rho_J = lambda_max(Sigma^{1/2} S Sigma^{1/2})`` with ``S = sym(J Sigma^{-1})``.
+
+    One number controls two separate things for the anisotropic Student-t.
+
+    * The Euclidean one-sided Lipschitz constant of the anchored drift is
+      ``m_J = (2 beta / nu) lambda_min(Sigma^{-1} - S)``, so the paper's
+      Assumption 12(18) holds iff ``rho_J < 1``.
+    * The Euclidean Lyapunov drift condition (Assumption 1 of the paper) picks
+      up the same term.
+
+    ``S = (1/2)[J, Sigma^{-1}]``, so ``rho_J = 0`` exactly when ``J`` commutes
+    with ``Sigma`` -- and a commuting ``J`` is also the one that cannot
+    accelerate.  Acceleration and the Euclidean contraction constant are
+    therefore in direct tension.
+
+    The tension is an artefact of measuring in the Euclidean metric: for any
+    Lyapunov function of the form ``V = Psi(U_0)`` the skew drift contributes
+    exactly zero, because ``<J grad U0, grad V> = Psi'(U0) <J grad U0, grad U0>
+    = 0``.  Geometric ergodicity of the continuous-time dynamics therefore holds
+    for every skew ``J``, with no smallness condition; it is only the
+    synchronous-coupling W2 constants that degrade.
+    """
+    d = target.d
+    if J is None:
+        return 0.0
+    J = np.asarray(J, dtype=np.float64)
+    A = target.Sigma_inv
+    S = 0.5 * (J @ A + (J @ A).T)
+    H = target.Sigma_half @ S @ target.Sigma_half
+    return float(np.max(np.linalg.eigvalsh(0.5 * (H + H.T))))
+
+
+def assumption12(target, J=None):
+    """The paper's Assumption 12 constants ``(m, L, alpha)`` for the skew drift."""
+    d = target.d
+    A = target.Sigma_inv
+    c = 2.0 * target.beta / target.nu
+    Jm = np.zeros((d, d)) if J is None else np.asarray(J, dtype=np.float64)
+    S = 0.5 * (Jm @ A + (Jm @ A).T)
+    m = c * float(np.min(np.linalg.eigvalsh(A - S)))
+    L = c * float(np.linalg.norm((Jm - np.eye(d)) @ A, 2))
+    alpha = target.d * float(np.max(np.linalg.eigvalsh(A))) / target.nu
+    return {"m": m, "L": L, "alpha": alpha, "rho_J": rho_J(target, J),
+            "assumption12_holds": bool(0.0 < alpha < m)}
+
+
 def second_moment_operator(target, J, eta):
     r"""Matrix of ``L(C) = M C M^T + (2 eta/nu) Tr(Sigma^{-1} C) I``.
 
@@ -88,6 +139,33 @@ def second_moment_operator(target, J, eta):
     return np.kron(M, M) + (2.0 * eta / target.nu) * np.outer(
         np.eye(d).ravel(), A.ravel()
     )
+
+
+def continuous_second_moment_operator(target, J=None):
+    r"""Generator of ``d/dt C = -B C - C B^T + 2(1 + Tr(Sigma^{-1} C)/nu) I``.
+
+    The continuous-time counterpart of :func:`second_moment_operator`.  Its
+    spectral abscissa gives the exact exponential rate at which the second
+    moment of the *SDE* (no discretisation) reaches equilibrium, so comparing
+    it across ``J`` isolates the acceleration of the dynamics from the smaller
+    stepsize the skew drift forces on the scheme.
+    """
+    d = target.d
+    B = drift_matrix(target, J)
+    I = np.eye(d)
+    return -(np.kron(I, B) + np.kron(B, I)) + (2.0 / target.nu) * np.outer(
+        I.ravel(), target.Sigma_inv.ravel()
+    )
+
+
+def continuous_ms_rate(target, J=None):
+    """Exponential rate of second-moment convergence for the SDE itself.
+
+    Positive iff the second moment converges; this is the honest statement of
+    ergodicity in the regime where the paper's Assumption 12 fails.
+    """
+    ev = np.linalg.eigvals(continuous_second_moment_operator(target, J))
+    return float(-np.max(ev.real))
 
 
 def ms_factor(target, J, eta):
