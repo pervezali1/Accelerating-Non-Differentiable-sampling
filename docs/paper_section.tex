@@ -1,0 +1,188 @@
+% Draft subsection extending "Anchored Langevin Algorithms" (arXiv:2509.19455).
+% Numbering placeholders (\ref{...}) point at the existing labels of that paper:
+%   eq:al-sde  (Eq. 5-7)   thm:invariant (Thm 2)   thm:heavy (Thm 3)
+%   thm:timechange (Thm 11)   asm:msq (Asm 12)   thm:w2 (Thm 14)
+% All numbers below are produced by the code at
+%   https://github.com/pervezali1/Accelerating-Non-Differentiable-sampling
+
+\section{Non-reversible anchored Langevin dynamics}
+\label{sec:skew}
+
+The anchored Langevin SDE \eqref{eq:al-sde} is reversible with respect to
+$\pi\propto e^{-U}$.  Reversibility is not required for correctness, and it is
+known that a suitable non-reversible perturbation can only improve the rate of
+convergence of a diffusion to its stationary law
+\citep{hwang1993accelerating,hwang2005accelerating,lelievre2013optimal,%
+duncan2016variance,reybellet2015irreversible}.  We show that such a
+perturbation is available inside the anchored framework, that it costs one
+matrix--vector product per step, and that it is effective precisely on the
+anisotropic heavy-tailed targets that the reversible dynamics handles worst.
+
+Let $J\in\mathbb R^{d\times d}$ be a constant skew-symmetric matrix,
+$J^\top=-J$, and consider
+\begin{equation}\label{eq:sal-sde}
+  dX_t \;=\; e^{(U-U_0)(X_t)}\,(J-I)\,\nabla U_0(X_t)\,dt
+        \;+\;\sqrt2\,e^{(U-U_0)(X_t)/2}\,dW_t ,
+\end{equation}
+which we call the \emph{skew-anchored Langevin SDE}.  Setting $J=0$ recovers
+\eqref{eq:al-sde}.
+
+\subsection{Invariance and ergodicity}
+
+\begin{theorem}\label{thm:skew-invariant}
+Let $U_0\in C^2$, $U\in C^1$ with $\int e^{-U}<\infty$, and suppose
+\eqref{eq:sal-sde} does not explode.  Then $\pi\propto e^{-U}$ is an invariant
+measure of \eqref{eq:sal-sde} for every constant skew-symmetric $J$.
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+The generator is
+$\mathcal L_Jf=e^{U-U_0}\big(\Delta f-\langle\nabla U_0,\nabla f\rangle
++\langle J\nabla U_0,\nabla f\rangle\big)$.  Using
+$e^{(U-U_0)}e^{-U}=e^{-U_0}$, the added drift $c=e^{U-U_0}J\nabla U_0$ satisfies
+\[
+  \nabla\!\cdot\!\big(e^{-U}c\big)=\nabla\!\cdot\!\big(e^{-U_0}J\nabla U_0\big)
+  =e^{-U_0}\Big(\operatorname{Tr}\big(J\nabla^2U_0\big)-\langle\nabla U_0,J\nabla U_0\rangle\Big)=0,
+\]
+since $\operatorname{Tr}(JH)=0$ for skew $J$ and symmetric $H$, and
+$\langle v,Jv\rangle=0$.  Hence $\int\mathcal L_Jf\,d\pi=0$ on $C_c^\infty$.
+\end{proof}
+
+In $L^2(\pi)$ the added term is antisymmetric, so the Dirichlet form of
+Lemma~\ref{lem:dirichlet} is unchanged; the perturbation cannot slow
+convergence and generically accelerates it.
+
+\begin{proposition}\label{prop:skew-lyapunov}
+Let $V=\Psi\circ U_0$ with $\Psi\in C^2$ increasing.  Then
+$\mathcal L_JV=\mathcal LV$ identically.  Consequently every drift condition of
+the form of Assumption~\ref{asm:drift} verified with such a $V$ holds for every
+skew $J$ with the same constants, and Theorems~\ref{thm:invariant} and
+\ref{thm:heavy} extend verbatim.
+\end{proposition}
+
+\begin{proof}
+$\langle J\nabla U_0,\nabla V\rangle=\Psi'(U_0)\langle J\nabla U_0,\nabla U_0\rangle=0$.
+\end{proof}
+
+For the heavy-tailed targets of Theorem~\ref{thm:heavy}, where
+$U_0=\beta\log q$, Proposition~\ref{prop:skew-lyapunov} applies with
+$\Psi(u)=e^{u/\beta}$, so $V=q$.  The random time change of
+Section~\ref{sec:timechange} also carries over: $X_t=Z_{\ell(t)}$ where $Z$
+solves $dZ_t=(J-I)\nabla U_0(Z_t)dt+\sqrt2\,d\widetilde W_t$ and $\ell$ is
+unchanged, and the two Euler--Maruyama schemes remain pathwise identical under
+synchronous coupling.
+
+\begin{remark}[The mean-square analysis does not extend]
+Assumption~\ref{asm:msq} asks for a one-sided Lipschitz constant $m>\alpha$.
+For the Student-$t$ target of Example~\ref{ex:studentt} one finds
+$m_J=\tfrac{2\beta}{\nu}\lambda_{\min}(\Sigma^{-1}-S)$ with
+$S=\tfrac12[J,\Sigma^{-1}]$, so $m_J>0$ requires
+$\rho_J:=\lambda_{\max}(\Sigma^{1/2}S\Sigma^{1/2})<1$; and $\rho_J=0$ exactly
+when $J$ commutes with $\Sigma$, which is also exactly when $J$ cannot
+accelerate.  Moreover $\alpha<m$ already fails at $J=0$ unless
+$\beta>\tfrac d2\kappa(\Sigma)$, the condition of
+Corollary~\ref{cor:studentt}.  We therefore do not extend Theorem~\ref{thm:w2};
+for the canonical anchor $\beta=\tfrac{d+\nu}{2}-1$ we instead compute the
+second moment of the discretisation exactly (Section~\ref{sec:skew-msq}).
+\end{remark}
+
+\subsection{Exact second-moment analysis of the discretisation}
+\label{sec:skew-msq}
+
+For $U=\tfrac{d+\nu}{2}\log q$ and $U_0=\beta\log q$ with
+$\beta=\tfrac{d+\nu}{2}-1$, the drift of \eqref{eq:sal-sde} is linear and the
+diffusion coefficient is the scalar $q^{1/2}$, so the Euler--Maruyama scheme is
+\[
+  x_{k+1}=(I-\eta B)x_k+\sqrt{2\eta}\,q(x_k)^{1/2}\xi_{k+1},
+  \qquad B=\tfrac{2\beta}{\nu}(I-J)\Sigma^{-1}.
+\]
+Because $q$ is exactly quadratic and the noise is isotropic given $x$, the
+second-moment matrix obeys the \emph{exact} affine recursion
+\begin{equation}\label{eq:msq-recursion}
+  C_{k+1}=MC_kM^\top+2\eta\Big(1+\tfrac{\operatorname{Tr}(\Sigma^{-1}C_k)}{\nu}\Big)I,
+  \qquad M=I-\eta B,
+\end{equation}
+whose linear part is
+$L=M\otimes M+\tfrac{2\eta}{\nu}\operatorname{vec}(I)\operatorname{vec}(\Sigma^{-1})^\top$.
+The scheme is mean-square stable iff $\rho(L)<1$; the stationary covariance of
+the chain is the fixed point of \eqref{eq:msq-recursion}, giving the
+discretisation bias exactly rather than as an $O(\eta)$ bound; and
+$-\log\rho(L)$ is the exact per-iteration rate.  Note that the stationary
+covariance of the \emph{SDE} is $\tfrac{\nu}{\nu-2}\Sigma$ for every $J$, since
+the $J$ terms cancel in $BC+CB^\top$; this is what makes a comparison across
+$J$ at equal bias well posed.
+
+\subsection{Choosing $J$, and a ceiling}
+
+Since $\operatorname{Tr}(JA)=0$ for skew $J$ and symmetric $A$, the eigenvalues
+of $(I-J)A$ sum to $\operatorname{Tr}(A)$, whence
+\begin{equation}\label{eq:ceiling}
+  \min_i\operatorname{Re}\lambda_i\big((I-J)A\big)\le\frac{\operatorname{Tr}(A)}{d},
+\end{equation}
+against $\lambda_{\min}(A)$ at $J=0$.  The bound \eqref{eq:ceiling} is attained:
+$(I+K)A$ is similar to $A+A^{1/2}KA^{1/2}$, so it suffices to rotate to a basis
+in which $A$ has constant diagonal $\bar a=\operatorname{Tr}(A)/d$ and there
+replace the strictly lower triangle by minus its transpose, a skew move leaving
+an upper-triangular matrix with spectrum $\{\bar a\}$.
+
+\begin{proposition}[No gain on radial targets]\label{prop:radial}
+If $U$ and $U_0$ are radial, then for every constant skew $J$ the added drift
+generates rotations, which commute with $\mathcal L$ and act unitarily on
+$L^2(\pi)$.  Hence $\|e^{t\mathcal L_J}f\|_{L^2(\pi)}=\|e^{t\mathcal L}f\|_{L^2(\pi)}$
+for all $f$ and $t$: the perturbation has no effect.
+\end{proposition}
+
+Proposition~\ref{prop:radial} applies to the target
+$\pi\propto(1+\|x\|^2)^{-\iota}$ of Section~\ref{sec:heavyexp}; note also that
+$\iota>1+d/2$ with $\iota=2$ forces $d=1$, where the only skew matrix is $0$.
+The experiments below therefore use anisotropic heavy-tailed targets.
+
+\subsection{Numerical experiments}
+
+We take $\pi$ to be the $d$-dimensional Student-$t$ with $\nu$ degrees of
+freedom and scale $\Sigma$ of condition number $\kappa$, anchored with
+$\beta=\tfrac{d+\nu}{2}-1$, and follow the protocol of
+Section~\ref{sec:heavyexp}: $5{,}000$ particles, priors $\mathcal N(0,10I)$ and
+$\mathrm{Uniform}(-5,5)$, sliced 2-Wasserstein distance against the exact
+projected quantiles.  Since a larger $\|J\|$ forces a smaller stable stepsize,
+each variant is run at the stepsize that puts its stationary covariance at a
+common relative error of $2\%$, computed from \eqref{eq:msq-recursion}; the
+comparison is then at equal accuracy and equal cost per iteration.
+
+Table~\ref{tab:skew-speedup} reports the resulting speed-up
+$-\log\rho(L_J)\,/\,{-\log\rho(L_0)}$.
+
+\begin{table}[t]
+\centering
+\caption{Per-iteration speed-up at equal discretisation bias, exact.}
+\label{tab:skew-speedup}
+\begin{tabular}{lrrrr}
+\toprule
+$\kappa(\Sigma)$ & $d=2$ & $d=3$ & $d=5$ & $d=10$\\
+\midrule
+1    & 1.00 & 1.00 & 1.00 & 1.00\\
+10   & 1.20 & 1.19 & 1.13 & 1.16\\
+100  & 6.83 & 3.57 & 2.08 & 1.53\\
+1000 & 64.2 & 20.3 & 9.49 & 4.91\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Simulation confirms the prediction.  For $d=2$, $\nu=5$, $\kappa=100$ averaged
+over $10$ runs, the iterations needed to bring the variance along the slowest
+direction of $\Sigma$ within $10\%$ of the truth fall from $3316$ at $J=0$ to
+$831$ at $\|J\|_2=3.46$, a factor $4.0$; no run diverged.
+
+Two caveats deserve emphasis.  First, the gain in the \emph{continuous-time}
+rate is much larger than the realisable one --- up to $380\times$ against
+$64\times$ per iteration --- because the larger drift shrinks the mean-square
+stable stepsize; optimising \eqref{eq:ceiling} alone therefore selects a
+$\|J\|$ far beyond the useful range.  Second, the gain decreases with dimension
+at fixed $\kappa$, and we make no claim about the high-dimensional regime.
+
+Finally, we combine both difficulties the anchored framework is designed for by
+taking $U=\iota\log q+\sum_i p_\lambda(x_i)$ with $p_\lambda$ the MCP penalty of
+Section~\ref{sec:regularisers} and $U_0=\beta\log q+\sum_i p^\varepsilon_\lambda(x_i)$
+its smoothing \eqref{eq:mcp-smoothed}.  The penalty is bounded, so the
+polynomial tail is preserved and exact reference samples are available by
+rejection from the Student-$t$ core.

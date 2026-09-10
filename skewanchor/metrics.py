@@ -94,7 +94,29 @@ def _quad(n):
     return _QUAD_CACHE[n]
 
 
-def w2_squared_1d_to_exact(x, ppf, isf=None):
+_REF_CACHE = {}
+_MAX_CACHE = 64          # each entry holds ~n reference quantiles
+
+
+def _reference_values(n, ppf, isf, key=None):
+    """Reference quantiles at the quadrature nodes, cached.
+
+    The nodes depend only on ``n``, and the reference law only on ``key``, so a
+    sweep that evaluates the same statistic at many iterations and replications
+    pays for the (slow) quantile function exactly once.
+    """
+    if key is not None and (n, key) in _REF_CACHE:
+        return _REF_CACHE[(n, key)]
+    u_mid, w_mid, v_tail, w_tail = _quad(n)
+    vals = (ppf(u_mid), ppf(v_tail), isf(v_tail))
+    if key is not None:
+        if len(_REF_CACHE) >= _MAX_CACHE:
+            _REF_CACHE.clear()
+        _REF_CACHE[(n, key)] = vals
+    return vals
+
+
+def w2_squared_1d_to_exact(x, ppf, isf=None, key=None):
     r"""Exact ``W_2^2`` between the empirical law of ``x`` and a continuous law.
 
     ``W_2^2 = int_0^1 (F_n^{-1}(u) - F^{-1}(u))^2 du``, with ``F_n^{-1}`` the
@@ -110,19 +132,23 @@ def w2_squared_1d_to_exact(x, ppf, isf=None):
         raise ValueError("need at least 3 samples")
     if isf is None:
         isf = lambda w: ppf(1.0 - w)
-    u_mid, w_mid, v_tail, w_tail = _quad(n)
+    _, w_mid, _, w_tail = _quad(n)
+    ref_mid, ref_lo, ref_hi = _reference_values(n, ppf, isf, key)
 
-    total = float(np.sum(w_mid * (x[1:-1, None] - ppf(u_mid)) ** 2))
-    total += float(np.sum(w_tail * (x[0] - ppf(v_tail)) ** 2))
-    total += float(np.sum(w_tail * (x[-1] - isf(v_tail)) ** 2))
+    total = float(np.sum(w_mid * (x[1:-1, None] - ref_mid) ** 2))
+    total += float(np.sum(w_tail * (x[0] - ref_lo) ** 2))
+    total += float(np.sum(w_tail * (x[-1] - ref_hi) ** 2))
     return total
 
 
-def w2_1d_to_exact(x, ppf, isf=None):
-    return float(np.sqrt(max(w2_squared_1d_to_exact(x, ppf, isf), 0.0)))
+def w2_1d_to_exact(x, ppf, isf=None, key=None):
+    return float(np.sqrt(max(w2_squared_1d_to_exact(x, ppf, isf, key), 0.0)))
 
 
-def w2_squared_1d_midpoint(x, ppf):
+_MID_CACHE = {}
+
+
+def w2_squared_1d_midpoint(x, ppf, key=None):
     """Naive midpoint quantile estimator ``(1/n) sum_j (x_(j) - F^{-1}((j-0.5)/n))^2``.
 
     This is the estimator most implementations reach for, and it *truncates* the
@@ -132,8 +158,15 @@ def w2_squared_1d_midpoint(x, ppf):
     """
     x = np.sort(np.asarray(x, dtype=np.float64).ravel())
     n = x.size
-    u = (np.arange(n) + 0.5) / n
-    return float(np.mean((x - ppf(u)) ** 2))
+    if key is not None and (n, key) in _MID_CACHE:
+        ref = _MID_CACHE[(n, key)]
+    else:
+        ref = ppf((np.arange(n) + 0.5) / n)
+        if key is not None:
+            if len(_MID_CACHE) >= _MAX_CACHE:
+                _MID_CACHE.clear()
+            _MID_CACHE[(n, key)] = ref
+    return float(np.mean((x - ref) ** 2))
 
 
 def sliced_w2_midpoint(samples, target, directions=None):
@@ -141,8 +174,10 @@ def sliced_w2_midpoint(samples, target, directions=None):
     directions = axis_directions(target.d) if directions is None else directions
     total = 0.0
     for theta in directions:
+        key = (float(target.nu), float(np.asarray(theta) @ target.mu),
+               target.projected_scale(theta))
         total += w2_squared_1d_midpoint(
-            samples @ theta, lambda u, th=theta: target.projected_ppf(u, th)
+            samples @ theta, lambda u, th=theta: target.projected_ppf(u, th), key=key
         )
     return float(np.sqrt(total / len(directions)))
 
@@ -172,10 +207,15 @@ def sliced_w2(samples, target, directions):
     total = 0.0
     for theta in directions:
         proj = samples @ theta
+        # the projected law of a multivariate t is a univariate t, so
+        # (nu, loc, scale) identifies the reference completely
+        key = (float(target.nu), float(np.asarray(theta) @ target.mu),
+               target.projected_scale(theta))
         total += w2_squared_1d_to_exact(
             proj,
             lambda u, th=theta: target.projected_ppf(u, th),
             lambda w, th=theta: target.projected_isf(w, th),
+            key=key,
         )
     return float(np.sqrt(total / len(directions)))
 
