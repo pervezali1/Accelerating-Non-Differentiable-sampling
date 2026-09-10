@@ -206,6 +206,29 @@ replicas instead of three, and sweeping $\alpha$ over $\{1,2,4,8\}$:
 The smoothing lemma and the bound live in [`ands/penalties.py`](ands/penalties.py), with
 `tests/test_penalties.py` pinning both.
 
+## The multivariate Laplace study
+
+[`notebooks/Unconstrained_Sampling_ANDS.ipynb`](notebooks/Unconstrained_Sampling_ANDS.ipynb) compares
+$J = 0$ against a constant skew on two multivariate Laplace targets. Unconstrained, every constant
+antisymmetric $J$ leaves $\pi$ invariant, so the choice is purely a rate choice — and the original
+tridiagonal $J_a$ made it arbitrarily.
+
+| at $a = 4$ | Target A | Target B |
+|---|---|---|
+| $J_a$ tridiagonal | 1.66× [1.59, 1.74] | 1.58× [1.46, 1.72] |
+| $J$ **aligned** to the 2 largest-variance eigenvectors | **3.18× [3.02, 3.34]** | **3.41× [3.12, 3.73]** |
+| $J$ anti-aligned (2 smallest) | 1.10× [1.03, 1.19] | 1.11× [1.04, 1.18] |
+
+Aiming is worth about a factor of two on top of the strength, and it is what lets the strength be raised:
+the aligned field improves to 3.69× and 4.56× at $a = 8$, where the tridiagonal one stalls on A and becomes
+unmeasurable on B. At $a \le 4$ the acceleration is free — stationary $W_1$ sits at 0.83-0.99× the floor.
+
+The notebook also carries a correction to the measurement: estimating the $W_1$ floor against one fixed
+reference has a 15-20% per-coordinate spread, which on Target B put the $\tau$ threshold inside the
+stationary noise and made every speed-up look negative. Drawing both sides fresh over 24 pairs, and
+setting the threshold at $3\times$ the floor, fixes it; a guard labels any row where $\tau$ is still not
+resolvable.
+
 ## Standalone, in one file
 
 [`examples/learning_curve_standalone.ipynb`](examples/learning_curve_standalone.ipynb) reproduces
