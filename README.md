@@ -159,6 +159,13 @@ At these strengths the acceleration is **free**: every stationary $W_1$ interval
 straddles the sampling floor, and the projection atom on $\partial K$ is flat to within 0.07 percentage
 points across all four schemes.
 
+**Getting the atom below $J = 0$.** At fixed $\eta$ the projection atom is flat across $s$, and must be:
+it is a discretisation artefact driven by the *normal* step near the wall, and $J_s$ is tangential. But it
+scales like $\sqrt\eta$, so the speed-up can be spent on refining $\eta$. At $s = 16$ with $\eta/2$,
+$J_s$ reaches the floor in **1.24× and 1.38× fewer iterations** than $J = 0$ *and* leaves **31% less mass**
+on the wall (1.82% against 2.62%, 1.44% against 2.09%). Refining to $\eta/4$ drops the atom further but
+costs more iterations than the speed-up affords.
+
 Aiming is most of the effect. At the same $s = 16$, rotating in the plane of the two largest-variance
 eigenvectors gives 2.12× and 2.81×; the two smallest gives 1.04× [0.96, 1.13] and 1.14× [1.08, 1.20] —
 nothing. That is the argument for this field over the cross product $s\,(x \times w)$, which is equally
