@@ -107,3 +107,11 @@
     subgradient ULA eta=4.29e-03 iters_to_2xfloor=    -1 final W2=0.2062
     subgradient ULA eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.1562
 
+== exp7_bias_audit.json: state-dependent fields ==
+Traceback (most recent call last):
+  File "/home/user/Accelerating-Non-Differentiable-sampling/experiments/summarize.py", line 190, in <module>
+    summarize_exp7()
+  File "/home/user/Accelerating-Non-Differentiable-sampling/experiments/summarize.py", line 167, in summarize_exp7
+    print(f"  baseline (Euler, J=0): {r['base_iters']:.0f} iterations")
+                                      ~^^^^^^^^^^^^^^
+TypeError: list indices must be integers or slices, not str

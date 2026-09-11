@@ -172,7 +172,39 @@ dominates it. That is why the two criteria rank the methods differently, and it
 is why Section 8 reports the speed-ups under the tail-sensitive criterion as
 well.
 
-## 8. Exact numbers for the constant field
+## 8. The same comparison under the tail-sensitive criterion
+
+Re-selecting every stepsize so that the **stationary covariance** error is 2 %
+instead, and verifying the achieved value rather than trusting the
+extrapolation:
+
+| method | $\eta$ | achieved covariance bias | iterations | speed-up |
+|---|---|---|---|---|
+| Euler, $J=0$ | 1.27e-3 | 0.0203 | 2374 | 1.00× |
+| Euler, constant $\|J\|$=4.95 | 3.40e-4 | 0.0186 | 678 | 3.50× |
+| Cayley, constant $\|J\|$=19.8 | 4.30e-4 | 0.0192 | 362 | 6.56× |
+| Cayley, stream $a=-3$, $\|J\|$=9.9 | 1.09e-4 | 0.0171 | 319 | 7.44× |
+| Euler, stream $a=-3$, $\|J\|$=4.95 | 1.78e-4 | 0.0146 | 219 | **10.84×** |
+
+**The ordering survives, the magnitudes do not.** A tilted state-dependent field
+is still the best method, still beats the best constant field, and still beats
+it by more than the integrator does on its own. But 79× at matched bulk accuracy
+becomes 10.8× at matched covariance accuracy. Both numbers are real; they answer
+different questions.
+
+Which to quote depends on the application. If the tail is the point — and on a
+heavy-tailed target it usually is — the 10.8× figure is the honest one. Against
+the first round's best constant field under this same criterion (3.5× measured,
+6.8× exact), state dependence is worth roughly a further 2 to 3 times.
+
+Two details. The two stream rows came in *under* the 2 % target (0.0146 and
+0.0171), so they were given slightly conservative stepsizes and 10.84× is if
+anything a small underestimate. And under this criterion the Cayley variant is
+*worse* than Euler for the tilted field, because the bias is then dominated by
+the nonlinear remainder that the split step takes explicitly — advancing the
+linear part exactly no longer buys anything.
+
+## 9. Exact numbers for the constant field
 
 For a constant field the second-moment recursion is exact for any integrator, so
 these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
@@ -187,15 +219,13 @@ these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
 The integrator roughly triples the exact speed-up everywhere, and closes about
 40 % of the gap to the continuous-time ceiling.
 
-## 9. Threats to validity
+## 10. Threats to validity
 
-* **Two accuracy criteria disagree.** Matching the stationary *covariance* and
-  matching stationary *quantiles* pick different stepsizes for a skew method,
-  because its bias sits mostly in the tail. Covariance is exactly computable but
-  needs fourth moments to estimate, which at $\nu = 5$ makes the sample version
-  very noisy; the quantile criterion is what the simulations use, calibrated to
-  agree with the covariance criterion at $J=0$. Under the covariance criterion
-  the constant-field Euler speed-up is 6.8× rather than 7.7×.
+* **Two accuracy criteria disagree, by a factor of seven.** 79× at matched bulk
+  accuracy, 10.8× at matched covariance accuracy, for the same method. Sections
+  7 and 8 give both. The ordering of methods is the same under either, so the
+  qualitative conclusion is safe; any single speed-up number is not, unless the
+  criterion is stated with it.
 * **The tilt sweep is not closed.** The speed-up is still improving at the edge
   of the range in places, and there is no analogue of the
   $\operatorname{Tr}(A)/d$ ceiling for a state-dependent field, so how far the

@@ -21,9 +21,14 @@ into the anchored framework where it also reaches heavy tails.
 
 ## Headline: a state-dependent field, and a better integrator
 
-Two changes take the speed-up on the anisotropic heavy-tailed target from 7× to
-about 80×, measured at equal accuracy and equal cost per iteration
-($d=2$, $\nu=5$, $\kappa(\Sigma)=100$).
+Two changes improve on the first round's constant field, at equal accuracy and
+equal cost per iteration ($d=2$, $\nu=5$, $\kappa(\Sigma)=100$). How much they
+improve it depends on what "equal accuracy" means, and the honest answer is a
+range: **79× at matched bulk accuracy, 10.8× at matched covariance accuracy.**
+Both are measured; they answer different questions. A skew perturbation's
+discretisation error concentrates in the tail, so a criterion built on
+mid-range quantiles cannot see it and a covariance criterion is dominated by it.
+The ordering of methods is the same under either.
 
 **Let $J$ depend on $x$ — but add the correction term.** Keeping the drift in
 the form $e^{U-U_0}J(x)\nabla U_0$ forces
@@ -45,22 +50,24 @@ limit. The part that grows with $\|J\|$ is explicit Euler's error on a
 rotation. Advancing the linear part by its Cayley transform or matrix
 exponential removes it.
 
-| method | iterations | speed-up |
+| method | matched bulk accuracy | matched covariance accuracy |
 |---|---|---|
-| Euler, $J = 0$ | 2685 | 1.0× |
-| Euler, best constant field | 348 | 7.7× |
-| Cayley, best constant field | 202 | 13.3× |
-| Euler, best tilted stream field | 45 | 59.7× |
-| Cayley, best tilted stream field | 34 | **79.0×** |
+| Euler, $J = 0$ | 1.0× | 1.0× |
+| Euler, best constant field | 7.7× | 3.5× |
+| Cayley, best constant field | 13.3× | 6.6× |
+| Euler, best tilted stream field | 59.7× | **10.8×** |
+| Cayley, best tilted stream field | **79.0×** | 7.4× |
 
-The two effects are independent and compose: the integrator is worth about
-1.7×, the tilt about 6×.
+Under either criterion the tilted state-dependent field is the best method and
+beats the best constant field by more than the integrator does on its own.
+Under the strict criterion it is worth roughly a further 2 to 3 times over the
+first round.
 
 Confirmed on the paper's own sliced-2-Wasserstein metric with 5000 particles and
 8 replications: 2470 iterations to twice the estimator floor at $J=0$, 350 with
-the best constant field, and **59 with the tilted field** — 41.9× — with every
+the best constant field, and 59 with the tilted field — 41.9× — with every
 final $W_2$ inside the floor's uncertainty, so the fast methods really are
-converged.
+converged rather than passing through.
 
 At matched *effective* rotation strength and the same integrator the comparison
 is starker still: 59.7× for the tilted field against 5.9× for the constant one.

@@ -1,0 +1,42 @@
+[
+ {
+  "label": "Euler, J=0",
+  "eta": 0.001072,
+  "frobenius": 0.01691438058343245,
+  "per_direction_variance": 0.07570549479319055,
+  "quantile_mid": 0.043399707037530266,
+  "quantile_99": 0.03160869424885049
+ },
+ {
+  "label": "Euler, constant |J|=4.95",
+  "eta": 0.00083,
+  "frobenius": 0.04888735321216834,
+  "per_direction_variance": 0.09478309948599128,
+  "quantile_mid": 0.045437659711723866,
+  "quantile_99": 0.04698253594781354
+ },
+ {
+  "label": "Cayley, constant |J|=19.8",
+  "eta": 0.000666,
+  "frobenius": 0.030986802040737737,
+  "per_direction_variance": 0.09906772708080269,
+  "quantile_mid": 0.04725026134139165,
+  "quantile_99": 0.05065998056236043
+ },
+ {
+  "label": "Euler, stream a=-3 |J|=4.95",
+  "eta": 0.000934,
+  "frobenius": 0.10520527278203416,
+  "per_direction_variance": 0.10557461297775705,
+  "quantile_mid": 0.04774139542385081,
+  "quantile_99": 0.07287442808948863
+ },
+ {
+  "label": "Euler, stream a=-2 |J|=9.9",
+  "eta": 0.000591,
+  "frobenius": 0.0710883155594028,
+  "per_direction_variance": 0.10349815012140207,
+  "quantile_mid": 0.04670944937176791,
+  "quantile_99": 0.05561649706477634
+ }
+]
