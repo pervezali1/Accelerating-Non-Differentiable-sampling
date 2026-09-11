@@ -163,7 +163,18 @@ def summarize_exp1_exp5():
 def summarize_exp7():
     for path in sorted(glob.glob(os.path.join(DATA, "exp7_*.json"))):
         r = runner.load_json(path)
-        print(f"== {os.path.basename(path)}: state-dependent fields ==")
+        name = os.path.basename(path)
+        if isinstance(r, list):          # the two audit files are flat lists of rows
+            print(f"== {name} ==")
+            for row in r:
+                bits = [f"{k}={row[k]:.4g}" for k in
+                        ("eta", "cov_bias", "frobenius", "per_direction_variance",
+                         "quantile_mid", "quantile_99", "speedup") if k in row]
+                extra = f" iters={row['iters']:.0f}" if "iters" in row else ""
+                print(f"    {row.get('label', '?'):32s} " + "  ".join(bits) + extra)
+            print()
+            continue
+        print(f"== {name}: state-dependent fields ==")
         print(f"  baseline (Euler, J=0): {r['base_iters']:.0f} iterations")
         best_exact = {}
         for row in r.get("exact", []):

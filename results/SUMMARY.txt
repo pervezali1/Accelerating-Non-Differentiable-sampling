@@ -107,11 +107,36 @@
     subgradient ULA eta=4.29e-03 iters_to_2xfloor=    -1 final W2=0.2062
     subgradient ULA eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.1562
 
-== exp7_bias_audit.json: state-dependent fields ==
-Traceback (most recent call last):
-  File "/home/user/Accelerating-Non-Differentiable-sampling/experiments/summarize.py", line 190, in <module>
-    summarize_exp7()
-  File "/home/user/Accelerating-Non-Differentiable-sampling/experiments/summarize.py", line 167, in summarize_exp7
-    print(f"  baseline (Euler, J=0): {r['base_iters']:.0f} iterations")
-                                      ~^^^^^^^^^^^^^^
-TypeError: list indices must be integers or slices, not str
+== exp7_bias_audit.json ==
+    Euler, J=0                       eta=0.001072  frobenius=0.01691  per_direction_variance=0.07571  quantile_mid=0.0434  quantile_99=0.03161
+    Euler, constant |J|=4.95         eta=0.00083  frobenius=0.04889  per_direction_variance=0.09478  quantile_mid=0.04544  quantile_99=0.04698
+    Cayley, constant |J|=19.8        eta=0.000666  frobenius=0.03099  per_direction_variance=0.09907  quantile_mid=0.04725  quantile_99=0.05066
+    Euler, stream a=-3 |J|=4.95      eta=0.000934  frobenius=0.1052  per_direction_variance=0.1056  quantile_mid=0.04774  quantile_99=0.07287
+    Euler, stream a=-2 |J|=9.9       eta=0.000591  frobenius=0.07109  per_direction_variance=0.1035  quantile_mid=0.04671  quantile_99=0.05562
+
+== exp7_covariance_criterion.json ==
+    Euler, J=0                       eta=0.001268  cov_bias=0.02026  speedup=1 iters=2374
+    Euler, constant |J|=4.95         eta=0.0003396  cov_bias=0.01858  speedup=3.501 iters=678
+    Cayley, constant |J|=19.8        eta=0.0004299  cov_bias=0.01921  speedup=6.558 iters=362
+    Euler, stream a=-3 |J|=4.95      eta=0.0001776  cov_bias=0.01459  speedup=10.84 iters=219
+    Cayley, stream a=-3 |J|=9.9      eta=0.0001086  cov_bias=0.01714  speedup=7.442 iters=319
+
+== exp7_state_dependent_k100.json: state-dependent fields ==
+  baseline (Euler, J=0): 2685 iterations
+    exact, constant field, euler  :   6.83x at |J|=4.95
+    exact, constant field, cayley :  17.18x at |J|=9.90
+    exact, constant field, expm   :  20.41x at |J|=316.80
+    stream a=-3.00 |J|= 9.90 cayley            78.97x (eta=6.34e-04, 34 iterations)
+    stream a=-4.00 |J|= 9.90 cayley            68.85x (eta=4.44e-04, 39 iterations)
+    stream a=-2.00 |J|= 9.90 euler             59.67x (eta=5.91e-04, 45 iterations)
+    stream a=-4.00 |J|= 4.95 euler             51.63x (eta=7.26e-04, 52 iterations)
+    stream a=-3.00 |J|= 4.95 euler             51.63x (eta=9.34e-04, 52 iterations)
+    stream a=-6.00 |J|= 4.95 cayley            51.63x (eta=4.69e-04, 52 iterations)
+    stream a=-6.00 |J|= 9.90 cayley            51.63x (eta=2.18e-04, 52 iterations)
+    stream a=-6.00 |J|= 4.95 euler             45.51x (eta=4.39e-04, 59 iterations)
+    stream a=-2.00 |J|= 4.95 euler             45.51x (eta=9.38e-04, 59 iterations)
+    stream a=-3.00 |J|= 9.90 euler             45.51x (eta=5.95e-04, 59 iterations)
+    stream a=-4.00 |J|= 4.95 cayley            45.51x (eta=6.41e-04, 59 iterations)
+    stream a=-3.00 |J|= 4.95 cayley            39.49x (eta=6.75e-04, 68 iterations)
+    best: stream a=-3.00 |J|= 9.90 cayley at 78.97x
+
