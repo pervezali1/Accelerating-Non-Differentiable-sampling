@@ -147,7 +147,32 @@ Every final $W_2$ sits inside the floor's uncertainty, so the comparison really
 is at equal accuracy and the fast methods are converged, not merely passing
 through.
 
-## 7. Exact numbers for the constant field
+## 7. Bias audit: the criteria are not interchangeable
+
+At each method's chosen stepsize, four ways of asking how accurate it is:
+
+| method | Frobenius covariance | worst per-direction variance | quantiles 50–90 | quantile 99 |
+|---|---|---|---|---|
+| Euler, $J=0$ | 0.017 | 0.076 | 0.043 | 0.032 |
+| Euler, constant $\|J\|$=4.95 | 0.049 | 0.095 | 0.045 | 0.047 |
+| Cayley, constant $\|J\|$=19.8 | 0.031 | 0.099 | 0.047 | 0.051 |
+| Euler, stream $a=-3$ | 0.105 | 0.106 | 0.048 | 0.073 |
+| Euler, stream $a=-2$, $\|J\|$=9.9 | 0.071 | 0.104 | 0.047 | 0.056 |
+
+The criterion the comparison equalises — quantiles 50 to 90 — is matched to
+within 10 % across every method, as it should be. **Nothing else is.** The
+covariance error of the tilted field is six times the baseline's, and its
+99th-percentile error twice. So the faster methods are not uniformly as accurate
+as the baseline: their error is concentrated in the tail, and the bulk criterion
+cannot see it.
+
+For the baseline the worst direction is the stiff one, which barely enters the
+Frobenius norm; for the tilted field the worst direction is the soft one, which
+dominates it. That is why the two criteria rank the methods differently, and it
+is why Section 8 reports the speed-ups under the tail-sensitive criterion as
+well.
+
+## 8. Exact numbers for the constant field
 
 For a constant field the second-moment recursion is exact for any integrator, so
 these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
@@ -162,7 +187,7 @@ these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
 The integrator roughly triples the exact speed-up everywhere, and closes about
 40 % of the gap to the continuous-time ceiling.
 
-## 8. Threats to validity
+## 9. Threats to validity
 
 * **Two accuracy criteria disagree.** Matching the stationary *covariance* and
   matching stationary *quantiles* pick different stepsizes for a skew method,
