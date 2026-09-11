@@ -273,6 +273,14 @@ indistinguishable. That is not a badly-chosen $\lambda$: at $\lambda = 0.25$, $a
 do reach into MCP's and SCAD's taper, where the three charge 0.375 / 0.094 / 0.125 at $|w| = 1.5$. The
 penalties genuinely differ; the classifier does not.
 
+The accuracy curves themselves are in
+[`notebooks/figures/reg_accuracy_curves.pdf`](notebooks/figures/reg_accuracy_curves.pdf): accuracy
+rising from 0.5 toward the exact posterior, with the elbow zoomed underneath and a dot marking where
+each scheme first reaches 99% of the ceiling. Both $J_s$ curves sit left of $J = 0$ in all three
+panels. On MAGIC the dashed $J_a$ curve visibly climbs *above* the ceiling line, which is the
+overshoot in its plainest form. On Titanic $J = 0$ overtakes $J_s$ after about 250 iterations, a
+reminder that reaching the ceiling sooner and settling on it exactly are different things.
+
 Counting wins, where a scheme wins only if its speed-up interval clears 1 **and** its gap to the ceiling
 is no worse than $J = 0$'s by more than 0.002:
 
