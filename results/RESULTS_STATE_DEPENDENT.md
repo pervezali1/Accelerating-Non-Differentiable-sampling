@@ -204,7 +204,65 @@ anything a small underestimate. And under this criterion the Cayley variant is
 the nonlinear remainder that the split step takes explicitly — advancing the
 linear part exactly no longer buys anything.
 
-## 9. Exact numbers for the constant field
+## 9. The transient hump, and how to remove it
+
+Every skew method overshoots before it converges: the Wasserstein curve rises
+to several times its starting value, peaks, and only then falls. The hump grows
+with $\|J\|$, which is the clue to what it is.
+
+**What causes it.** The prior $\mathcal N(0, 10I)$ is 24 times too wide along the
+*stiff* axis (standard deviation 3.16 against the target's 0.129). The anchored
+drift is $b = c(J-I)\Sigma^{-1}x$, so a particle displaced by $x_1$ along the
+stiff axis picks up a soft-direction velocity $c\,\delta\,\lambda_{\max}x_1$ while
+its own stiff component decays at rate $c\,\lambda_{\max}$. Integrating, the soft
+excursion is
+
+$$\text{excursion} \;\approx\; \|J\| \times (\text{initial stiff spread}),$$
+
+independent of $\lambda_{\max}$. The rotation is converting the prior's
+mismatch in the fast direction into a long trip down the slow one.
+
+Measured peaks track that prediction, growing linearly in $\|J\|$ exactly as it
+says:
+
+| $\|J\|_2$ | 0 | 1.48 | 2.47 | 3.46 | 4.95 | 8.41 |
+|---|---|---|---|---|---|---|
+| hump (peak / start) | 1.00× | 1.35× | 2.02× | 2.63× | 3.40× | 4.63× |
+| peak at iteration | — | 134 | 111 | 92 | 76 | 52 |
+
+**The fix: warm the field up.** The rotation buys nothing during that phase —
+the stiff direction is contracting on its own, a hundred times faster than the
+soft one — so hold it back until the contraction is done. Scaling the skew part
+by a smoothstep over a few stiff relaxation times (one relaxation is
+$1/(\eta c\lambda_{\max})$ iterations, 33 here) removes the hump. A scaled skew
+field is still skew, so the target is preserved at every iteration and hence by
+the time-inhomogeneous chain.
+
+It is not a trade-off. Convergence gets *faster*:
+
+| field | ramp | hump | iterations to 2× floor |
+|---|---|---|---|
+| constant $\|J\|$=4.95 | none | 3.40× | 885 |
+| constant $\|J\|$=4.95 | 5 relaxations | **1.00×** | **733** |
+| constant $\|J\|$=8.41 | none | 4.63× | 607 |
+| constant $\|J\|$=8.41 | 5 relaxations | 1.08× | **503** |
+| tilted $a=-3$ | none | 2.20× | 134 |
+| tilted $a=-3$ | 3 relaxations | **1.00×** | 162 |
+
+The one caveat is the tilted field, which converges in 134 iterations — fewer
+than a five-relaxation ramp takes. There a shorter ramp is worth more, and
+three relaxations removes the hump for a 21 % cost. Hence the default of three,
+with five recommended for a constant field. Smoothstep beat linear and
+exponential ramps at every length tried.
+
+**What does not work: gating on the radius.** Switching the rotation off where
+$q$ is large also removes the hump — and wrecks the accuracy, because the gate
+is still partly active across the bulk and reintroduces the spread-out-$\psi$
+penalty of Section 2. Final Wasserstein distance goes from 0.08 to 0.20–0.27,
+and at $q_c \le 5$ the chain never reaches the floor at all. The fix has to be
+in time, not in space.
+
+## 10. Exact numbers for the constant field
 
 For a constant field the second-moment recursion is exact for any integrator, so
 these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
@@ -219,7 +277,7 @@ these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
 The integrator roughly triples the exact speed-up everywhere, and closes about
 40 % of the gap to the continuous-time ceiling.
 
-## 10. Threats to validity
+## 11. Threats to validity
 
 * **Two accuracy criteria disagree, by a factor of seven.** 79× at matched bulk
   accuracy, 10.8× at matched covariance accuracy, for the same method. Sections
@@ -235,6 +293,9 @@ The integrator roughly triples the exact speed-up everywhere, and closes about
   untuned.
 * **The tilt needs to know $\Sigma$.** As does the optimal constant field.
   Estimating it online is not studied.
+* **The ramp length needs the target's stiff timescale.** It is computed from
+  $\Sigma$ and $\eta$, not tuned, but a practitioner without $\Sigma$ would have
+  to estimate it.
 * **State dependence costs exact integrability.** A constant field gives a
   linear drift that the exponential integrator advances exactly; a tilted field
   does not, so only its constant part is advanced exactly and the remainder is

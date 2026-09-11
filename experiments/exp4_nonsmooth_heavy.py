@@ -50,6 +50,9 @@ def main():
     ap.add_argument("--bias", type=float, default=0.02)
     ap.add_argument("--prior", default="normal10")
     ap.add_argument("--fracs", type=float, nargs="*", default=[0.0, 0.1, 0.3, 0.5, 0.7, 1.0, 1.7])
+    ap.add_argument("--ramp", type=float, default=0.0,
+                    help="warm up the skew field over this many stiff relaxation times "
+                         "(0 disables it). Removes the transient hump.")
     args = ap.parse_args()
 
     target = nonsmooth.make(args.d, args.nu, args.kappa, lam=args.lam, a=args.a, eps=args.eps)
@@ -77,6 +80,8 @@ def main():
                 "slow": metrics.slow_direction_error(x, target)}
 
     results = {"config": vars(args), "floor": floor, "J_optimal_norm": norm_opt, "rows": []}
+    if args.ramp > 0:
+        print(f"  warm-up ramp: {args.ramp:g} stiff relaxation times")
 
     print("\n--- equal-bias stepsize taken from the Student-t core ---")
     for frac in args.fracs:
@@ -87,9 +92,11 @@ def main():
         for r in range(args.reps):
             rng_i = np.random.default_rng(500 + r)
             x0 = runner.make_prior(args.prior, args.d, args.n, rng_i)
+            sch = (samplers.warmup_schedule(base, eta, args.ramp)
+                   if args.ramp > 0 and J is not None else None)
             res = samplers.run("skew_anchored", target, x0, eta, args.steps,
                                np.random.default_rng(9000 + r), J=J,
-                               record_at=record_at, recorder=recorder)
+                               record_at=record_at, recorder=recorder, schedule=sch)
             if res.diverged_at is not None:
                 n_div += 1
                 continue
@@ -106,10 +113,11 @@ def main():
                                 "iters": iters.tolist(), "w2": w2.tolist(),
                                 "slow": slow.tolist(), "n_diverged": n_div,
                                 "iters_to_2xfloor": hit, "iters_to_slow10": hit_slow,
-                                "final_w2": float(w2[-1])})
-        print(f"  |J|={frac * norm_opt:6.2f} eta={eta:.2e} iters_to_2xfloor={hit:6d} "
-              f"iters_to_slow<10%={hit_slow:6d} final_W2={w2[-1]:.4f} "
-              f"diverged={n_div}/{args.reps} ({time.time() - t0:.0f}s)")
+                                "final_w2": float(w2[-1]),
+                                "hump": float(np.max(w2) / w2[0]), "ramp": args.ramp})
+        print(f"  |J|={frac * norm_opt:6.2f} eta={eta:.2e} hump={np.max(w2) / w2[0]:5.2f}x "
+              f"iters_to_2xfloor={hit:6d} iters_to_slow<10%={hit_slow:6d} "
+              f"final_W2={w2[-1]:.4f} diverged={n_div}/{args.reps} ({time.time() - t0:.0f}s)")
 
     # ULA on a non-differentiable potential: a subgradient step, for reference
     print("\n--- subgradient ULA baseline (grad U undefined at x_i = 0) ---")
@@ -149,7 +157,8 @@ def main():
                   f"{best['speedup_slow']:.2f}x sooner than J=0")
 
     print("wrote", runner.save_json(results, os.path.join(
-        OUT, f"exp4_nonsmooth_d{args.d}_k{int(args.kappa)}.json")))
+        OUT, f"exp4_nonsmooth_d{args.d}_k{int(args.kappa)}"
+             f"{'_ramp' if args.ramp > 0 else ''}.json")))
 
 
 if __name__ == "__main__":

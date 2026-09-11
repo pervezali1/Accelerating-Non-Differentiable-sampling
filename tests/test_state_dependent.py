@@ -148,3 +148,81 @@ if __name__ == "__main__":
                 failed += 1
                 print(f"FAIL {name}: {exc}")
     sys.exit(1 if failed else 0)
+
+
+# --------------------------------------------------------------- warm-up ramp
+
+
+def test_warmup_schedule_shape_and_length():
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    eta = 3e-4
+    c = 2 * t.beta / t.nu
+    k_relax = 1.0 / (eta * c * (1.0 / t.Sigma_evals.min()))
+    for shape in ("linear", "smooth", "exponential"):
+        sch = samplers.warmup_schedule(t, eta, 3.0, shape=shape)
+        assert sch(0) < 1e-9, shape                       # starts off
+        assert sch(10 * k_relax) > 0.99, shape            # ends on
+        vals = [sch(k) for k in range(0, int(4 * k_relax), 5)]
+        assert all(b >= a - 1e-12 for a, b in zip(vals, vals[1:])), shape  # monotone
+        assert all(0.0 <= v <= 1.0 + 1e-12 for v in vals), shape
+
+
+def test_schedule_matches_the_unramped_step_once_warm():
+    """After the ramp completes the two dynamics are the same map."""
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    J = 4.95 * np.array([[0.0, 1.0], [-1.0, 0.0]])
+    eta = 3e-4
+    sch = samplers.warmup_schedule(t, eta, 3.0)
+    warm = samplers.field_anchored_step(t, eta, sf.ConstantSkew(J), "euler", schedule=sch)
+    plain = samplers.field_anchored_step(t, eta, sf.ConstantSkew(J), "euler")
+    x = np.random.default_rng(0).standard_normal((64, 2))
+    burn = np.random.default_rng(1)
+    for _ in range(400):                                   # run the ramp out
+        warm(x, burn)
+    a = warm(x, np.random.default_rng(2))
+    b = plain(x, np.random.default_rng(2))
+    assert np.abs(a - b).max() < 1e-12
+
+
+def test_warmup_preserves_the_target():
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    J = 4.95 * np.array([[0.0, 1.0], [-1.0, 0.0]])
+    eta = 3e-4
+    rng = np.random.default_rng(3)
+    x0 = t.sample(80_000, rng)
+    step = samplers.field_anchored_step(t, eta, sf.ConstantSkew(J), "euler",
+                                        schedule=samplers.warmup_schedule(t, eta, 3.0))
+    res = samplers.simulate(step, x0, 600, np.random.default_rng(4))
+    assert res.diverged_at is None
+    got, truth = res.final_state.var(axis=0), np.diag(t.cov())
+    assert np.all(np.abs(got - truth) / truth < 0.15), (got, truth)
+
+
+def test_warmup_removes_the_transient_hump():
+    """The hump is the rotation flinging the prior's stiff-direction excess
+    along the soft axis; warming up removes it without slowing convergence."""
+    from skewanchor import metrics
+
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    J = 4.95 * np.array([[0.0, 1.0], [-1.0, 0.0]])
+    eta = 3e-4
+    rec = [1, 20, 40, 60, 80, 110, 150, 220, 320, 500, 800, 1400]
+
+    def curve(schedule):
+        x = np.random.default_rng(5).standard_normal((3000, 2)) * np.sqrt(10.0)
+        step = samplers.field_anchored_step(t, eta, sf.ConstantSkew(J), "euler",
+                                            schedule=schedule)
+        rr = np.random.default_rng(9)
+        out, k = [], 0
+        for tk in rec:
+            while k < tk:
+                x = step(x, rr)
+                k += 1
+            out.append(metrics.axis_sliced_w2(x, t))
+        return np.array(out)
+
+    plain = curve(None)
+    warm = curve(samplers.warmup_schedule(t, eta, 5.0))
+    assert plain.max() / plain[0] > 2.5, plain.max() / plain[0]
+    assert warm.max() / warm[0] < 1.1, warm.max() / warm[0]
+    assert warm[-1] < 1.3 * plain[-1]          # and it still converges

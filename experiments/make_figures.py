@@ -235,34 +235,43 @@ def fig_iact(mode):
 
 
 def fig_nonsmooth(mode):
-    for path in sorted(glob.glob(os.path.join(DATA, "exp4_*.json"))):
+    """The composite target, with and without the warm-up ramp side by side."""
+    plain = sorted(glob.glob(os.path.join(DATA, "exp4_nonsmooth_*[0-9].json")))
+    ramped = sorted(glob.glob(os.path.join(DATA, "exp4_nonsmooth_*_ramp.json")))
+    if not plain:
+        print("  skip: no exp4 data")
+        return
+    p = plotting.use_style(mode)
+    panels = [("no warm-up: the rotation flings the prior's stiff-direction\n"
+               "excess along the soft axis", plain[0])]
+    if ramped:
+        panels.append(("with a warm-up ramp: the hump is gone and it converges\n"
+                       "no later", ramped[0]))
+    fig, axes = plt.subplots(1, len(panels), figsize=(5.8 * len(panels), 4.1), squeeze=False)
+    for ax, (title, path) in zip(axes[0], panels):
         res = runner.load_json(path)
-        if not res.get("rows"):
-            continue
-        p = plotting.use_style(mode)
-        fig, ax = plt.subplots(figsize=(5.8, 3.9))
-        colors = plotting.ramp(len(res["rows"]), mode)
-        for row, color in zip(res["rows"], colors):
+        colours = plotting.ramp(len(res["rows"]), mode)
+        for row, colour in zip(res["rows"], colours):
             it = np.asarray(row["iters"], dtype=float)
             it[0] = max(it[1] * 0.5, 0.5)
-            ax.plot(it, row["w2"], color=color, label=f"$\\|J\\|$ = {row['J_norm']:.2f}")
+            ax.plot(it, row["w2"], color=colour, label=f"$\\|J\\|$ = {row['J_norm']:.2f}")
         for e in res.get("ula", [])[:1]:
             it = np.asarray(e["iters"], dtype=float)
             it[0] = max(it[1] * 0.5, 0.5)
-            ax.plot(it, e["w2"], color=p["categorical"][1], ls=":",
-                    label="subgradient ULA")
-        lo_lim = max(res["floor"] * 0.35, 1e-4)
-        ax.set_ylim(bottom=lo_lim)
-        ax.axhspan(lo_lim, res["floor"] * 1.15, color=p["reference"], alpha=0.16,
-                   linewidth=0)
+            ax.plot(it, e["w2"], color=p["categorical"][1], ls=":", label="subgradient ULA")
+        ax.axhspan(0, res["floor"] * 1.15, color=p["reference"], alpha=0.16, linewidth=0)
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("iteration")
         ax.set_ylabel("sliced 2-Wasserstein distance")
-        ax.set_title("Heavy tailed and non-differentiable (MCP penalty)", loc="left")
-        ax.legend(loc="lower left", ncols=2)
-        tag = os.path.basename(path)[:-5]
-        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig7_{tag}_{mode}.png")))
+        ax.set_title(title, loc="left", fontsize=9.5)
+    ylims = [ax.get_ylim() for ax in axes[0]]
+    lo, hi = min(y[0] for y in ylims), max(y[1] for y in ylims)
+    for ax in axes[0]:
+        ax.set_ylim(lo, hi)
+    axes[0][0].legend(loc="lower left", ncols=2, fontsize=8)
+    tag = os.path.basename(plain[0])[:-5]
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig7_{tag}_{mode}.png")))
 
 
 # ------------------------------------------------------------------ fig 8

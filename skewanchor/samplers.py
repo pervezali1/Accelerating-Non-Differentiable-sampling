@@ -42,6 +42,7 @@ __all__ = [
     "skew_anchored_step",
     "generic_skew_anchored_step",
     "field_anchored_step",
+    "warmup_schedule",
     "stream_anchored_step",
     "make_step",
     "run",
@@ -144,7 +145,7 @@ def skew_anchored_step(target, eta, J=None):
     return step
 
 
-def generic_skew_anchored_step(target, eta, J=None):
+def generic_skew_anchored_step(target, eta, J=None, schedule=None):
     """Euler-Maruyama for any target exposing ``anchor_scale`` and ``grad_U0``.
 
     Slower than :func:`skew_anchored_step` (which hard-codes the log-quadratic
@@ -153,16 +154,57 @@ def generic_skew_anchored_step(target, eta, J=None):
     """
     d = target.d
     J = np.zeros((d, d)) if J is None else np.asarray(J, dtype=np.float64)
-    Jm = (J - np.eye(d)).T
+    I = np.eye(d)
     sq = np.sqrt(2.0 * eta)
+    counter = {"k": 0}
 
     def step(x, rng):
+        s_k = 1.0 if schedule is None else float(schedule(counter["k"]))
+        counter["k"] += 1
         scale = target.anchor_scale(x)
-        drift = scale[:, None] * (target.grad_U0(x) @ Jm)
+        drift = scale[:, None] * (target.grad_U0(x) @ (s_k * J - I).T)
         noise = np.sqrt(scale)[:, None] * rng.standard_normal(x.shape)
         return x + eta * drift + sq * noise
 
     return step
+
+
+def warmup_schedule(target, eta, n_relax=3.0, shape="smooth"):
+    r"""Warm-up of the skew field over ``n_relax`` stiff relaxation times.
+
+    Starting from a prior that is much wider than the target, the skew drift
+    converts the excess spread along the *stiff* axis into a transient excursion
+    along the soft one, of size roughly ``||J|| x (initial stiff spread)``: a
+    hump in the convergence curve before it falls.  The rotation buys nothing
+    during that phase -- the stiff direction is contracting on its own, a
+    hundred times faster -- so holding it back until the contraction is done
+    removes the hump at no cost, and usually converges sooner as well.
+
+    One stiff relaxation takes ``1 / (eta c lambda_max(Sigma^{-1}))``
+    iterations with ``c = 2 beta / nu``.  Returns a callable ``k -> [0, 1]``.
+
+    ``shape`` is ``smooth`` (a smoothstep, the default and the best of the three
+    at every length tested), ``linear``, or ``exponential``.
+
+    ``n_relax = 3`` is a good default everywhere.  A constant field does better
+    still at ``5`` -- the hump vanishes completely and convergence is unchanged
+    -- but a tilted field can converge in fewer iterations than a five-relaxation
+    ramp takes, so there the shorter ramp is worth more.
+    """
+    c = 2.0 * target.beta / target.nu
+    lam_max = 1.0 / float(np.min(target.Sigma_evals))
+    k_relax = 1.0 / (eta * c * lam_max)
+    K = max(1.0, n_relax * k_relax)
+    if shape == "linear":
+        return lambda k: min(1.0, k / K)
+    if shape == "exponential":
+        return lambda k: 1.0 - np.exp(-3.0 * k / K)
+    if shape == "smooth":
+        def smooth(k):
+            u = min(1.0, k / K)
+            return u * u * (3.0 - 2.0 * u)
+        return smooth
+    raise ValueError(f"unknown ramp shape {shape!r}")
 
 
 def _radial_psi(field, x):
@@ -177,7 +219,8 @@ def _radial_psi(field, x):
     return NotImplemented, None
 
 
-def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512):
+def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512,
+                        schedule=None):
     r"""Anchored step with a state-dependent skew field and a choice of integrator.
 
     ``integrator``:
@@ -196,6 +239,12 @@ def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512)
     ``cayley`` and ``expm`` need the log-quadratic structure that makes the
     anchored drift linear (``s = 1``), with a constant or radially modulated
     field; they raise otherwise.
+
+    ``schedule`` is an optional callable ``k -> [0, 1]`` scaling the skew part at
+    iteration ``k`` -- see :func:`warmup_schedule`.  A scaled skew field is still
+    skew, so the target is preserved at every iteration and therefore by the
+    time-inhomogeneous chain as well.  **The returned step is stateful when a
+    schedule is given** (it counts iterations), so build a fresh one per run.
     """
     from scipy.linalg import expm as _expm
 
@@ -206,10 +255,14 @@ def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512)
     s_exp = target.s
 
     if integrator == "euler":
+        counter = {"k": 0}
+
         def step(x, rng):
+            s_k = 1.0 if schedule is None else float(schedule(counter["k"]))
+            counter["k"] += 1
             g = target.grad_U0(x)
             rot = g if field is None else field.apply(x, g)
-            drift = target.anchor_scale(x)[:, None] * ((0.0 if field is None else 1.0) * rot - g)
+            drift = target.anchor_scale(x)[:, None] * ((0.0 if field is None else s_k) * rot - g)
             noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
             return x + eta * drift + sq * noise
         return step
@@ -224,21 +277,35 @@ def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512)
         Jl = np.zeros((d, d)) if J0 is None else psi * J0
         return coef * (np.eye(d) - Jl) @ A
 
-    if field is None or field.is_constant:
-        B = B_of_psi(1.0 if J0 is not None else 0.0)
+    def _prop(psi):
+        B = B_of_psi(psi)
         if integrator == "cayley":
-            M = np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
-        else:
-            M = _expm(-eta * B)
+            return np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
+        return _expm(-eta * B)
+
+    if field is None or field.is_constant:
+        full = 1.0 if J0 is not None else 0.0
+        M_full = _prop(full)
+        counter = {"k": 0}
 
         def step(x, rng):
+            if schedule is None:
+                M = M_full
+            else:
+                M = _prop(full * float(schedule(counter["k"])))
+                counter["k"] += 1
             noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
             return x @ M.T + sq * noise
         return step
 
     # radially modulated: bin on psi and build one propagator per bin
+    counter = {"k": 0}
+
     def step(x, rng):
         psi = field.psi(x)
+        if schedule is not None:
+            psi = psi * float(schedule(counter["k"]))
+            counter["k"] += 1
         lo, hi = float(psi.min()), float(psi.max())
         if hi - lo < 1e-14:
             centres = np.array([lo])
@@ -263,7 +330,8 @@ def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512)
     return step
 
 
-def stream_anchored_step(target, eta, field, integrator="expm", reference=None):
+def stream_anchored_step(target, eta, field, integrator="expm", reference=None,
+                         schedule=None):
     r"""Anchored step whose skew part is a state-dependent stream field (``d = 2``).
 
     The drift is ``b_anchored(x) + c(x)`` with
@@ -289,19 +357,29 @@ def stream_anchored_step(target, eta, field, integrator="expm", reference=None):
     J0 = np.array([[0.0, 1.0], [-1.0, 0.0]])
     sq = np.sqrt(2.0 * eta)
     delta = getattr(field, "delta", 0.0) if reference is None else reference
-    B = coef * (np.eye(d) - delta * J0) @ A
-    if integrator == "euler":
-        M = np.eye(d) - eta * B
-    elif integrator == "cayley":
-        M = np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
-    elif integrator == "expm":
-        M = _expm(-eta * B)
-    else:
+
+    def _prop(scale):
+        B = coef * (np.eye(d) - scale * delta * J0) @ A
+        if integrator == "euler":
+            return np.eye(d) - eta * B
+        if integrator == "cayley":
+            return np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
+        if integrator == "expm":
+            return _expm(-eta * B)
         raise ValueError(integrator)
+
+    M_full = _prop(1.0)
     base = field.constant_member()
+    counter = {"k": 0}
 
     def step(x, rng):
-        extra = field.drift(x) - base.drift(x)
+        if schedule is None:
+            s_k, M = 1.0, M_full
+        else:
+            s_k = float(schedule(counter["k"]))
+            counter["k"] += 1
+            M = _prop(s_k)
+        extra = s_k * (field.drift(x) - base.drift(x))
         y = x + eta * extra
         return y @ M.T + sq * (target.sigma(x))[:, None] * rng.standard_normal(x.shape)
 
@@ -355,7 +433,7 @@ def underdamped_step(target, eta, gamma=2.0, state=None):
 SAMPLERS = ("ula", "skew_ula", "anchored", "skew_anchored", "mala", "underdamped")
 
 
-def make_step(name, target, eta, J=None, rng=None, gamma=2.0, n=None):
+def make_step(name, target, eta, J=None, rng=None, gamma=2.0, n=None, schedule=None):
     if name == "ula":
         return ula_step(target, eta), None
     if name == "skew_ula":
@@ -365,9 +443,17 @@ def make_step(name, target, eta, J=None, rng=None, gamma=2.0, n=None):
     fast = hasattr(target, "Sigma_inv") and getattr(target, "s", None) is not None \
         and type(target).__name__ == "LogQuadraticTarget"
     if name == "anchored":
-        return (skew_anchored_step if fast else generic_skew_anchored_step)(target, eta, None), None
+        if fast:
+            return skew_anchored_step(target, eta, None), None
+        return generic_skew_anchored_step(target, eta, None), None
     if name == "skew_anchored":
-        return (skew_anchored_step if fast else generic_skew_anchored_step)(target, eta, J), None
+        if fast and schedule is None:
+            return skew_anchored_step(target, eta, J), None
+        if fast:
+            from .skewfield import ConstantSkew
+            return field_anchored_step(target, eta, ConstantSkew(J), "euler",
+                                       schedule=schedule), None
+        return generic_skew_anchored_step(target, eta, J, schedule=schedule), None
     if name == "mala":
         return mala_step(target, eta), None
     if name == "underdamped":
@@ -378,8 +464,10 @@ def make_step(name, target, eta, J=None, rng=None, gamma=2.0, n=None):
     raise ValueError(f"unknown sampler {name!r}")
 
 
-def run(name, target, x0, eta, n_steps, rng, J=None, record_at=None, recorder=None, gamma=2.0):
-    step, _ = make_step(name, target, eta, J=J, rng=rng, gamma=gamma, n=x0.shape[0])
+def run(name, target, x0, eta, n_steps, rng, J=None, record_at=None, recorder=None,
+        gamma=2.0, schedule=None):
+    step, _ = make_step(name, target, eta, J=J, rng=rng, gamma=gamma, n=x0.shape[0],
+                        schedule=schedule)
     return simulate(step, x0, n_steps, rng, record_at=record_at, recorder=recorder)
 
 
