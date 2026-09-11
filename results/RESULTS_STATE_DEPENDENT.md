@@ -75,14 +75,21 @@ the truth, at matched accuracy, relative to Euler with $J=0$ (2685 iterations):
 | method | $\|J\|_2$ | tilt $a$ | $\eta$ | iterations | speed-up |
 |---|---|---|---|---|---|
 | Euler, $J=0$ | 0 | — | 1.07e-3 | 2685 | 1.00× |
-| Euler, constant | 4.95 | 0 | 7.43e-4 | 348 | 7.72× |
-| Euler, constant | 19.8 | 0 | 1.21e-4 | 1359 | 1.98× |
-| Cayley, constant | 9.9 | 0 | 6.49e-4 | 232 | 11.57× |
-| Cayley, constant | 19.8 | 0 | 6.44e-4 | 202 | **13.29×** |
-| Euler, stream | 4.95 | −0.9 | 8.69e-4 | 134 | 20.04× |
-| Euler, stream | 4.95 | −2.0 | 8.92e-4 | 59 | 45.51× |
-| Euler, stream | 4.95 | −4.0 | 7.79e-4 | 45 | **59.67×** |
-| Cayley, stream | 9.9 | −0.9 | 6.44e-4 | 102 | 26.32× |
+| Euler, constant | 4.95 | 0 | 8.30e-4 | 348 | 7.72× |
+| Euler, constant | 9.9 | 0 | 4.18e-4 | 399 | 6.73× |
+| Euler, constant | 19.8 | 0 | 1.15e-4 | 1359 | 1.98× |
+| Cayley, constant | 9.9 | 0 | 7.09e-4 | 232 | 11.57× |
+| Cayley, constant | 19.8 | 0 | 6.66e-4 | 202 | **13.29×** |
+| Euler, stream | 4.95 | +0.5 | 7.11e-4 | 789 | 3.40× |
+| Euler, stream | 4.95 | −0.5 | 8.97e-4 | 202 | 13.29× |
+| Euler, stream | 4.95 | −1.0 | 9.29e-4 | 102 | 26.32× |
+| Euler, stream | 4.95 | −2.0 | 9.38e-4 | 59 | 45.51× |
+| Euler, stream | 4.95 | −3.0 | 9.34e-4 | 52 | 51.63× |
+| Euler, stream | 9.9 | −2.0 | 5.91e-4 | 45 | **59.67×** |
+
+The tilt curve has a clear interior optimum near $a \approx -3$: tilting the
+wrong way ($a>0$) is worse than a constant field, and tilting too far eventually
+turns back down.
 
 Two separate effects, and they compose. The integrator alone takes the constant
 field from 7.7× to 13.3×. State dependence alone takes it from 7.7× to 59.7×
@@ -106,6 +113,13 @@ and compare fields with the same effective strength under the same integrator
 So at equal rotation strength, equal accuracy, equal cost per iteration and the
 same integrator, placing the rotation well is worth a further **4 to 5 times**.
 That is the part of the result that is genuinely about state dependence.
+
+Resolution: convergence is read off a log-spaced grid with a ratio of 1.15
+between points, and the stepsize is set from a bias estimate with a few per cent
+of noise, so individual entries carry roughly 20 % uncertainty. The constant
+column varies between 8.8× and 13.3× across all strengths measured, which is
+the size of that noise; the gap to the tilted column is an order of magnitude
+larger.
 
 ## 6. The same result on the paper's own metric
 
