@@ -41,6 +41,8 @@ __all__ = [
     "skew_ula_step",
     "skew_anchored_step",
     "generic_skew_anchored_step",
+    "field_anchored_step",
+    "stream_anchored_step",
     "make_step",
     "run",
     "run_time_changed",
@@ -159,6 +161,149 @@ def generic_skew_anchored_step(target, eta, J=None):
         drift = scale[:, None] * (target.grad_U0(x) @ Jm)
         noise = np.sqrt(scale)[:, None] * rng.standard_normal(x.shape)
         return x + eta * drift + sq * noise
+
+    return step
+
+
+def _radial_psi(field, x):
+    """psi values of a RadialModulated field, or a constant, or None."""
+    from .skewfield import ConstantSkew, RadialModulated
+    if field is None:
+        return None, None
+    if isinstance(field, ConstantSkew):
+        return None, field.J
+    if isinstance(field, RadialModulated):
+        return field.psi(x), field.J0
+    return NotImplemented, None
+
+
+def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512):
+    r"""Anchored step with a state-dependent skew field and a choice of integrator.
+
+    ``integrator``:
+
+    ``euler``   the explicit Euler-Maruyama step of the paper, extended to
+                ``J(x)``.  Works for any field and any target.
+    ``cayley``  the drift's linear part is advanced by the Cayley transform
+                ``(I + eta B/2)^{-1}(I - eta B/2)``.  That map has unit modulus
+                on the skew part, so the rotation is no longer amplified each
+                step -- which is what the explicit scheme gets wrong.
+    ``expm``    the drift's linear part is advanced exactly by
+                ``exp(-eta B)``.  For a state-dependent field ``B`` depends on
+                ``x`` only through the scalar ``psi``, so the exponential is
+                computed once per ``psi`` bin.
+
+    ``cayley`` and ``expm`` need the log-quadratic structure that makes the
+    anchored drift linear (``s = 1``), with a constant or radially modulated
+    field; they raise otherwise.
+    """
+    from scipy.linalg import expm as _expm
+
+    d = target.d
+    sq = np.sqrt(2.0 * eta)
+    coef = 2.0 * target.beta / target.nu
+    A = target.Sigma_inv
+    s_exp = target.s
+
+    if integrator == "euler":
+        def step(x, rng):
+            g = target.grad_U0(x)
+            rot = g if field is None else field.apply(x, g)
+            drift = target.anchor_scale(x)[:, None] * ((0.0 if field is None else 1.0) * rot - g)
+            noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
+            return x + eta * drift + sq * noise
+        return step
+
+    if abs(s_exp - 1.0) > 1e-12:
+        raise ValueError("cayley/expm need the canonical anchor beta = iota - 1 (s = 1)")
+    psi_probe, J0 = _radial_psi(field, np.zeros((1, d)))
+    if psi_probe is NotImplemented:
+        raise ValueError("cayley/expm support constant or radially modulated fields only")
+
+    def B_of_psi(psi):
+        Jl = np.zeros((d, d)) if J0 is None else psi * J0
+        return coef * (np.eye(d) - Jl) @ A
+
+    if field is None or field.is_constant:
+        B = B_of_psi(1.0 if J0 is not None else 0.0)
+        if integrator == "cayley":
+            M = np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
+        else:
+            M = _expm(-eta * B)
+
+        def step(x, rng):
+            noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
+            return x @ M.T + sq * noise
+        return step
+
+    # radially modulated: bin on psi and build one propagator per bin
+    def step(x, rng):
+        psi = field.psi(x)
+        lo, hi = float(psi.min()), float(psi.max())
+        if hi - lo < 1e-14:
+            centres = np.array([lo])
+            idx = np.zeros(x.shape[0], dtype=int)
+        else:
+            edges = np.linspace(lo, hi, n_bins + 1)
+            centres = 0.5 * (edges[:-1] + edges[1:])
+            idx = np.clip(np.searchsorted(edges, psi) - 1, 0, n_bins - 1)
+        used = np.unique(idx)
+        Ms = np.empty((len(used), d, d))
+        for k, u in enumerate(used):
+            B = B_of_psi(centres[u])
+            if integrator == "cayley":
+                Ms[k] = np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
+            else:
+                Ms[k] = _expm(-eta * B)
+        remap = np.searchsorted(used, idx)
+        out = np.einsum("nij,nj->ni", Ms[remap], x)
+        noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
+        return out + sq * noise
+
+    return step
+
+
+def stream_anchored_step(target, eta, field, integrator="expm", reference=None):
+    r"""Anchored step whose skew part is a state-dependent stream field (``d = 2``).
+
+    The drift is ``b_anchored(x) + c(x)`` with
+    ``c(x) = e^{U(x)} J_0 grad Phi(x)`` -- the complete two-dimensional family of
+    target-preserving perturbations.
+
+    The field is split into the constant part (whose drift is linear, and which
+    the chosen integrator advances exactly) and the nonlinear remainder, taken
+    explicitly.  ``reference`` is the constant-field member used for the split;
+    it defaults to the ``a = b = 0`` member of the same family when the field
+    was built by :meth:`StreamField2D.quadrupole`.
+    """
+    from scipy.linalg import expm as _expm
+
+    if target.d != 2:
+        raise ValueError("stream fields are implemented for d = 2")
+    if abs(target.s - 1.0) > 1e-12:
+        raise ValueError("stream step needs the canonical anchor beta = iota - 1")
+
+    d = 2
+    coef = 2.0 * target.beta / target.nu
+    A = target.Sigma_inv
+    J0 = np.array([[0.0, 1.0], [-1.0, 0.0]])
+    sq = np.sqrt(2.0 * eta)
+    delta = getattr(field, "delta", 0.0) if reference is None else reference
+    B = coef * (np.eye(d) - delta * J0) @ A
+    if integrator == "euler":
+        M = np.eye(d) - eta * B
+    elif integrator == "cayley":
+        M = np.linalg.solve(np.eye(d) + 0.5 * eta * B, np.eye(d) - 0.5 * eta * B)
+    elif integrator == "expm":
+        M = _expm(-eta * B)
+    else:
+        raise ValueError(integrator)
+    base = field.constant_member()
+
+    def step(x, rng):
+        extra = field.drift(x) - base.drift(x)
+        y = x + eta * extra
+        return y @ M.T + sq * (target.sigma(x))[:, None] * rng.standard_normal(x.shape)
 
     return step
 
