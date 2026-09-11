@@ -510,6 +510,11 @@ python3 experiments/paired_comparison.py --datasets titanic breast_cancer \
     --geometry identity
 ```
 
+A narrower walkthrough of the same machinery on Titanic and MAGIC only, scoring
+both accuracy and predictive log-loss, is in
+[`notebooks/titanic_magic.ipynb`](notebooks/titanic_magic.ipynb); it runs in
+about ten minutes and needs nothing beyond `requirements.txt` plus Jupyter.
+
 Single runs are configurable, for instance
 
 ```bash
@@ -572,6 +577,7 @@ nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference
 experiments/       runners, plotting scripts, diagnostics
+notebooks/         titanic_magic.ipynb: the two-dataset walkthrough, accuracy and loss
 tests/test_nds.py  divergence identities, surrogate accuracy, invariance
 results/           traces (.npz), per-dataset summaries, summary.csv
 figures/           the figures referenced above

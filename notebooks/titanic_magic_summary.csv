@@ -1,0 +1,7 @@
+dataset,field,amplitude,step size,accuracy @200,|acc - ref|,iters to acc band,log-loss @200,loss - ref,iters to loss band,mean error @200
+Titanic (survival),J = 0,0.0,0.0022,0.7825,0.0011,41,0.4566,0.0013,74,0.932
+Titanic (survival),constant J_a,1.0,0.00386,0.7828,0.0008,9,0.4555,0.0002,19,0.58
+Titanic (survival),gated J_s,1.0,0.00386,0.7826,0.0009,10,0.4555,0.0002,21,0.582
+MAGIC Gamma Telescope,J = 0,0.0,9.33e-05,0.7937,0.001,41,0.4587,0.0002,60,4.016
+MAGIC Gamma Telescope,constant J_a,1.0,0.000184,0.7946,0.0002,2,0.4586,0.0,25,1.117
+MAGIC Gamma Telescope,gated J_s,1.0,0.000184,0.7945,0.0003,3,0.4585,-0.0001,24,1.185

@@ -157,6 +157,7 @@ def run_dataset(name: str, args) -> dict:
             metropolis=False, ref_mean=ref_mean, ref_metric=ref_metric,
         )
         arrays[f"accuracy_{key}"] = res.accuracy
+        arrays[f"loss_{key}"] = res.loss
         arrays[f"error_{key}"] = res.mean_error
         arrays[f"potential_{key}"] = res.potential
         curve = res.accuracy.mean(axis=1)
@@ -167,6 +168,7 @@ def run_dataset(name: str, args) -> dict:
             "step_size": h,
             "accuracy_at_100": float(curve[min(100, args.n_iter)]),
             "accuracy_final": float(curve[-1]),
+            "loss_final": float(res.loss[-1].mean()),
             "iters_to_ref_0.005": iterations_to_reach(curve, ref_acc, 0.005),
             "iters_to_ref_0.01": iterations_to_reach(curve, ref_acc, 0.01),
             "mean_error_final": float(res.mean_error[-1].mean()),

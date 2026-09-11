@@ -62,6 +62,7 @@ class ChainResult:
     posterior_mean: np.ndarray  # (d, m) running mean of w over the run
     final_state: np.ndarray  # (d, m)
     mean_error: np.ndarray | None = None  # (n_iter + 1, m) whitened error of the running mean
+    loss: np.ndarray | None = None  # (n_iter + 1, m) running predictive log-loss
     meta: dict = field(default_factory=dict)
 
 
@@ -70,6 +71,18 @@ def _score(P: np.ndarray, y: np.ndarray) -> np.ndarray:
     yc = y[:, None]
     correct = (P > 0.5) * yc + (P < 0.5) * (1.0 - yc) + (P == 0.5) * 0.5
     return correct.mean(axis=0)
+
+
+def _log_loss(P: np.ndarray, y: np.ndarray, eps: float = 1e-12) -> np.ndarray:
+    """Mean predictive log-loss of a probability matrix (n, m), in nats.
+
+    Unlike accuracy, this reads the whole predictive probability rather than
+    which side of one half it falls on, so it responds to the posterior spread
+    and not only to the decision boundary.
+    """
+    Q = np.clip(P, eps, 1.0 - eps)
+    yc = y[:, None]
+    return -(yc * np.log(Q) + (1.0 - yc) * np.log1p(-Q)).mean(axis=0)
 
 
 class _Stepper:
@@ -146,7 +159,9 @@ def run_chain(
 
     The accuracy trace is that of the *running* posterior predictive mean,
     ``mean_{s<=t} sigmoid(X_eval w_s)``, thresholded at one half with ties
-    counting as one half -- so the ``w = 0`` start scores exactly 0.5.
+    counting as one half -- so the ``w = 0`` start scores exactly 0.5.  The loss
+    trace is that same running predictive scored by log-loss, which sees the
+    whole probability rather than which side of one half it lands on.
 
     Given ``ref_mean`` and ``ref_metric`` (typically the inverse reference
     posterior covariance), the run also records the error of the running mean,
@@ -176,9 +191,11 @@ def run_chain(
     if track_error:
         err_trace[0] = _error(W)
 
+    loss_trace = np.empty((n_iter + 1, n_walkers)) if X_eval is not None else None
     if X_eval is not None:
         P_sum = _sigmoid(X_eval @ W)
         acc_trace[0] = _score(P_sum, y_eval)
+        loss_trace[0] = _log_loss(P_sum, y_eval)
     else:
         P_sum = None
         acc_trace[0] = np.nan
@@ -193,7 +210,9 @@ def run_chain(
             err_trace[t] = _error(W_sum / (t + 1))
         if P_sum is not None:
             P_sum += _sigmoid(X_eval @ W)
-            acc_trace[t] = _score(P_sum / (t + 1), y_eval)
+            P_mean = P_sum / (t + 1)
+            acc_trace[t] = _score(P_mean, y_eval)
+            loss_trace[t] = _log_loss(P_mean, y_eval)
 
     return ChainResult(
         accuracy=acc_trace,
@@ -203,6 +222,7 @@ def run_chain(
         posterior_mean=W_sum / (n_iter + 1),
         final_state=W,
         mean_error=err_trace,
+        loss=loss_trace,
         meta={"label": skew.label, "n_walkers": n_walkers, "fd_eps": fd_eps},
     )
 
