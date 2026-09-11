@@ -209,7 +209,33 @@ the continuous-time second-moment rate is unchanged to machine precision
 (`exp5`), and the measured Wasserstein curves coincide.  **Any apparent gain on
 a radial target is discretisation noise.**
 
-## 9. Summary: claims and non-claims
+## 9. State dependence and the integrator
+
+Two later findings change the picture; both are developed in
+[`STATE_DEPENDENT.md`](STATE_DEPENDENT.md).
+
+**The binding constraint is bias, not stability.** The equal-bias stepsize sits
+a factor of 14 (at $J=0$) to 50 (at $\|J\|\approx 15$) *below* the mean-square
+stability limit of Section 6. So nothing is gained by making the scheme more
+stable; what is needed is a smaller discretisation error. The error that grows
+with $\|J\|$ is explicit Euler's treatment of a rotation, which amplifies by
+$\sqrt{1+\theta^2}$ per step. Advancing the linear part of the drift by its
+Cayley transform or its matrix exponential removes that term, and the equal-bias
+stepsize then becomes essentially independent of $\|J\|$.
+`analysis.propagator` implements all three, and the exact second-moment theory
+of Section 6 carries over unchanged with $M = I-\eta B$ replaced by the
+corresponding map.
+
+**State-dependent $J$ needs a correction term.** Keeping the drift in the form
+$e^{U-U_0}J(x)\nabla U_0$ imposes $\langle\operatorname{div}J,\nabla U_0\rangle
+= 0$, whose complete solution in $d=2$ is a radial profile $\psi(q)J_0$ — a
+family blind to direction, and empirically worse than a constant field. Adding
+$-e^{U-U_0}\operatorname{div}J$ removes the condition outright: every skew
+matrix field then preserves $\pi$, because $\pi c$ becomes the divergence of an
+antisymmetric field. In $d=2$ the complete family is
+$c = e^{U}J_0\nabla\Phi$ for an arbitrary stream function $\Phi$.
+
+## 10. Summary: claims and non-claims
 
 Claimed and proved:
 
@@ -237,3 +263,8 @@ Computed exactly (not bounded):
   apply and stepsizes are chosen empirically).
 * No claim that the skew perturbation helps in high dimension: the realised
   speed-up falls steadily with $d$ (see `results/`).
+* Nothing about state-dependent fields in $d \ge 3$ beyond the fact that the
+  divergence-free curl family exists there; it is implemented but not tuned.
+* The stream-function results are two-dimensional and empirical. There is no
+  analogue of the $\operatorname{Tr}(A)/d$ ceiling for a state-dependent field,
+  so we do not know how far from optimal the tuned member is.

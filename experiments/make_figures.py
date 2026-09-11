@@ -265,6 +265,76 @@ def fig_nonsmooth(mode):
         print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig7_{tag}_{mode}.png")))
 
 
+# ------------------------------------------------------------------ fig 8
+
+
+def fig_flow_field(mode):
+    """Why tilting helps: the rotation should feed the stiff axis, not fight it."""
+    from skewanchor import skewfield as sf
+    from skewanchor.targets import anisotropic_student_t
+
+    T = anisotropic_student_t(2, 5.0, 100.0)
+    p = plotting.use_style(mode)
+    sd = np.sqrt(np.diag(T.cov()))
+    gx = np.linspace(-3.2 * sd[0], 3.2 * sd[0], 34)
+    gy = np.linspace(-3.2 * sd[1], 3.2 * sd[1], 34)
+    X, Y = np.meshgrid(gx, gy)
+    pts = np.column_stack([X.ravel(), Y.ravel()])
+    dens = np.exp(-T.U(pts)).reshape(X.shape)
+
+    fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.8))
+    for ax, (a, title) in zip(axes, [(0.0, "constant field: uniform circulation"),
+                                     (-2.0, "tilted field: strong on the soft axis, "
+                                            "reversed on the stiff one")]):
+        c = sf.StreamField2D.quadrupole(T, 4.95, a, 0.0).drift(pts)
+        U = c[:, 0].reshape(X.shape)
+        V = c[:, 1].reshape(X.shape)
+        mag = np.hypot(U, V)
+        ax.contour(X, Y, dens, levels=6, colors=p["reference"], linewidths=0.6, alpha=0.7)
+        ax.streamplot(gx, gy, U, V, color=np.log10(mag + 1e-9), cmap="Blues",
+                      density=1.1, linewidth=0.9, arrowsize=0.8)
+        ax.set_title(title, loc="left", fontsize=9.5)
+        ax.set_xlabel("stiff direction")
+        ax.set_ylabel("soft direction")
+        ax.set_xlim(gx[0], gx[-1])
+        ax.set_ylim(gy[0], gy[-1])
+        ax.grid(False)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig8_flow_field_{mode}.png")))
+
+
+def fig_state_dependent(mode):
+    res = _load("exp6_state_dependent_k100.json")
+    if res is None or not res.get("measured"):
+        return
+    p = plotting.use_style(mode)
+    rows = [r for r in res["measured"] if r.get("kind") == "stream"]
+    if not rows:
+        return
+    fig, ax = plt.subplots(figsize=(5.6, 3.8))
+    integs = sorted({r["integrator"] for r in rows})
+    for i, integ in enumerate(integs):
+        for j, jn in enumerate(sorted({r["J_norm"] for r in rows if r["integrator"] == integ})):
+            sub = sorted([r for r in rows if r["integrator"] == integ and r["J_norm"] == jn],
+                         key=lambda r: r["tilt"])
+            colour = p["categorical"][(2 * i + j) % len(p["categorical"])]
+            lab = f"{integ}, $\|J\|$={jn:g}"
+            ax.plot([r["tilt"] for r in sub], [r["speedup"] for r in sub], "-o",
+                    color=colour, label=lab)
+    const = [r for r in res["measured"] if r.get("kind") == "constant"]
+    if const:
+        best = max(r["speedup"] for r in const)
+        ax.axhline(best, color=p["reference"], lw=1.0, ls="--")
+        ax.annotate(f"best constant field ({best:.1f}x)", xy=(ax.get_xlim()[0], best),
+                    xytext=(3, 3), textcoords="offset points",
+                    color=p["text_secondary"], fontsize=8)
+    ax.set_xlabel("quadrupole tilt $a$   (negative = rotate harder on the soft axis)")
+    ax.set_ylabel("speed-up at equal accuracy")
+    ax.set_yscale("log")
+    ax.set_title("State dependence beats any constant field", loc="left")
+    ax.legend(loc="upper right", fontsize=8)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig9_state_dependent_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -279,6 +349,8 @@ def main():
         fig_isotropic_control(mode)
         fig_iact(mode)
         fig_nonsmooth(mode)
+        fig_flow_field(mode)
+        fig_state_dependent(mode)
 
 
 if __name__ == "__main__":

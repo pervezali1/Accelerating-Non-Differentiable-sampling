@@ -122,7 +122,31 @@ def assumption12(target, J=None):
             "assumption12_holds": bool(0.0 < alpha < m)}
 
 
-def second_moment_operator(target, J, eta):
+def propagator(target, J, eta, integrator="euler"):
+    r"""One-step linear map ``M`` applied to the state by the chosen integrator.
+
+    ``euler``   ``I - eta B`` -- the explicit scheme of the paper.  A rotation is
+                amplified by ``sqrt(1 + theta^2)`` each step, which is where the
+                ``J``-dependent bias comes from.
+    ``cayley``  ``(I + eta B/2)^{-1}(I - eta B/2)`` -- unit modulus on the skew
+                part, so the rotation is no longer amplified.
+    ``expm``    ``exp(-eta B)`` -- the linear drift advanced exactly.
+    """
+    from scipy.linalg import expm as _expm
+
+    d = target.d
+    B = drift_matrix(target, J)
+    I = np.eye(d)
+    if integrator == "euler":
+        return I - eta * B
+    if integrator == "cayley":
+        return np.linalg.solve(I + 0.5 * eta * B, I - 0.5 * eta * B)
+    if integrator == "expm":
+        return _expm(-eta * B)
+    raise ValueError(f"unknown integrator {integrator!r}")
+
+
+def second_moment_operator(target, J, eta, integrator="euler"):
     r"""Matrix of ``L(C) = M C M^T + (2 eta/nu) Tr(Sigma^{-1} C) I``.
 
     Vectorised, ``L = M (x) M + (2 eta / nu) vec(I) vec(Sigma^{-1})^T``, a
@@ -134,7 +158,7 @@ def second_moment_operator(target, J, eta):
     the symmetric block.
     """
     d = target.d
-    M = np.eye(d) - eta * drift_matrix(target, J)
+    M = propagator(target, J, eta, integrator)
     A = target.Sigma_inv
     return np.kron(M, M) + (2.0 * eta / target.nu) * np.outer(
         np.eye(d).ravel(), A.ravel()
@@ -168,41 +192,42 @@ def continuous_ms_rate(target, J=None):
     return float(-np.max(ev.real))
 
 
-def ms_factor(target, J, eta):
+def ms_factor(target, J, eta, integrator="euler"):
     """Per-iteration second-moment contraction factor ``rho(L)``."""
-    return float(np.max(np.abs(np.linalg.eigvals(second_moment_operator(target, J, eta)))))
+    return float(np.max(np.abs(np.linalg.eigvals(
+        second_moment_operator(target, J, eta, integrator)))))
 
 
-def ms_rate(target, J, eta):
+def ms_rate(target, J, eta, integrator="euler"):
     """Per-iteration convergence rate ``-log rho(L)``.  Larger is faster.
 
     This is the quantity to compare across methods at equal cost: the number of
     iterations to reduce the second-moment error by a factor ``e`` is ``1/rate``.
     """
-    rho = ms_factor(target, J, eta)
+    rho = ms_factor(target, J, eta, integrator)
     return float(-np.log(rho)) if 0 < rho < 1 else float("-inf")
 
 
-def is_ms_stable(target, J, eta):
-    return ms_factor(target, J, eta) < 1.0
+def is_ms_stable(target, J, eta, integrator="euler"):
+    return ms_factor(target, J, eta, integrator) < 1.0
 
 
-def max_stable_stepsize(target, J=None, hi=10.0, tol=1e-8):
+def max_stable_stepsize(target, J=None, hi=10.0, tol=1e-8, integrator="euler"):
     """Largest ``eta`` with ``rho(L) < 1``, by bisection.
 
     Returns 0.0 when no positive stepsize is stable, which happens when the
     continuous-time dynamics itself fails the ``m > alpha`` balance.
     """
-    if not is_ms_stable(target, J, 1e-12):
+    if not is_ms_stable(target, J, 1e-12, integrator):
         return 0.0
     lo = 1e-12
-    while is_ms_stable(target, J, hi):
+    while is_ms_stable(target, J, hi, integrator):
         hi *= 2.0
         if hi > 1e6:
             return hi
     while hi - lo > tol * max(1.0, hi):
         mid = 0.5 * (lo + hi)
-        if is_ms_stable(target, J, mid):
+        if is_ms_stable(target, J, mid, integrator):
             lo = mid
         else:
             hi = mid
@@ -219,20 +244,20 @@ def deterministic_stepsize_limit(target, J=None):
     return float(np.min(2.0 * lam.real / np.abs(lam) ** 2))
 
 
-def stationary_covariance(target, J, eta):
+def stationary_covariance(target, J, eta, integrator="euler"):
     """Fixed point ``C_inf`` of the affine recursion, or ``None`` if unstable."""
     d = target.d
-    if not is_ms_stable(target, J, eta):
+    if not is_ms_stable(target, J, eta, integrator):
         return None
-    K = second_moment_operator(target, J, eta)
+    K = second_moment_operator(target, J, eta, integrator)
     rhs = (2.0 * eta * np.eye(d)).ravel()
     C = np.linalg.solve(np.eye(d * d) - K, rhs).reshape(d, d)
     return 0.5 * (C + C.T)
 
 
-def covariance_bias(target, J, eta, relative=True):
+def covariance_bias(target, J, eta, relative=True, integrator="euler"):
     """Relative Frobenius distance between ``C_inf`` and ``nu/(nu-2) Sigma``."""
-    C = stationary_covariance(target, J, eta)
+    C = stationary_covariance(target, J, eta, integrator)
     if C is None:
         return float("inf")
     truth = target.cov()
@@ -240,23 +265,23 @@ def covariance_bias(target, J, eta, relative=True):
     return float(err / np.linalg.norm(truth)) if relative else float(err)
 
 
-def eta_for_bias(target, J, bias, tol=1e-6):
+def eta_for_bias(target, J, bias, tol=1e-6, integrator="euler"):
     """Largest ``eta`` whose stationary covariance bias equals ``bias``.
 
     The equal-bias stepsize is the basis of the fair comparison: methods are run
     at the stepsize that puts them all at the same asymptotic accuracy, and only
     then are their convergence rates compared.
     """
-    hi = max_stable_stepsize(target, J)
+    hi = max_stable_stepsize(target, J, integrator=integrator)
     if hi <= 0:
         return 0.0
-    if covariance_bias(target, J, hi * (1 - 1e-9)) < bias:
+    if covariance_bias(target, J, hi * (1 - 1e-9), integrator=integrator) < bias:
         return hi
     lo = 1e-14
     hi = hi * (1 - 1e-9)
     while hi - lo > tol * max(1.0, hi):
         mid = 0.5 * (lo + hi)
-        if covariance_bias(target, J, mid) < bias:
+        if covariance_bias(target, J, mid, integrator=integrator) < bias:
             lo = mid
         else:
             hi = mid
