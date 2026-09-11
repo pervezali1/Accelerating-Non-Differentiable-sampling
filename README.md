@@ -121,8 +121,9 @@ constant-$J$ $W_1$ plateaus at 0.0387 → 0.0371 → 0.0397.
 
 ```
 ands/
-  data.py          Titanic and MAGIC loaders (cached under data/)
   targets.py       the hinge + L1 Gibbs posterior, its anchor and projection
+  penalties.py     Lasso, MCP, SCAD with exact Gaussian smoothing and anchor bounds
+  data.py          Titanic, MAGIC Gamma Telescope, Wisconsin breast cancer
   skew.py          the three fields, closed-form divergences, autograd checks
   samplers.py      projected anchored Langevin; exact random-walk Metropolis reference
   diagnostics.py   W1 per coordinate, KS, boundary mass, reference floor
@@ -258,6 +259,41 @@ The notebook also records a negative result: aiming the rotation at the posterio
 directions, worth 2-3× on $W_1$, is worth **nothing** here (0.98× and 1.00×) and loses to an arbitrary
 tridiagonal generator. $W_1$ is dominated by the large-variance directions; accuracy reads only the
 direction of $w$, so a generator that couples all coordinates serves it better.
+
+## Does the regularizer change the answer?
+
+[`notebooks/Regularizer_comparison.ipynb`](notebooks/Regularizer_comparison.ipynb) runs all three
+penalties in `penalties.py` — Lasso, MCP, SCAD — against all five schemes on all three real datasets,
+and asks for which combination a skew field actually buys accuracy over $J = 0$.
+
+**It does not. The field does.** The exact posterior's accuracy ceiling is the same whichever penalty
+is used — Titanic 0.7898/0.7898/0.7901, MAGIC 0.7837/0.7833/0.7836, breast cancer
+0.9599/0.9605/0.9593 — every spread below the 0.002 tolerance used to call two accuracies
+indistinguishable. That is not a badly-chosen $\lambda$: at $\lambda = 0.25$, $a = 3$ the coefficients
+do reach into MCP's and SCAD's taper, where the three charge 0.375 / 0.094 / 0.125 at $|w| = 1.5$. The
+penalties genuinely differ; the classifier does not.
+
+Counting wins, where a scheme wins only if its speed-up interval clears 1 **and** its gap to the ceiling
+is no worse than $J = 0$'s by more than 0.002:
+
+| field | wins |
+|---|---|
+| $J_s$, tangent to $\partial K$ | **15** of 18 |
+| $J_a$, constant | **0** of 18 |
+
+split evenly across the penalties — Lasso 5, MCP 5, SCAD 5. $J_s$ at $s = 8$ wins in all nine
+dataset-by-penalty cells and is the only setting that never trades accuracy for its speed-up
+(1.53-1.55× on Titanic, 1.33-1.35× on MAGIC, 1.11-1.15× on breast cancer).
+
+$J_a$ fails in both available ways. On Titanic and breast cancer it is simply slower, 0.23-0.66×: a
+constant skew is not tangent to the sphere, so it drives walkers into the wall and projection discards
+the work. On MAGIC it looks like 2.1-3.3× but its gap to the ceiling is *negative*, so those chains
+settle **above** the exact posterior's own accuracy — bias flattering itself on the one metric that
+cannot see bias, which is the constrained study's finding again.
+
+This notebook is also where $a > 1$ first appears on real data: breast cancer under MCP (1.0056) and
+SCAD (1.0043), the non-convexity correction doing visible work, inside the proven bound both times.
+All accuracies are in-sample.
 
 ## Running it
 
