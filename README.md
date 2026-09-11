@@ -1,18 +1,36 @@
 # Accelerating Non-Differentiable Sampling
 
 Does an irreversible (skew-symmetric) perturbation speed up a **derivative-free**
-MCMC sampler?  This repository answers that question on four binary
-classification posteriors by measuring how fast test-set accuracy converges from
-a cold `w = 0` start, for four choices of the perturbation:
+MCMC sampler?  Measured on four binary-classification posteriors by how fast
+test-set accuracy converges from a cold `w = 0` start, the answer splits in two,
+and the split is the interesting part.
+
+**With a Metropolis-corrected kernel and a random `J`: no**, and a constant
+rotation of the same magnitude as the reversible part is distinctly worse.
+A Metropolis-Hastings chain satisfies detailed balance by construction, so
+accept/reject re-reversibilises whatever proposal it is given: the
+irreversibility never reaches the chain, and only the proposal's worse
+acceptance rate does.  [Results](#results)
+
+![accuracy from the w = 0 start](figures/accuracy_four_datasets.png)
+
+**With unadjusted dynamics and a `J` designed from the geometry: yes**, by a
+wide margin on three of the four datasets.  The design couples each slow
+eigendirection of the warm-up Hessian to a fast one, at the amplitude where
+their two relaxation rates collide, which is the only thing a skew term can do:
+it cannot raise the mean rate, only stop one direction from setting the pace.
+[Making the rotation pay](#making-the-rotation-pay)
+
+![accuracy with a designed rotation](figures/accuracy_four_datasets_designed.png)
+
+The four fields compared in both experiments:
 
 | variant | field | divergence correction |
 |---|---|---|
 | `zero` | `J = 0` (reversible baseline) | not needed |
-| `constant` | `J_a = alpha A`, `A` skew-symmetric and constant | zero by construction |
-| `state` | `J_s(w) = alpha s(w) A`, radial profile `s` | included |
+| `constant` | `J_a = alpha A`, constant and skew-symmetric | zero by construction |
+| `state` | `J_s(w) = alpha s(w) A`, modulated by a profile `s` | included |
 | `state_nocorr` | the same `J_s(w)` | **dropped** |
-
-![accuracy from the w = 0 start](figures/accuracy_four_datasets.png)
 
 ## Provenance
 
@@ -267,6 +285,74 @@ The lesson for a state-dependent field is to compare the size of `Gamma` with
 the size of the reversible drift `D ghat` where the chain actually spends its
 time, before deciding the term is negligible.
 
+## Making the rotation pay
+
+The experiment above answers "does an irreversible perturbation help *this*
+sampler" with a clear no.  Two things in it were working against `J`, and both
+are fixable, which is what `experiments/run_designed.py` does.
+
+**The Metropolis step was the first.**  A Metropolis-Hastings chain satisfies
+detailed balance by construction, so it is reversible with respect to the
+target whatever proposal it is handed.  Accept/reject therefore destroys exactly
+the property `J` exists to supply, and what survives is only a proposal with a
+worse acceptance rate.  Irreversible Langevin samplers are studied as
+*unadjusted* dynamics, and that is what this section runs; the bias that comes
+with dropping accept/reject is controlled by the step-size rule below and
+reported with the results rather than hidden.
+
+**A random `A` was the second.**  What a skew term can do is bounded.  Since
+`trace(J H) = 0` for skew `J` and symmetric `H`, the mean relaxation rate of the
+linearised dynamics, `trace((D + J) H) / d`, is fixed by `D` and `H` alone: no
+rotation can raise it.  What a rotation *can* do is stop the slowest direction
+from setting the pace, and a matrix drawn at random does not do that on purpose.
+
+### The design
+
+Near its bulk the target looks like `U(w) = (w - m)^T H (w - m) / 2`, and with
+`D = I` the unadjusted dynamics relaxes at `lambda_min(H)` while an explicit
+step is capped by `lambda_max(H)`, so the iteration count scales with the
+condition number.  `nds.design.paired_skew` works in the eigenbasis of the
+warm-up estimate of `H` and couples the `k`-th slowest direction to the `k`-th
+fastest.  In a block with eigenvalues `a < b`, the coupling `[[0, s], [-s, 0]]`
+turns `diag(a, b)` into `[[a, s b], [-s a, b]]`, whose two rates are real and
+collide at the block mean `(a + b) / 2` when `s = (b - a) / (2 sqrt(a b))`.
+Pairing slowest with fastest maximises the smallest block mean over all
+pairings, so the bottleneck rate moves from the smallest eigenvalue to roughly
+the median one.
+
+Three details matter as much as the construction:
+
+* **Stay at or below the collision amplitude.**  Past it the block's rates
+  become complex, and an explicit step then has to shrink like `Re / |mu|^2`,
+  which costs more than the extra real part gains.  The runs use `0.8` of the
+  collision value, which keeps the spectrum real even though the warm-up
+  Hessian is only an estimate.  An L-BFGS search over *all* skew matrices,
+  maximising the true objective (the worst per-iteration contraction at the
+  step size in use), does not improve on the paired construction.
+* **Give each field its own step size, by a rule that matches the bias.**
+  `h = 2 safety / max Re mu` is the classical explicit optimum for the
+  reversible chain up to the `safety` factor, so `J = 0` runs at its own best
+  step size rather than one chosen for somebody else.  The unadjusted chain
+  inflates the stationary variance of mode `i` by `2 / (2 - h mu_i)`, so fixing
+  `h max Re mu` fixes the worst-case inflation and the fields are compared at
+  matched discretisation bias.  Inflating a variance does not move the
+  posterior mean, which is what both plotted functionals depend on.
+* **Guard the step size empirically.**  Shrinkage in the warm-up covariance
+  inflates the smallest posterior variances, which understates the largest
+  curvature; an explicit unadjusted step is unforgiving about that.
+  `nds.sampler.stable_step_size` runs a short pilot and halves `h` while the
+  potential fails to settle.  The summary records when it fired.
+
+The state-dependent field is the designed rotation modulated between half and
+full amplitude along the slowest posterior direction, on the scale of one
+standard deviation of that direction.  Both choices are deliberate: staying at
+or below the design amplitude keeps the spectrum real, and varying on the scale
+of the posterior is what gives the divergence correction something to do -- the
+radial profile of the first experiment varies over tens of standard deviations,
+which is why its `Gamma` was negligible.
+
+<!-- DESIGNED RESULTS -->
+
 ## Datasets
 
 | dataset | n (train/test) | d | source |
@@ -342,19 +428,23 @@ python3 experiments/run_accuracy.py --datasets magic --alpha 0.5 --geometry iden
 
 ## Where to go next
 
-The obstacle measured above is specific to putting the rotation inside the
-Euler proposal mean: that is what breaks the acceptance-ratio cancellation and
-forces the step size down.  Two ways around it, neither implemented here:
+The remaining gap is exactness.  The designed rotation wins with the unadjusted
+dynamics, whose invariant law is only correct to `O(h)`, and no amount of
+Metropolis correction can keep the win: an accept/reject step makes the chain
+reversible whatever the proposal, which is the whole content of the first
+experiment.  Two routes keep both properties, neither implemented here:
 
-1. Apply the rotation as a **separate volume-preserving flow** composed with a
-   reversible Metropolis step, rather than as a term in the same proposal.  For
+1. A **lifted or guided chain** -- an auxiliary velocity or direction flag that
+   persists until a rejection and then flips -- is irreversible *and* exact.
+   This is how non-reversibility is usually made rigorous, and the designed
+   pairing above says which directions the lift should move along.
+2. **Composing a volume-preserving flow with a reversible kernel.**  For
    constant skew `J` the flow `dw/dt = J grad U(w)` conserves `U` exactly
    (`grad U . J grad U = 0`) and preserves volume, so its exact solution leaves
-   the target invariant and a discretisation of it needs only its own
-   accept/reject step -- it does not have to share the reversible step size.
-2. Build irreversibility from a **lifted or guided chain** (a velocity flag that
-   persists until a rejection), which buys directed motion without a rotation
-   term in the proposal mean at all.
+   the target invariant; a discretisation of it can carry its own accept/reject
+   step without sharing the reversible step size.  The composed chain is still
+   reversible overall, so this buys a better proposal rather than genuine
+   irreversibility -- worth measuring, not a substitute for the lift.
 
 ## Layout
 

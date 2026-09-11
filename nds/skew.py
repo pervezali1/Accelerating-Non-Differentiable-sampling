@@ -94,14 +94,19 @@ class ConstantSkew(SkewField):
 class LocalizedSkew(SkewField):
     r"""``J(w) = alpha s(w) A`` with a radial profile ``s``.
 
-    Distances use the metric ``M`` (pass ``metric=D^{-1}`` to measure them in
-    whitened coordinates): ``r(w)^2 = w^T M w``.
-    With ``s(w) = 1 - exp(-r(w)^2 / 2 rho^2)`` the rotation is switched off at
-    the ``w = 0`` start and switched on once the walker has travelled a
-    distance of order ``rho``; ``profile="decay"`` flips that around.  The
-    divergence is available in closed form,
+    Distances are measured from ``center`` in the metric ``M`` (pass
+    ``metric=D^{-1}`` for whitened coordinates): ``r(w)^2 = (w - c)^T M (w - c)``.
+    Three profiles:
 
-        Gamma(w) = alpha A grad s(w),   grad s(w) = +/- (M w / rho^2) exp(-r(w)^2 / 2 rho^2),
+    * ``"grow"``: ``1 - exp(-r^2 / 2 rho^2)`` -- off at the centre, on far away;
+    * ``"decay"``: ``exp(-r^2 / 2 rho^2)`` -- the reverse;
+    * ``"taper"``: ``1 / (1 + r^2 / rho^2)`` -- a heavy-tailed version of
+      ``"decay"``, which keeps the field at half strength a distance ``rho``
+      from the centre instead of extinguishing it.
+
+    The divergence is available in closed form,
+
+        Gamma(w) = alpha A grad s(w),
 
     so the correction term costs one matrix-vector product.
     """
@@ -116,30 +121,43 @@ class LocalizedSkew(SkewField):
         profile: str = "grow",
         drop_correction: bool = False,
         metric: np.ndarray | None = None,
+        center: np.ndarray | None = None,
     ) -> None:
-        if profile not in ("grow", "decay"):
-            raise ValueError("profile must be 'grow' or 'decay'")
+        if profile not in ("grow", "decay", "taper"):
+            raise ValueError("profile must be 'grow', 'decay' or 'taper'")
         self.A = np.ascontiguousarray(A)
         self.alpha = float(alpha)
         self.rho = float(rho)
         self.profile = profile
         self.drop_correction = bool(drop_correction)
         self.metric = None if metric is None else np.ascontiguousarray(metric)
+        d = len(self.A)
+        self.center = (
+            np.zeros((d, 1)) if center is None else np.asarray(center, float).reshape(d, 1)
+        )
         if drop_correction:
             self.label = "$J_s$, correction dropped"
 
-    def _metric_apply(self, W: np.ndarray) -> np.ndarray:
-        return W if self.metric is None else self.metric @ W
+    def _offset(self, W: np.ndarray) -> tuple:
+        """``w - c`` and ``M (w - c)``."""
+        Z = W - self.center
+        return Z, (Z if self.metric is None else self.metric @ Z)
 
-    def _bump(self, W: np.ndarray) -> np.ndarray:
-        """exp(-r(w)^2 / 2 rho^2) per walker, shape (1, m), r^2 = w^T M w."""
-        MW = self._metric_apply(W)
-        r2 = (W * MW).sum(axis=0, keepdims=True)
-        return np.exp(-0.5 * r2 / self.rho**2)
+    def _profile(self, W: np.ndarray) -> tuple:
+        """``s(w)`` of shape (1, m) and its gradient of shape (d, m)."""
+        Z, MZ = self._offset(W)
+        r2 = (Z * MZ).sum(axis=0, keepdims=True)
+        if self.profile == "taper":
+            denom = 1.0 + r2 / self.rho**2
+            return 1.0 / denom, -2.0 * MZ / (self.rho**2 * denom**2)
+        bump = np.exp(-0.5 * r2 / self.rho**2)
+        grad_bump = -bump * MZ / self.rho**2
+        if self.profile == "grow":
+            return 1.0 - bump, -grad_bump
+        return bump, grad_bump
 
     def scale(self, W: np.ndarray) -> np.ndarray:
-        bump = self._bump(W)
-        return 1.0 - bump if self.profile == "grow" else bump
+        return self._profile(W)[0]
 
     def apply(self, W: np.ndarray, G: np.ndarray) -> np.ndarray:
         return self.alpha * self.scale(W) * (self.A @ G)
@@ -147,15 +165,17 @@ class LocalizedSkew(SkewField):
     def divergence(self, W: np.ndarray) -> np.ndarray:
         if self.drop_correction:
             return np.zeros_like(W)
-        sign = 1.0 if self.profile == "grow" else -1.0
-        grad_s = sign * self._bump(W) * self._metric_apply(W) / self.rho**2
-        return self.alpha * (self.A @ grad_s)
+        return self.alpha * (self.A @ self._profile(W)[1])
 
 
 class DirectionalSkew(SkewField):
     r"""``J(w) = alpha s(w) A`` with ``s(w) = tanh(c . w / ell)``.
 
-    ``s`` is measured from ``center``, i.e. ``s(w) = tanh(c . (w - center) / ell)``.
+    ``s(w) = offset + gain * tanh(c . (w - center) / ell)``, so ``offset`` and
+    ``gain`` place the modulation range: the default ``(0, 1)`` sweeps the field
+    from ``-A`` to ``+A``, while ``(0.75, -0.25)`` keeps it between half and full
+    strength -- useful when the field is already tuned and only its *variation*
+    is under test.
     Centring matters: the posterior bulk of these problems sits many whitened
     standard deviations away from ``w = 0``, so any profile centred at the origin
     is saturated where the chain actually lives, its gradient is ~0, and
@@ -165,7 +185,8 @@ class DirectionalSkew(SkewField):
     the regime in which dropping it can be seen to bias the uncorrected
     diffusion.
 
-        Gamma(w) = alpha A grad s(w),   grad s(w) = (1 - s(w)^2) c / ell.
+        Gamma(w) = alpha A grad s(w),
+        grad s(w) = gain (1 - tanh^2(c . (w - center) / ell)) c / ell.
     """
 
     label = "directional $J_c$"
@@ -178,9 +199,13 @@ class DirectionalSkew(SkewField):
         length_scale: float = 1.0,
         drop_correction: bool = False,
         center: np.ndarray | None = None,
+        offset: float = 0.0,
+        gain: float = 1.0,
     ) -> None:
         self.A = np.ascontiguousarray(A)
         self.alpha = float(alpha)
+        self.offset = float(offset)
+        self.gain = float(gain)
         d = len(self.A)
         c = np.zeros(d) if direction is None else np.asarray(direction, float).ravel()
         if direction is None:
@@ -194,9 +219,12 @@ class DirectionalSkew(SkewField):
         if drop_correction:
             self.label = "$J_c$, correction dropped"
 
-    def scale(self, W: np.ndarray) -> np.ndarray:
+    def _tanh(self, W: np.ndarray) -> np.ndarray:
         proj = (self.c * (W - self.center)).sum(axis=0, keepdims=True)
         return np.tanh(proj / self.length_scale)
+
+    def scale(self, W: np.ndarray) -> np.ndarray:
+        return self.offset + self.gain * self._tanh(W)
 
     def apply(self, W: np.ndarray, G: np.ndarray) -> np.ndarray:
         return self.alpha * self.scale(W) * (self.A @ G)
@@ -204,5 +232,6 @@ class DirectionalSkew(SkewField):
     def divergence(self, W: np.ndarray) -> np.ndarray:
         if self.drop_correction:
             return np.zeros_like(W)
-        grad_s = (1.0 - self.scale(W) ** 2) * self.c / self.length_scale
+        t = self._tanh(W)
+        grad_s = self.gain * (1.0 - t**2) * self.c / self.length_scale
         return self.alpha * (self.A @ grad_s)

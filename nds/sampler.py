@@ -277,6 +277,42 @@ def acceptance_diagnostics(
     }
 
 
+def stable_step_size(
+    target: LogisticPosterior,
+    skew: SkewField | None,
+    h0: float,
+    n_iter: int = 150,
+    n_walkers: int = 8,
+    seed: int = 0,
+    geometry: Geometry | None = None,
+    fd_eps: float = 1e-2,
+    shrink: float = 0.5,
+    max_tries: int = 8,
+    tolerance: float = 0.5,
+) -> dict:
+    """Largest step size at or below ``h0`` at which the *unadjusted* chain is stable.
+
+    The design rule in :mod:`nds.design` picks ``h0`` from the warm-up estimate
+    of the Hessian.  That estimate can be optimistic -- shrinkage inflates the
+    smallest posterior variances, which understates the largest curvature -- and
+    an explicit unadjusted step is unforgiving about it, so this guard runs a
+    short pilot and halves ``h`` until the potential stays finite and does not
+    climb back above its own minimum by more than ``tolerance``.  It fires rarely
+    and the result records whether it did.
+    """
+    h = float(h0)
+    for attempt in range(max_tries):
+        res = run_chain(
+            target, skew, h, n_iter, n_walkers=n_walkers, seed=seed,
+            geometry=geometry, fd_eps=fd_eps, metropolis=False,
+        )
+        trace = res.potential.mean(axis=1)
+        if np.isfinite(trace).all() and trace[-1] <= trace.min() * (1.0 + tolerance):
+            return {"step_size": h, "reductions": attempt, "stable": True}
+        h *= shrink
+    return {"step_size": h, "reductions": max_tries, "stable": False}
+
+
 def calibrate_step_size(
     target: LogisticPosterior,
     skew: SkewField | None,
