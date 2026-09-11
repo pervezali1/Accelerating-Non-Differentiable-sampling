@@ -44,6 +44,16 @@ onto the stiff direction, where the reversible drift is a hundred times faster
 and contracts it. Rotating while *on* the stiff axis undoes that. A constant
 field does both in equal measure; a tilted one is a ratchet.
 
+**Warm the field up.** Every skew method overshoots before it converges: the
+rotation turns the prior's excess spread along the stiff axis into an excursion
+down the soft one, of size roughly $\|J\|$ times the initial stiff spread. The
+rotation buys nothing during that phase — the stiff direction is contracting on
+its own, a hundred times faster — so scaling the skew part by a smoothstep over
+a few stiff relaxation times removes the overshoot. A scaled skew field is still
+skew, so the target is preserved throughout. For a constant field it also
+converges *sooner*: 885 iterations to 733. `samplers.warmup_schedule` computes
+the ramp from the target and the stepsize rather than tuning it.
+
 **Fix the integrator.** The binding constraint is discretisation bias, not
 stability — the equal-bias stepsize sits 14 to 50 times below the stability
 limit. The part that grows with $\|J\|$ is explicit Euler's error on a
@@ -182,7 +192,7 @@ skewanchor/
   skew.py        constant skew matrices, including the one attaining the Tr(A)/d ceiling
   skewfield.py   state-dependent fields: radial, curl (d>=3), and the d=2 stream family
   samplers.py    ULA, skew-ULA, anchored, skew-anchored, time-changed, MALA, underdamped;
-                 Euler, Cayley and exponential stepping for the anchored drift
+                 Euler, Cayley and exponential stepping; the warm-up schedule
   analysis.py    exact second-moment theory per integrator: stability, bias, rate
   metrics.py     sliced W2 with tail-resolving quadrature, the estimator floor, MMD, energy, IACT
   runner.py      repeated ensemble runs, bootstrap bands, divergence reporting
@@ -199,7 +209,7 @@ experiments/
   make_figures.py             all figures, light and dark
   summarize.py                every result file in one place, quoting medians
 docs/            THEORY.md, STATE_DEPENDENT.md, paper_section.tex, derivations/
-tests/           23 correctness tests
+tests/           27 correctness tests
 results/         data (JSON), figures (PNG), RESULTS.md, RESULTS_STATE_DEPENDENT.md
 ```
 
@@ -207,7 +217,7 @@ results/         data (JSON), figures (PNG), RESULTS.md, RESULTS_STATE_DEPENDENT
 
 ```bash
 pip install -r requirements.txt
-python -m pytest tests -q                       # 23 correctness tests, ~4 min
+python -m pytest tests -q                       # 27 correctness tests, ~4 min
 
 python experiments/exp1_theory_sweeps.py        # exact sweeps, no simulation
 python experiments/exp5_rate_decomposition.py   # SDE gain vs realisable gain
@@ -215,7 +225,7 @@ python experiments/exp6_estimator_noise.py      # is the metric trustworthy here
 python experiments/exp0_paper_replication.py    # the paper's Figure 8 + the control
 python experiments/exp2_anisotropic.py --setting d2_nu5_k100
 python experiments/exp3_single_chain.py
-python experiments/exp4_nonsmooth_heavy.py
+python experiments/exp4_nonsmooth_heavy.py --ramp 5   # --ramp removes the transient hump
 python experiments/exp7_state_dependent.py      # state-dependent J and the integrators
 python experiments/make_figures.py
 python experiments/summarize.py                 # read everything back
