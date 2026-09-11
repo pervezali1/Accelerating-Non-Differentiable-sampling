@@ -35,9 +35,9 @@ strength:
 
 | field | speed-up |
 |---|---|
-| constant | 2.95× |
-| radial, decaying in $q$ | 0.40× |
-| radial, decaying faster | 0.40× |
+| constant | 7.72× |
+| radial, decaying in $q$ | 1.15× |
+| radial, concentrated on the mode | 0.66× |
 | radial, growing in $q$ | diverged |
 
 That is the expected answer, not a bug. At fixed mean rotation strength the
@@ -88,7 +88,26 @@ Two separate effects, and they compose. The integrator alone takes the constant
 field from 7.7× to 13.3×. State dependence alone takes it from 7.7× to 59.7×
 with the *same* explicit Euler scheme.
 
-## 5. The same result on the paper's own metric
+## 5. Matched effective strength: the comparison that isolates state dependence
+
+A tilted field rotates harder in some places than a constant one, so part of the
+gain above could be "more rotation" rather than "better-placed rotation". To
+separate them, define the effective strength of a field as the root-mean-square
+drift magnitude under the target, expressed as the equivalent constant $\|J\|$,
+and compare fields with the same effective strength under the same integrator
+(Cayley):
+
+| effective $\|J\|$ | constant field | tilted stream field |
+|---|---|---|
+| 10.5 | 10.1× (at $\|J\|$ = 14.9) | **45.5×** ($a = -4$) |
+| 14.7 | 10.1× (at $\|J\|$ = 14.9) | **51.6×** ($a = -6$) |
+| 19.1 | 11.6× (at $\|J\|$ = 24.8) | 45.5× ($a = -8$) |
+
+So at equal rotation strength, equal accuracy, equal cost per iteration and the
+same integrator, placing the rotation well is worth a further **4 to 5 times**.
+That is the part of the result that is genuinely about state dependence.
+
+## 6. The same result on the paper's own metric
 
 The table above uses a slow-direction proxy. Repeating the top configurations
 with the sliced 2-Wasserstein distance against exact quantiles — the paper's
@@ -100,13 +119,14 @@ to twice the estimator floor (0.075 ± 0.018):
 | Euler, $J = 0$ | 2470 | 0.069 | 1.00× |
 | Euler, constant $\|J\|$=4.95 | 350 | 0.073 | 7.06× |
 | Cayley, constant $\|J\|$=19.8 | 246 | 0.082 | 10.04× |
-| Euler, stream $a=-2.0$ | 59 | 0.076 | **41.9×** |
+| Cayley, stream $a=-0.9$, $\|J\|$=9.9 | 101 | 0.078 | 24.5× |
+| Euler, stream $a=-2.0$, $\|J\|$=4.95 | 59 | 0.076 | **41.9×** |
 
 Every final $W_2$ sits inside the floor's uncertainty, so the comparison really
 is at equal accuracy and the fast methods are converged, not merely passing
 through.
 
-## 6. Exact numbers for the constant field
+## 7. Exact numbers for the constant field
 
 For a constant field the second-moment recursion is exact for any integrator, so
 these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
@@ -121,7 +141,7 @@ these involve no Monte Carlo at all. Speed-up at 2 % stationary covariance bias:
 The integrator roughly triples the exact speed-up everywhere, and closes about
 40 % of the gap to the continuous-time ceiling.
 
-## 7. Threats to validity
+## 8. Threats to validity
 
 * **Two accuracy criteria disagree.** Matching the stationary *covariance* and
   matching stationary *quantiles* pick different stepsizes for a skew method,

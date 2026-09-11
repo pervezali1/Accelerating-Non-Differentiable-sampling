@@ -160,9 +160,31 @@ def summarize_exp1_exp5():
         print()
 
 
+def summarize_exp7():
+    for path in sorted(glob.glob(os.path.join(DATA, "exp7_*.json"))):
+        r = runner.load_json(path)
+        print(f"== {os.path.basename(path)}: state-dependent fields ==")
+        print(f"  baseline (Euler, J=0): {r['base_iters']:.0f} iterations")
+        best_exact = {}
+        for row in r.get("exact", []):
+            k = row["integrator"]
+            if row["speedup"] > best_exact.get(k, (0,))[0]:
+                best_exact[k] = (row["speedup"], row["J_norm"])
+        for k, (sp, jn) in best_exact.items():
+            print(f"    exact, constant field, {k:7s}: {sp:6.2f}x at |J|={jn:.2f}")
+        rows = sorted(r.get("measured", []), key=lambda x: -x["speedup"])
+        for row in rows[:12]:
+            print(f"    {row['label']:40s} {row['speedup']:7.2f}x "
+                  f"(eta={row['eta']:.2e}, {row['iters']:.0f} iterations)")
+        if r.get("best"):
+            print(f"    best: {r['best']['label']} at {r['best']['speedup']:.2f}x")
+        print()
+
+
 if __name__ == "__main__":
     summarize_exp1_exp5()
     summarize_exp0()
     summarize_exp2()
     summarize_exp3()
     summarize_exp4()
+    summarize_exp7()
