@@ -343,13 +343,29 @@ Three details matter as much as the construction:
   `nds.sampler.stable_step_size` runs a short pilot and halves `h` while the
   potential fails to settle.  The summary records when it fired.
 
-The state-dependent field is the designed rotation modulated between half and
-full amplitude along the slowest posterior direction, on the scale of one
-standard deviation of that direction.  Both choices are deliberate: staying at
-or below the design amplitude keeps the spectrum real, and varying on the scale
-of the posterior is what gives the divergence correction something to do -- the
-radial profile of the first experiment varies over tens of standard deviations,
-which is why its `Gamma` was negligible.
+### Where the state-dependent field earns its keep
+
+The amplitude is derived from a quadratic model of the bulk, so applying it in
+the far field -- where that model does not hold and the gradient of `U` is
+largest -- is what makes a constant rotation overshoot.  That is the mechanism
+behind the amplitude the calibration settles on: on the two posteriors that are
+close to quadratic it picks the top of the ladder, and on the near-separable
+Breast Cancer posterior it backs the *constant* field off to a fraction of it.
+
+The state-dependent field is the same designed rotation multiplied by a profile
+that decays away from the bulk,
+
+```
+J_s(w) = s(w) J_a,   s(w) = exp(-r(w)^2 / 2 rho^2),   r(w)^2 = (w - m)^T H (w - m),
+```
+
+with `rho` six tenths of the whitened distance from `w = 0` to the warm-up mean,
+so the rotation is a quarter of its strength at the start and near full strength
+in the bulk.  It therefore leaves the descent alone and rotates only where the
+design is valid, and the calibration rewards that twice over: it accepts a
+larger amplitude than the constant field, and the larger amplitude buys a larger
+step size, since the step-size rule reads the bulk spectrum.  Its divergence is
+`Gamma(w) = -s(w) J_a H (w - m) / rho^2`, in closed form as always.
 
 <!-- DESIGNED RESULTS -->
 
