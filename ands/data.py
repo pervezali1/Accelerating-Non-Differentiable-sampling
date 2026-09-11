@@ -1,8 +1,10 @@
-"""Titanic and MAGIC Gamma Telescope, prepared for the constrained sampler.
+"""Titanic, MAGIC Gamma Telescope and Wisconsin breast cancer, prepared for the
+constrained sampler.
 
-Both are binary-classification tables, and both are turned into the same object: a
-standardised design matrix ``Phi`` (with intercept) and labels ``y`` in ``{-1, +1}``.
-Raw files are cached under ``data/`` so a run is reproducible without network access.
+All three are binary-classification tables, and all three are turned into the same
+object: a standardised design matrix ``Phi`` (with intercept) and labels ``y`` in ``{-1, +1}``.
+The first two are cached under ``data/`` so a run is reproducible without network
+access; the third ships inside scikit-learn and is never fetched.
 """
 
 import hashlib
@@ -133,5 +135,19 @@ def load_magic(n_max=2000, seed=0):
     return Dataset("magic", "MAGIC Gamma Telescope (gamma vs hadron)", Phi, y_all, names)
 
 
+def load_breast_cancer_wdbc():
+    """Wisconsin Diagnostic Breast Cancer: 569 biopsies, 30 real-valued features.
+
+    Ships with scikit-learn, so no network fetch.  Labels are +1 for benign.
+    """
+    from sklearn.datasets import load_breast_cancer as _lbc
+    b = _lbc()
+    Phi, names = _standardise(b.data, names=list(b.feature_names))
+    y = np.where(b.target == 1, 1.0, -1.0)
+    return Dataset("breast_cancer", "Breast cancer (WDBC)", Phi, y, names)
+
+
 def load_all(magic_n=2000, seed=0):
-    return {"titanic": load_titanic(seed=seed), "magic": load_magic(n_max=magic_n, seed=seed)}
+    return {"titanic": load_titanic(seed=seed),
+            "magic": load_magic(n_max=magic_n, seed=seed),
+            "breast_cancer": load_breast_cancer_wdbc()}
