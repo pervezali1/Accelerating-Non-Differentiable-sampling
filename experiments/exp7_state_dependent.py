@@ -53,7 +53,7 @@ PCTS = np.array([0.5, 0.7, 0.9])
 class Protocol:
     """Equal-accuracy stepsize selection and convergence measurement."""
 
-    def __init__(self, target, n_bias=20000, burn=3000, avg=2000, n_rate=5000,
+    def __init__(self, target, n_bias=15000, burn=2500, avg=1500, n_rate=5000,
                  steps=12000, reps=3, seed=11):
         self.t = target
         self.n_bias, self.burn, self.avg = n_bias, burn, avg
@@ -119,7 +119,7 @@ def main():
     ap.add_argument("--bias", type=float, default=0.02)
     ap.add_argument("--deltas", type=float, nargs="*", default=[4.95, 9.9, 19.8])
     ap.add_argument("--tilts", type=float, nargs="*",
-                    default=[-1.6, -1.3, -1.1, -0.9, -0.6, -0.3, 0.0, 0.3])
+                    default=[-6.0, -4.0, -3.0, -2.0, -1.0, -0.5, 0.0, 0.5])
     args = ap.parse_args()
 
     T = anisotropic_student_t(2, args.nu, args.kappa)
@@ -201,7 +201,7 @@ def main():
         print(f"\nbest measured: {best['label']} at {best['speedup']:.2f}x")
         res["best"] = best
     print("wrote", runner.save_json(res, os.path.join(
-        OUT, f"exp6_state_dependent_k{int(args.kappa)}.json")))
+        OUT, f"exp7_state_dependent_k{int(args.kappa)}.json")))
 
 
 if __name__ == "__main__":

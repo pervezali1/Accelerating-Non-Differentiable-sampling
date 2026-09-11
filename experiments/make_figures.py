@@ -303,7 +303,7 @@ def fig_flow_field(mode):
 
 
 def fig_state_dependent(mode):
-    res = _load("exp6_state_dependent_k100.json")
+    res = _load("exp7_state_dependent_k100.json")
     if res is None or not res.get("measured"):
         return
     p = plotting.use_style(mode)

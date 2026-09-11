@@ -9,7 +9,7 @@ reference $U_0$ and corrects with a multiplicative scaling:
 
 $$dX_t = -\nabla U_0(X_t)e^{(U-U_0)(X_t)}dt + \sqrt2\,e^{(U-U_0)(X_t)/2}dW_t .$$
 
-We insert a constant **skew-symmetric** matrix $J = -J^\top$ into the drift:
+We insert a **skew-symmetric** matrix $J = -J^\top$ into the drift:
 
 $$dX_t = e^{(U-U_0)(X_t)}\,(J-I)\,\nabla U_0(X_t)\,dt
         + \sqrt2\,e^{(U-U_0)(X_t)/2}\,dW_t .$$
@@ -19,7 +19,54 @@ untouched while the dynamics becomes non-reversible — the classical accelerati
 mechanism of Hwang–Hwang-Sheu–Sheu and Lelièvre–Nier–Pavliotis, transplanted
 into the anchored framework where it also reaches heavy tails.
 
-## Headline results
+## Headline: a state-dependent field, and a better integrator
+
+Two changes take the speed-up on the anisotropic heavy-tailed target from 7× to
+about 40–60×, measured at equal accuracy and equal cost per iteration
+($d=2$, $\nu=5$, $\kappa(\Sigma)=100$).
+
+**Let $J$ depend on $x$ — but add the correction term.** Keeping the drift in
+the form $e^{U-U_0}J(x)\nabla U_0$ forces
+$\langle\operatorname{div}J, \nabla U_0\rangle = 0$, whose complete solution in
+two dimensions is a radial profile that cannot tell the stiff axis from the soft
+one — and it makes things *worse* (0.4× against a constant field's 3×). Adding
+$-e^{U-U_0}\operatorname{div}J$ removes the condition outright: **every** skew
+matrix field then preserves the target. In $d=2$ the complete family is
+$c = e^{U}J_0\nabla\Phi$ for an arbitrary stream function $\Phi$.
+
+**Tilt the rotation towards the soft axis.** The rotation's job is to carry mass
+onto the stiff direction, where the reversible drift is a hundred times faster
+and contracts it. Rotating while *on* the stiff axis undoes that. A constant
+field does both in equal measure; a tilted one is a ratchet.
+
+**Fix the integrator.** The binding constraint is discretisation bias, not
+stability — the equal-bias stepsize sits 14 to 50 times below the stability
+limit. The part that grows with $\|J\|$ is explicit Euler's error on a
+rotation. Advancing the linear part by its Cayley transform or matrix
+exponential removes it.
+
+| method | iterations | speed-up |
+|---|---|---|
+| Euler, $J = 0$ | 2685 | 1.0× |
+| Euler, best constant field | 348 | 7.7× |
+| Cayley, best constant field | 202 | 13.3× |
+| Euler, tilted stream field | 45 | **59.7×** |
+
+Confirmed on the paper's own sliced-2-Wasserstein metric with 5000 particles and
+8 replications: 2470 iterations to twice the estimator floor at $J=0$, 350 with
+the best constant field, and **59 with the tilted field** — 41.9× — with every
+final $W_2$ inside the floor's uncertainty, so the fast methods really are
+converged.
+
+At matched *effective* rotation strength and the same integrator the comparison
+is starker still: 59.7× for the tilted field against 5.9× for the constant one.
+
+Full numbers and caveats: [`results/RESULTS_STATE_DEPENDENT.md`](results/RESULTS_STATE_DEPENDENT.md);
+theory in [`docs/STATE_DEPENDENT.md`](docs/STATE_DEPENDENT.md).
+
+![flow field](results/figures/fig8_flow_field_light.png)
+
+## First round: constant fields
 
 **The paper's Section 6.4 experiment reproduces**, and it is where the skew
 extension stops.  At $\iota=2$, $\beta=1$, $\eta=0.01$ and 5 000 particles the
@@ -119,9 +166,11 @@ distance by 1.9× because it truncates the tail cells; both are implemented.
 skewanchor/
   targets.py     log-quadratic (Student-t) targets: exact sampler, exact projected quantiles
   nonsmooth.py   heavy-tailed and non-differentiable at once (Student-t core + MCP penalty)
-  skew.py        constructions of J, including the one attaining the Tr(A)/d ceiling
-  samplers.py    ULA, skew-ULA, anchored, skew-anchored, time-changed, MALA, underdamped
-  analysis.py    exact second-moment theory: stability, bias, rate; the rho_J diagnostic
+  skew.py        constant skew matrices, including the one attaining the Tr(A)/d ceiling
+  skewfield.py   state-dependent fields: radial, curl (d>=3), and the d=2 stream family
+  samplers.py    ULA, skew-ULA, anchored, skew-anchored, time-changed, MALA, underdamped;
+                 Euler, Cayley and exponential stepping for the anchored drift
+  analysis.py    exact second-moment theory per integrator: stability, bias, rate
   metrics.py     sliced W2 with tail-resolving quadrature, the estimator floor, MMD, energy, IACT
   runner.py      repeated ensemble runs, bootstrap bands, divergence reporting
   plotting.py    figure style on a colour-vision-validated palette
@@ -133,18 +182,19 @@ experiments/
   exp4_nonsmooth_heavy.py     heavy tailed and non-differentiable at once
   exp5_rate_decomposition.py  the SDE's gain versus the realisable one
   exp6_estimator_noise.py     how trustworthy the Wasserstein number is on a heavy tail
+  exp7_state_dependent.py     state-dependent fields and rotation-aware integrators
   make_figures.py             all figures, light and dark
   summarize.py                every result file in one place, quoting medians
-docs/            THEORY.md, paper_section.tex, derivations/
-tests/           15 correctness tests
-results/         data (JSON), figures (PNG), RESULTS.md
+docs/            THEORY.md, STATE_DEPENDENT.md, paper_section.tex, derivations/
+tests/           23 correctness tests
+results/         data (JSON), figures (PNG), RESULTS.md, RESULTS_STATE_DEPENDENT.md
 ```
 
 ## Running it
 
 ```bash
 pip install -r requirements.txt
-python -m pytest tests -q                       # 15 correctness tests, ~4 min
+python -m pytest tests -q                       # 23 correctness tests, ~4 min
 
 python experiments/exp1_theory_sweeps.py        # exact sweeps, no simulation
 python experiments/exp5_rate_decomposition.py   # SDE gain vs realisable gain
@@ -153,6 +203,7 @@ python experiments/exp0_paper_replication.py    # the paper's Figure 8 + the con
 python experiments/exp2_anisotropic.py --setting d2_nu5_k100
 python experiments/exp3_single_chain.py
 python experiments/exp4_nonsmooth_heavy.py
+python experiments/exp7_state_dependent.py      # state-dependent J and the integrators
 python experiments/make_figures.py
 python experiments/summarize.py                 # read everything back
 ```
@@ -164,7 +215,9 @@ python experiments/summarize.py                 # read everything back
 
 The tests are the argument that the implementation is right, not that the method
 is good.  They check, among other things, that the paper's Section 6.4 target is
-reproduced exactly; that gradients match finite differences; that the
+reproduced exactly; that gradients match finite differences; that the correction
+term really does make an otherwise inadmissible skew field target-preserving,
+and that it is inadmissible without it; that
 Euler–Maruyama and time-changed discretisations agree to $10^{-15}$; that every
 sampler started at stationarity stays there; that the predicted stationary
 covariance matches a 150 000-particle simulation; that the mean-square stepsize
