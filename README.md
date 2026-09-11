@@ -14,14 +14,17 @@ acceptance rate does.  [Results](#results)
 
 ![accuracy from the w = 0 start](figures/accuracy_four_datasets.png)
 
-**With unadjusted dynamics and a `J` designed from the geometry: yes**, by a
-wide margin on three of the four datasets.  The design couples each slow
-eigendirection of the warm-up Hessian to a fast one, at the amplitude where
+**With unadjusted dynamics and a `J` designed from the geometry: yes**, on all
+four datasets, measured by how fast the running posterior mean reaches the
+reference -- 1.16x to 2.1x closer at iteration 600.  The design couples each
+slow eigendirection of the warm-up Hessian to a fast one, at the amplitude where
 their two relaxation rates collide, which is the only thing a skew term can do:
-it cannot raise the mean rate, only stop one direction from setting the pace.
+it cannot raise the mean relaxation rate, only stop one direction from setting
+the pace.  The accuracy functional itself barely registers the difference, for a
+reason worth knowing.
 [Making the rotation pay](#making-the-rotation-pay)
 
-![accuracy with a designed rotation](figures/accuracy_four_datasets_designed.png)
+![error of the running posterior mean with a designed rotation](figures/posterior_mean_error_designed.png)
 
 The four fields compared in both experiments:
 
@@ -367,7 +370,91 @@ larger amplitude than the constant field, and the larger amplitude buys a larger
 step size, since the step-size rule reads the bulk spectrum.  Its divergence is
 `Gamma(w) = -s(w) J_a H (w - m) / rho^2`, in closed form as always.
 
-<!-- DESIGNED RESULTS -->
+### What the design buys
+
+Same protocol as before: 32 walkers from `w = 0`, 600 iterations, four
+datasets, common walker seeds.  Full numbers in
+[`results/summary_designed.md`](results/summary_designed.md).
+
+Distance of the running posterior mean from the reference, in reference
+posterior standard deviations, at iteration 600 -- lower is better:
+
+| dataset | amplitude (`J_a` / `J_s`) | `J = 0` | constant `J_a` | state-dependent `J_s` |
+|---|---|---|---|---|
+| Titanic | 0.8 / 0.8 | 0.568 | **0.418** | 0.428 |
+| MAGIC | 0.8 / 0.8 | 1.589 | **0.750** | 0.774 |
+| Breast Cancer | 0.1 / 0.8 | 3.583 | **3.097** | 3.389 |
+| Spambase | 0.05 / 0.8 | 9.590 | **7.550** | 9.941 |
+
+![error of the running posterior mean, designed rotation](figures/posterior_mean_error_designed.png)
+
+The constant designed rotation beats the reversible baseline on all four, by
+1.16x to 2.1x, and the state-dependent one on three of them.  Paired walker by
+walker ([`results/paired_comparison_designed.md`](results/paired_comparison_designed.md)),
+the error differences against `J = 0` are -0.15 +/- 0.02 on Titanic, -0.84 +/-
+0.06 on MAGIC, -0.49 +/- 0.06 on Breast Cancer and -2.04 +/- 0.14 on Spambase
+for the constant field, every one of them many standard errors from zero; the
+state-dependent field matches it except on Spambase, where it is worse by
++0.35 +/- 0.03.  The calibration
+explains the two columns of amplitudes: on the two posteriors closest to
+quadratic both fields take the top of the ladder, while on the near-separable
+Breast Cancer posterior the constant field is backed off to 0.1 and on Spambase
+to 0.05 -- the state-dependent field keeps 0.8 there, because switching itself
+off in the far field is exactly what the constant one cannot do.  Spambase is
+also where the state-dependent field fails to convert that into a win: in 600
+iterations its walkers never get close enough to the bulk for the profile to
+switch the rotation on, so it behaves like the baseline with a slightly larger
+step.
+
+### The accuracy functional has almost no room
+
+The accuracy curves tell a much flatter story than the error curves:
+
+![accuracy with a designed rotation](figures/accuracy_four_datasets_designed.png)
+
+Every method classifies well within a handful of iterations -- on Breast Cancer
+the baseline is at 0.93 by iteration 2 -- so what is left to measure is a
+residual of a few thousandths.  By iterations to settle within 0.005 of the
+reference, the constant rotation wins on all four (Titanic 53 to 2, MAGIC 40 to
+17, Breast Cancer 543 to 116, Spambase never to 244) and the state-dependent one
+on three.  By eye, though, the rotation is level on Titanic and MAGIC and
+*behind* for the first hundred iterations on Breast Cancer and Spambase, where
+the baseline approaches the reference from above while the rotation approaches
+from below.
+
+Both readings are correct, and the reason they differ is the same one the
+Metropolis-corrected experiment ran into from the other side: classification
+accuracy is set by the stiff, high-signal directions of the posterior, which
+every method resolves almost immediately, while the rotation works on the flat
+directions, which barely move a decision boundary.  A rotation cannot speed up
+the stiff directions -- it can only divert drift away from them, which is the
+small early cost visible in those two panels -- so on this functional there is
+very little for any `J` to win.  Judged on convergence to the posterior, the
+design does what it was built to do.
+
+A predictive metric that is sensitive to the posterior spread, test log-loss of
+the running predictive rather than its accuracy, would be the honest way to show
+this on held-out data; the traces here record accuracy only.
+
+### What is *not* claimed
+
+* The reversible method that spends the same warm-up covariance on a
+  preconditioner is faster than either rotation on Titanic and MAGIC, and the
+  grey line in both figures shows it.  On Breast Cancer and Spambase its large
+  step throws walkers deep into the tails first -- the hump in the error figure
+  -- and it takes hundreds of iterations to recover.  The rotation's claim is
+  against `J = 0` *in the same geometry*, which is the comparison the
+  irreversible-sampling literature makes, not against preconditioning.
+* The unadjusted chain is biased.  The step-size rule caps the worst-case
+  variance inflation at 1.18 for every field, and inflating a variance does not
+  move the posterior mean, but the invariant law is only correct to `O(h)`
+  -- unlike the Metropolis-corrected experiment, which is exact.
+* The divergence correction is again numerically negligible: the bulk-centred
+  profile gives `Gamma / |D ghat|` between 0.000 and 0.008 in the bulk, so the
+  two state-dependent curves coincide to four digits.  The one setting where
+  that term is visible is
+  [the correction experiment](#the-correction-term-only-matters-without-the-metropolis-step).
+
 
 ## Datasets
 
@@ -396,6 +483,15 @@ python3 experiments/acceptance_scaling.py --dataset titanic   # the step-size me
 python3 experiments/run_alpha_sweep.py && python3 experiments/plot_alpha_sweep.py
 python3 experiments/run_correction_bias.py
 python3 experiments/plot_correction_bias.py --datasets titanic
+```
+
+The designed-rotation experiment of
+[Making the rotation pay](#making-the-rotation-pay):
+
+```bash
+./experiments/run_designed_all.sh              # four datasets, ~40 min in parallel
+python3 experiments/plot_accuracy.py --tag designed --suffix _designed \
+    --title 'Accuracy from the $w = 0$ start, unadjusted dynamics with a designed rotation'
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they
@@ -468,6 +564,7 @@ experiment.  Two routes keep both properties, neither implemented here:
 nds/data.py        dataset loaders, caching, standardisation, splits
 nds/target.py      logistic posterior, central-difference surrogate, prediction
 nds/skew.py        J = 0, constant, radial and directional fields, and their divergence
+nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference

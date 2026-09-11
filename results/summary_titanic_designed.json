@@ -1,0 +1,284 @@
+{
+  "dataset": "titanic",
+  "pretty_name": "Titanic (survival)",
+  "dim": 10,
+  "n_train": 623,
+  "n_test": 268,
+  "reference_accuracy": 0.7835820895522388,
+  "geometry": "designed",
+  "unadjusted": true,
+  "amplitude": {
+    "constant": 0.8,
+    "state": 0.8
+  },
+  "amplitude_calibration": {
+    "constant": {
+      "amplitude": 0.8,
+      "ladder": [
+        {
+          "amplitude": 0.0,
+          "step_size": 0.0019037370601709103,
+          "score": 0.3171709729369948,
+          "final_score": 0.1766806770394283
+        },
+        {
+          "amplitude": 0.05,
+          "step_size": 0.0019048414251651945,
+          "score": 0.3153091142941445,
+          "final_score": 0.1816448767840319
+        },
+        {
+          "amplitude": 0.1,
+          "step_size": 0.001908170584893571,
+          "score": 0.31242899493379,
+          "final_score": 0.1850394911191624
+        },
+        {
+          "amplitude": 0.2,
+          "step_size": 0.0019217342628556208,
+          "score": 0.30467578501871306,
+          "final_score": 0.1866250590833082
+        },
+        {
+          "amplitude": 0.4,
+          "step_size": 0.0019803719610866893,
+          "score": 0.28383129494949405,
+          "final_score": 0.17972563543118292
+        },
+        {
+          "amplitude": 0.8,
+          "step_size": 0.002337048089183297,
+          "score": 0.26075255002525094,
+          "final_score": 0.2427302105529517
+        }
+      ]
+    },
+    "state": {
+      "amplitude": 0.8,
+      "ladder": [
+        {
+          "amplitude": 0.0,
+          "step_size": 0.0019037370601709103,
+          "score": 0.3171709729369948,
+          "final_score": 0.1766806770394283
+        },
+        {
+          "amplitude": 0.05,
+          "step_size": 0.0019048414251651945,
+          "score": 0.3159838831915537,
+          "final_score": 0.18143176535981706
+        },
+        {
+          "amplitude": 0.1,
+          "step_size": 0.001908170584893571,
+          "score": 0.31392130108902044,
+          "final_score": 0.18488375354334635
+        },
+        {
+          "amplitude": 0.2,
+          "step_size": 0.0019217342628556208,
+          "score": 0.30801594241958186,
+          "final_score": 0.18734501115591365
+        },
+        {
+          "amplitude": 0.4,
+          "step_size": 0.0019803719610866893,
+          "score": 0.2910851279393895,
+          "final_score": 0.1817141107556315
+        },
+        {
+          "amplitude": 0.8,
+          "step_size": 0.002337048089183297,
+          "score": 0.26708493259993316,
+          "final_score": 0.23707190928418792
+        }
+      ]
+    }
+  },
+  "safety": 0.15,
+  "rho": 8.342424794656958,
+  "gamma_over_drift_in_bulk": 0.007967873581049712,
+  "n_iter": 600,
+  "n_walkers": 32,
+  "prior_scale": 2.0,
+  "step_sizes": {
+    "zero": 0.0019037370601709103,
+    "constant": 0.002337048089183297,
+    "state": 0.002337048089183297
+  },
+  "rho_fraction": 0.6,
+  "whitened_start_radius": 13.904041324428265,
+  "design": {
+    "eigenvalues_H": [
+      11.496166675619437,
+      32.044134565470976,
+      51.393457955183784,
+      58.59609921622244,
+      66.39788988751059,
+      90.21167752012158,
+      93.07227779710402,
+      111.3809348249255,
+      127.85877362184434,
+      157.58478745645002
+    ],
+    "reversible_rate": 11.496166675619437,
+    "mean_rate_bound": 80.00361995204527,
+    "irreversible_rate": 40.7138908317856,
+    "max_real_rate": 128.36706330028397,
+    "max_abs_rate": 128.36706330028397,
+    "condition_number": 13.70759418360286,
+    "speedup": 3.541518836720576,
+    "block_rates": [
+      84.5404770660347,
+      79.95145409365767,
+      81.38719639005468,
+      75.83418850666325,
+      78.30478370381607
+    ],
+    "amplitude": 0.8
+  },
+  "design_state": {
+    "eigenvalues_H": [
+      11.496166675619437,
+      32.044134565470976,
+      51.393457955183784,
+      58.59609921622244,
+      66.39788988751059,
+      90.21167752012158,
+      93.07227779710402,
+      111.3809348249255,
+      127.85877362184434,
+      157.58478745645002
+    ],
+    "reversible_rate": 11.496166675619437,
+    "mean_rate_bound": 80.00361995204527,
+    "irreversible_rate": 40.7138908317856,
+    "max_real_rate": 128.36706330028397,
+    "max_abs_rate": 128.36706330028397,
+    "condition_number": 13.70759418360286,
+    "speedup": 3.541518836720576,
+    "block_rates": [
+      84.5404770660347,
+      79.95145409365767,
+      81.38719639005468,
+      75.83418850666325,
+      78.30478370381607
+    ],
+    "amplitude": 0.8
+  },
+  "design_on_reference": {
+    "eigenvalues_H": [
+      10.970798962033657,
+      31.778554719265173,
+      51.18761990172866,
+      60.78507516997479,
+      64.37786812575298,
+      81.60158636464479,
+      89.48750079144054,
+      113.05475152251158,
+      135.32330327415482,
+      182.14472402960718
+    ],
+    "reversible_rate": 10.970798962033657,
+    "mean_rate_bound": 82.07117828611142,
+    "irreversible_rate": 36.328695552994034,
+    "max_real_rate": 155.82750067871797,
+    "max_abs_rate": 155.82750067871797,
+    "condition_number": 16.602685425186483,
+    "speedup": 3.3113992589524024
+  },
+  "summary": [
+    {
+      "dataset": "titanic",
+      "variant": "zero",
+      "step_size": 0.0019037370601709103,
+      "accuracy_at_100": 0.7820662313432836,
+      "accuracy_final": 0.7825326492537313,
+      "iters_to_ref_0.005": 53,
+      "iters_to_ref_0.01": 29,
+      "mean_error_final": 0.5681990987150833,
+      "potential_final": 276.5474235421075,
+      "ess_potential_second_half": 1371.7751752522017,
+      "predicted_decay": 0.9781143214497214,
+      "variance_inflation": 1.1764705882352942,
+      "step_size_from_rule": 0.0019037370601709103,
+      "step_reductions": 0,
+      "diverged": false
+    },
+    {
+      "dataset": "titanic",
+      "variant": "constant",
+      "step_size": 0.002337048089183297,
+      "accuracy_at_100": 0.7828824626865671,
+      "accuracy_final": 0.7820662313432836,
+      "iters_to_ref_0.005": 2,
+      "iters_to_ref_0.01": 1,
+      "mean_error_final": 0.4175854669683866,
+      "potential_final": 276.9085377700619,
+      "ess_potential_second_half": 1481.736029581147,
+      "predicted_decay": 0.9048496792283581,
+      "variance_inflation": 1.1764705882352942,
+      "step_size_from_rule": 0.002337048089183297,
+      "step_reductions": 0,
+      "diverged": false
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state",
+      "step_size": 0.002337048089183297,
+      "accuracy_at_100": 0.7832322761194029,
+      "accuracy_final": 0.7817164179104478,
+      "iters_to_ref_0.005": 21,
+      "iters_to_ref_0.01": 6,
+      "mean_error_final": 0.4278698327604423,
+      "potential_final": 276.8847482434729,
+      "ess_potential_second_half": 1473.0485283717917,
+      "predicted_decay": 0.9048496792283581,
+      "variance_inflation": 1.1764705882352942,
+      "step_size_from_rule": 0.002337048089183297,
+      "step_reductions": 0,
+      "diverged": false
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state_nocorr",
+      "step_size": 0.002337048089183297,
+      "accuracy_at_100": 0.7831156716417911,
+      "accuracy_final": 0.7815998134328359,
+      "iters_to_ref_0.005": 21,
+      "iters_to_ref_0.01": 6,
+      "mean_error_final": 0.4291484811220988,
+      "potential_final": 276.8823603894675,
+      "ess_potential_second_half": 1471.7964734107159,
+      "predicted_decay": 0.9048496792283581,
+      "variance_inflation": 1.1764705882352942,
+      "step_size_from_rule": 0.002337048089183297,
+      "step_reductions": 0,
+      "diverged": false
+    },
+    {
+      "dataset": "titanic",
+      "variant": "precond",
+      "step_size": 0.29999999999999977,
+      "accuracy_at_100": 0.7820662313432836,
+      "accuracy_final": 0.7827658582089552,
+      "iters_to_ref_0.005": 1,
+      "iters_to_ref_0.01": 1,
+      "mean_error_final": 0.31584700784411057,
+      "potential_final": 277.25839252166924,
+      "ess_potential_second_half": 2850.379943773467,
+      "predicted_decay": 0.7000000000000004,
+      "variance_inflation": 1.1764705882352942,
+      "step_size_from_rule": 0.29999999999999977,
+      "step_reductions": 0,
+      "diverged": false
+    }
+  ],
+  "variant_order": [
+    "zero",
+    "constant",
+    "state",
+    "state_nocorr"
+  ],
+  "runtime_seconds": 94.6363570690155
+}

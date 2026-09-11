@@ -20,7 +20,7 @@ import numpy as np
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-VARIANTS = ["constant", "state", "state_nocorr"]
+VARIANTS = ["constant", "state", "state_nocorr", "precond"]
 
 
 def paired(a: np.ndarray, b: np.ndarray) -> tuple:
@@ -35,11 +35,14 @@ def main() -> None:
     )
     parser.add_argument("--geometry", default="warmup")
     parser.add_argument("--alpha", type=float, default=1.0)
+    parser.add_argument("--tag", default=None,
+                        help="trace-file stem after the dataset name; defaults to "
+                             "'<geometry>_alpha<alpha>'")
     args = parser.parse_args()
 
     lines = [
         f"Paired differences against the J = 0 baseline at the final iteration, "
-        f"{args.geometry} geometry, alpha = {args.alpha:g} "
+        f"{args.tag or args.geometry} run "
         "(same walker seeds, so differences are paired).",
         "A difference is only meaningful if it is a few standard errors from zero.",
         "",
@@ -47,21 +50,22 @@ def main() -> None:
         "|---|---|---|---|",
     ]
     for name in args.datasets:
-        path = os.path.join(
-            ROOT, "results", f"traces_{name}_{args.geometry}_alpha{args.alpha:g}.npz"
-        )
+        stem = args.tag if args.tag else f"{args.geometry}_alpha{args.alpha:g}"
+        path = os.path.join(ROOT, "results", f"traces_{name}_{stem}.npz")
         if not os.path.exists(path):
             continue
         blob = np.load(path, allow_pickle=False)
         acc0 = blob["accuracy_zero"][-1]
         err0 = blob["error_zero"][-1]
         for variant in VARIANTS:
+            if f"accuracy_{variant}" not in blob.files:
+                continue
             da, sa = paired(blob[f"accuracy_{variant}"][-1], acc0)
             de, se = paired(blob[f"error_{variant}"][-1], err0)
             lines.append(
                 f"| {name} | {variant} | {da:+.4f} +/- {sa:.4f} | {de:+.3f} +/- {se:.3f} |"
             )
-    suffix = "" if args.geometry == "warmup" else f"_{args.geometry}"
+    suffix = f"_{args.tag}" if args.tag else ("" if args.geometry == "warmup" else f"_{args.geometry}")
     out = os.path.join(ROOT, "results", f"paired_comparison{suffix}.md")
     with open(out, "w") as handle:
         handle.write("\n".join(lines) + "\n")
