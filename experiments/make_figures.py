@@ -344,6 +344,51 @@ def fig_state_dependent(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig9_state_dependent_{mode}.png")))
 
 
+# ----------------------------------------------------------------- fig 10
+
+
+def fig_three_way(mode):
+    """J = 0, J constant, J state dependent -- one curve each."""
+    for path in sorted(glob.glob(os.path.join(DATA, "exp8_three_way_*.json"))):
+        res = runner.load_json(path)
+        rows = res.get("rows") or []
+        if len(rows) < 2:
+            continue
+        p = plotting.use_style(mode)
+        fig, ax = plt.subplots(figsize=(6.4, 4.4))
+        floor = res["floor"]
+        for i, row in enumerate(rows):
+            colour = p["categorical"][i % len(p["categorical"])]
+            it = np.asarray(row["iters"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            w = np.asarray(row["w2"], dtype=float)
+            ax.plot(it, w, color=colour, label=row["label"], zorder=3 - i * 0.1)
+            hit = row.get("iters_to_2xfloor", -1)
+            if hit and hit > 0:
+                j = int(np.argmin(np.abs(it - hit)))
+                ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
+                        markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
+                sp = row.get("speedup")
+                txt = f"{hit:d} iters" + (f"   {sp:.1f}x" if sp and sp > 1.01 else "")
+                ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, -14),
+                            textcoords="offset points", ha="center",
+                            color=colour, fontsize=8, zorder=5)
+        ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
+        ax.annotate("measurement floor (exact draws)", xy=(1.0, floor * 1.12),
+                    xytext=(2, 3), textcoords="offset points",
+                    color=p["text_secondary"], fontsize=8)
+        ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_ylabel("sliced 2-Wasserstein distance")
+        which = "heavy tailed and non-differentiable" if "composite" in path else "heavy tailed"
+        ax.set_title(f"Anchored Langevin on a {which} target", loc="left")
+        ax.legend(loc="lower left", fontsize=8.5)
+        tag = os.path.basename(path)[:-5]
+        print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig10_{tag}_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -360,6 +405,7 @@ def main():
         fig_nonsmooth(mode)
         fig_flow_field(mode)
         fig_state_dependent(mode)
+        fig_three_way(mode)
 
 
 if __name__ == "__main__":

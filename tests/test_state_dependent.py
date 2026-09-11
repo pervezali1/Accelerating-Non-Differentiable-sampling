@@ -226,3 +226,58 @@ def test_warmup_removes_the_transient_hump():
     assert plain.max() / plain[0] > 2.5, plain.max() / plain[0]
     assert warm.max() / warm[0] < 1.1, warm.max() / warm[0]
     assert warm[-1] < 1.3 * plain[-1]          # and it still converges
+
+
+def test_stream_quadrupole_rewrite_matches_the_stream_form():
+    """c = delta e^{U-U0} J0 [F grad U0 - grad F]  is  e^U J0 grad Phi."""
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    x = np.random.default_rng(0).standard_normal((8, 2))
+    J0 = np.array([[0.0, 1.0], [-1.0, 0.0]])
+    S = t.Sigma_inv_half / np.sqrt(t.nu)
+    for a in (0.0, -3.0, 0.5):
+        got = sf.StreamField2D.quadrupole(t, 4.95, a, 0.0).drift(x)
+
+        def Phi(y, a=a):
+            u = y @ S
+            q = 1.0 + np.einsum("ni,ni->n", u, u)
+            return -4.95 * q ** (-t.beta) * (1.0 + a * (u[:, 0] ** 2 - u[:, 1] ** 2) / q)
+
+        h = 1e-7
+        g = np.zeros_like(x)
+        for i in range(2):
+            e = np.zeros(2)
+            e[i] = h
+            g[:, i] = (Phi(x + e) - Phi(x - e)) / (2 * h)
+        want = np.exp(t.U(x))[:, None] * (g @ J0.T)
+        assert np.abs(got - want).max() < 1e-5 * max(1.0, np.abs(want).max()), a
+
+
+def test_stream_field_preserves_a_composite_target():
+    """The stream form needs nothing from the potential, so it works for the
+    heavy-tailed non-differentiable target too."""
+    from skewanchor import nonsmooth
+
+    C = nonsmooth.make(2, 5.0, 100.0)
+    xs = C.sample(200, np.random.default_rng(1))
+    for a in (0.0, -3.0):
+        fld = sf.StreamField2D.quadrupole(C, 4.95, a, 0.0, geometry=C.base)
+        res = np.abs(_div_pi_c(C, fld.drift, xs)).max()
+        scale = np.abs(fld.drift(xs)).max()
+        assert res < 1e-5 * scale, (a, res, scale)
+
+
+def test_stream_euler_step_preserves_a_composite_target():
+    from skewanchor import nonsmooth
+
+    C = nonsmooth.make(2, 5.0, 100.0)
+    rng = np.random.default_rng(2)
+    C.cov(rng, 300_000)
+    truth = np.diag(C.cov())
+    x0 = C.sample(80_000, rng)
+    for a in (0.0, -3.0):
+        fld = sf.StreamField2D.quadrupole(C, 4.95, a, 0.0, geometry=C.base)
+        step = samplers.stream_euler_step(C, 2e-4, fld)
+        res = samplers.simulate(step, x0, 400, np.random.default_rng(3))
+        assert res.diverged_at is None, a
+        got = res.final_state.var(axis=0)
+        assert np.all(np.abs(got - truth) / truth < 0.15), (a, got, truth)

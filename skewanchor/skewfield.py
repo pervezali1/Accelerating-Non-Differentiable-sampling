@@ -219,37 +219,71 @@ class StreamField2D:
         self.delta = float(delta)
         self.a = float(a)
         self.b = float(b)
+        self._drift = None
+        self.geometry = None
 
     def drift(self, x):
+        if getattr(self, "_drift", None) is not None:
+            return self._drift(np.atleast_2d(x))
         x = np.atleast_2d(x)
         return (np.exp(self.target.U(x)))[:, None] * (self.grad_Phi(x) @ self.J0.T)
 
     def constant_member(self):
         """The ``a = b = 0`` member of the same family -- the constant field."""
-        return StreamField2D.quadrupole(self.target, self.delta, 0.0, 0.0)
+        return StreamField2D.quadrupole(self.target, self.delta, 0.0, 0.0,
+                                        geometry=getattr(self, "geometry", None))
 
     @classmethod
-    def quadrupole(cls, target, delta, a=0.0, b=0.0):
-        S = target.Sigma_inv_half / np.sqrt(target.nu)
-        beta = target.beta
+    def quadrupole(cls, target, delta, a=0.0, b=0.0, geometry=None):
+        r"""The tilted family used in the experiments.
 
-        def grad_Phi(x):
+            Phi = -delta e^{-U0} (1 + a w1 + b w2),
+            w1  = (u1^2 - u2^2)/q,   w2 = 2 u1 u2 / q,
+            u   = Sigma^{-1/2} x / sqrt(nu),   q = 1 + |u|^2,
+
+        whose ``a = b = 0`` member is exactly the constant field of norm
+        ``delta``.  ``a`` tilts the rotation towards the soft axis (``a < 0``) or
+        the stiff one (``a > 0``); ``b`` shears it.  Neither is admissible as a
+        bare ``J(x)`` field -- both become legal through the stream form.
+
+        Evaluated as
+
+            c = delta e^{U-U0} J_0 [ (1 + a w1 + b w2) grad U0 - a grad w1 - b grad w2 ],
+
+        which is ``e^U J_0 grad Phi`` rewritten so that only the bounded factor
+        ``e^{U-U0}`` appears; ``e^{U}`` itself is ``q^{iota}`` and overflows
+        long before the dynamics does.
+
+        This form needs only ``anchor_scale`` and ``grad_U0`` from the target, so
+        it works for a composite potential too -- pass the Student-t core as
+        ``geometry`` to supply the quadratic form that ``w1`` and ``w2`` are
+        built from.
+        """
+        geo = target if geometry is None else geometry
+        S = geo.Sigma_inv_half / np.sqrt(geo.nu)
+
+        def shape(x):
+            """(F, grad F) with F = 1 + a w1 + b w2."""
             u = x @ S
-            r2 = np.einsum("ni,ni->n", u, u)
-            q = 1.0 + r2
+            q = 1.0 + np.einsum("ni,ni->n", u, u)
             w1 = (u[:, 0] ** 2 - u[:, 1] ** 2) / q
             w2 = (2.0 * u[:, 0] * u[:, 1]) / q
-            F = 1.0 + a * w1 + b * w2
             dw1 = (np.stack([2 * u[:, 0], -2 * u[:, 1]], 1) * q[:, None]
                    - (u[:, 0] ** 2 - u[:, 1] ** 2)[:, None] * 2 * u) / q[:, None] ** 2
             dw2 = (np.stack([2 * u[:, 1], 2 * u[:, 0]], 1) * q[:, None]
                    - (2 * u[:, 0] * u[:, 1])[:, None] * 2 * u) / q[:, None] ** 2
-            dF = a * dw1 + b * dw2
-            gu = -delta * ((-2.0 * beta * q ** (-beta - 1.0))[:, None] * u * F[:, None]
-                           + (q ** (-beta))[:, None] * dF)
-            return gu @ S
+            return 1.0 + a * w1 + b * w2, (a * dw1 + b * dw2) @ S
 
-        return cls(target, grad_Phi, delta=delta, a=a, b=b)
+        def drift(x):
+            x = np.atleast_2d(x)
+            F, dF = shape(x)
+            v = F[:, None] * target.grad_U0(x) - dF
+            return delta * target.anchor_scale(x)[:, None] * (v @ cls.J0.T)
+
+        obj = cls(target, None, delta=delta, a=a, b=b)
+        obj._drift = drift
+        obj.geometry = geometry
+        return obj
 
 
 # ------------------------------------------------------------------ profiles

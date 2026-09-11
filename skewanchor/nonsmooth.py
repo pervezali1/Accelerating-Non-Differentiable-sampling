@@ -70,6 +70,8 @@ class HeavyTailedMCP:
         self.s = self.base.s
         self.Sigma = self.base.Sigma
         self.Sigma_inv = self.base.Sigma_inv
+        self.Sigma_inv_half = self.base.Sigma_inv_half
+        self.Sigma_half = self.base.Sigma_half
         self.Sigma_evals = self.base.Sigma_evals
         self.Sigma_evecs = self.base.Sigma_evecs
         self.mu = self.base.mu

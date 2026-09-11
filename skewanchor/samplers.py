@@ -44,6 +44,7 @@ __all__ = [
     "field_anchored_step",
     "warmup_schedule",
     "stream_anchored_step",
+    "stream_euler_step",
     "make_step",
     "run",
     "run_time_changed",
@@ -382,6 +383,34 @@ def stream_anchored_step(target, eta, field, integrator="expm", reference=None,
         extra = s_k * (field.drift(x) - base.drift(x))
         y = x + eta * extra
         return y @ M.T + sq * (target.sigma(x))[:, None] * rng.standard_normal(x.shape)
+
+    return step
+
+
+def stream_euler_step(target, eta, field=None, schedule=None):
+    r"""Euler-Maruyama with a stream-field skew part, for *any* target.
+
+        x <- x + eta [ -e^{U-U0} grad U0 + s_k c(x) ] + sqrt(2 eta) e^{(U-U0)/2} xi
+
+    ``field`` supplies ``c(x)``; ``None`` gives the reversible anchored dynamics.
+    Unlike :func:`stream_anchored_step` this makes no use of the log-quadratic
+    structure, so it works for a composite potential; the price is that the
+    linear part is not advanced exactly.
+
+    ``schedule`` is the warm-up of :func:`warmup_schedule`.  Stateful when given.
+    """
+    sq = np.sqrt(2.0 * eta)
+    counter = {"k": 0}
+
+    def step(x, rng):
+        s_k = 1.0 if schedule is None else float(schedule(counter["k"]))
+        counter["k"] += 1
+        scale = target.anchor_scale(x)
+        drift = -scale[:, None] * target.grad_U0(x)
+        if field is not None:
+            drift = drift + s_k * field.drift(x)
+        noise = np.sqrt(scale)[:, None] * rng.standard_normal(x.shape)
+        return x + eta * drift + sq * noise
 
     return step
 
