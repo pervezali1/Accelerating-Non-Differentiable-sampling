@@ -85,7 +85,14 @@ the truth, at matched accuracy, relative to Euler with $J=0$ (2685 iterations):
 | Euler, stream | 4.95 | −1.0 | 9.29e-4 | 102 | 26.32× |
 | Euler, stream | 4.95 | −2.0 | 9.38e-4 | 59 | 45.51× |
 | Euler, stream | 4.95 | −3.0 | 9.34e-4 | 52 | 51.63× |
-| Euler, stream | 9.9 | −2.0 | 5.91e-4 | 45 | **59.67×** |
+| Euler, stream | 9.9 | −2.0 | 5.91e-4 | 45 | 59.67× |
+| Cayley, stream | 4.95 | −6.0 | 4.69e-4 | 52 | 51.63× |
+| Cayley, stream | 9.9 | −4.0 | 4.44e-4 | 39 | 68.85× |
+| Cayley, stream | 9.9 | −3.0 | 6.34e-4 | 34 | **78.97×** |
+
+The two effects compose almost exactly: the integrator is worth about 1.7×
+(7.7 → 13.3 with a constant field) and the tilt about 6× (13.3 → 79.0 with the
+same integrator).
 
 The tilt curve has a clear interior optimum near $a \approx -3$: tilting the
 wrong way ($a>0$) is worse than a constant field, and tilting too far eventually
@@ -93,7 +100,7 @@ turns back down.
 
 Two separate effects, and they compose. The integrator alone takes the constant
 field from 7.7× to 13.3×. State dependence alone takes it from 7.7× to 59.7×
-with the *same* explicit Euler scheme.
+with the *same* explicit Euler scheme. Together: **79.0×**.
 
 ## 5. Matched effective strength: the comparison that isolates state dependence
 

@@ -22,7 +22,7 @@ into the anchored framework where it also reaches heavy tails.
 ## Headline: a state-dependent field, and a better integrator
 
 Two changes take the speed-up on the anisotropic heavy-tailed target from 7× to
-about 40–60×, measured at equal accuracy and equal cost per iteration
+about 80×, measured at equal accuracy and equal cost per iteration
 ($d=2$, $\nu=5$, $\kappa(\Sigma)=100$).
 
 **Let $J$ depend on $x$ — but add the correction term.** Keeping the drift in
@@ -50,7 +50,11 @@ exponential removes it.
 | Euler, $J = 0$ | 2685 | 1.0× |
 | Euler, best constant field | 348 | 7.7× |
 | Cayley, best constant field | 202 | 13.3× |
-| Euler, tilted stream field | 45 | **59.7×** |
+| Euler, best tilted stream field | 45 | 59.7× |
+| Cayley, best tilted stream field | 34 | **79.0×** |
+
+The two effects are independent and compose: the integrator is worth about
+1.7×, the tilt about 6×.
 
 Confirmed on the paper's own sliced-2-Wasserstein metric with 5000 particles and
 8 replications: 2470 iterations to twice the estimator floor at $J=0$, 350 with
@@ -65,6 +69,8 @@ Full numbers and caveats: [`results/RESULTS_STATE_DEPENDENT.md`](results/RESULTS
 theory in [`docs/STATE_DEPENDENT.md`](docs/STATE_DEPENDENT.md).
 
 ![flow field](results/figures/fig8_flow_field_light.png)
+
+![tilt curve](results/figures/fig9_state_dependent_light.png)
 
 ## First round: constant fields
 
