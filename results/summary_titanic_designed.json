@@ -50,6 +50,12 @@
           "step_size": 0.002337048089183297,
           "score": 0.26075255002525094,
           "final_score": 0.2427302105529517
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.0035485960147311354,
+          "score": 0.26508431250827813,
+          "final_score": 0.22591485845692189
         }
       ]
     },
@@ -65,40 +71,47 @@
         {
           "amplitude": 0.05,
           "step_size": 0.0019048414251651945,
-          "score": 0.3159838831915537,
-          "final_score": 0.18143176535981706
+          "score": 0.3159970678039758,
+          "final_score": 0.18164140650317595
         },
         {
           "amplitude": 0.1,
           "step_size": 0.001908170584893571,
-          "score": 0.31392130108902044,
-          "final_score": 0.18488375354334635
+          "score": 0.31382534238310467,
+          "final_score": 0.18505701514597073
         },
         {
           "amplitude": 0.2,
           "step_size": 0.0019217342628556208,
-          "score": 0.30801594241958186,
-          "final_score": 0.18734501115591365
+          "score": 0.3073721403314066,
+          "final_score": 0.1867373580294209
         },
         {
           "amplitude": 0.4,
           "step_size": 0.0019803719610866893,
-          "score": 0.2910851279393895,
-          "final_score": 0.1817141107556315
+          "score": 0.28806260916120513,
+          "final_score": 0.1799194420657423
         },
         {
           "amplitude": 0.8,
           "step_size": 0.002337048089183297,
-          "score": 0.26708493259993316,
-          "final_score": 0.23707190928418792
+          "score": 0.2633212843332202,
+          "final_score": 0.24233837278718284
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.0035485960147311354,
+          "score": 0.2650142140585683,
+          "final_score": 0.2272933075561479
         }
       ]
     }
   },
   "safety": 0.15,
-  "rho": 8.342424794656958,
-  "gamma_over_drift_in_bulk": 0.007967873581049712,
-  "n_iter": 600,
+  "gate_radius": 10.4280309933212,
+  "gate_width": 1.3904041324428267,
+  "gamma_over_drift_in_bulk": 0.0006619786316218971,
+  "n_iter": 200,
   "n_walkers": 32,
   "prior_scale": 2.0,
   "step_sizes": {
@@ -106,7 +119,7 @@
     "constant": 0.002337048089183297,
     "state": 0.002337048089183297
   },
-  "rho_fraction": 0.6,
+  "gate_fraction": 0.75,
   "whitened_start_radius": 13.904041324428265,
   "design": {
     "eigenvalues_H": [
@@ -193,12 +206,12 @@
       "variant": "zero",
       "step_size": 0.0019037370601709103,
       "accuracy_at_100": 0.7820662313432836,
-      "accuracy_final": 0.7825326492537313,
+      "accuracy_final": 0.7818330223880597,
       "iters_to_ref_0.005": 53,
       "iters_to_ref_0.01": 29,
-      "mean_error_final": 0.5681990987150833,
-      "potential_final": 276.5474235421075,
-      "ess_potential_second_half": 1371.7751752522017,
+      "mean_error_final": 1.1277791495525538,
+      "potential_final": 277.0249087691264,
+      "ess_potential_second_half": 645.2593842659841,
       "predicted_decay": 0.9781143214497214,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.0019037370601709103,
@@ -213,9 +226,9 @@
       "accuracy_final": 0.7820662313432836,
       "iters_to_ref_0.005": 2,
       "iters_to_ref_0.01": 1,
-      "mean_error_final": 0.4175854669683866,
-      "potential_final": 276.9085377700619,
-      "ess_potential_second_half": 1481.736029581147,
+      "mean_error_final": 0.8563927039190276,
+      "potential_final": 277.3765072812896,
+      "ess_potential_second_half": 693.074774417319,
       "predicted_decay": 0.9048496792283581,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.002337048089183297,
@@ -226,13 +239,13 @@
       "dataset": "titanic",
       "variant": "state",
       "step_size": 0.002337048089183297,
-      "accuracy_at_100": 0.7832322761194029,
-      "accuracy_final": 0.7817164179104478,
-      "iters_to_ref_0.005": 21,
+      "accuracy_at_100": 0.7828824626865672,
+      "accuracy_final": 0.7824160447761194,
+      "iters_to_ref_0.005": 20,
       "iters_to_ref_0.01": 6,
-      "mean_error_final": 0.4278698327604423,
-      "potential_final": 276.8847482434729,
-      "ess_potential_second_half": 1473.0485283717917,
+      "mean_error_final": 0.8702165784485254,
+      "potential_final": 277.3731507548115,
+      "ess_potential_second_half": 693.6477758529277,
       "predicted_decay": 0.9048496792283581,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.002337048089183297,
@@ -243,13 +256,13 @@
       "dataset": "titanic",
       "variant": "state_nocorr",
       "step_size": 0.002337048089183297,
-      "accuracy_at_100": 0.7831156716417911,
-      "accuracy_final": 0.7815998134328359,
-      "iters_to_ref_0.005": 21,
+      "accuracy_at_100": 0.7828824626865672,
+      "accuracy_final": 0.7824160447761194,
+      "iters_to_ref_0.005": 20,
       "iters_to_ref_0.01": 6,
-      "mean_error_final": 0.4291484811220988,
-      "potential_final": 276.8823603894675,
-      "ess_potential_second_half": 1471.7964734107159,
+      "mean_error_final": 0.8706024250740696,
+      "potential_final": 277.37263434816515,
+      "ess_potential_second_half": 693.734975729915,
       "predicted_decay": 0.9048496792283581,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.002337048089183297,
@@ -261,12 +274,12 @@
       "variant": "precond",
       "step_size": 0.29999999999999977,
       "accuracy_at_100": 0.7820662313432836,
-      "accuracy_final": 0.7827658582089552,
+      "accuracy_final": 0.7829990671641791,
       "iters_to_ref_0.005": 1,
       "iters_to_ref_0.01": 1,
-      "mean_error_final": 0.31584700784411057,
-      "potential_final": 277.25839252166924,
-      "ess_potential_second_half": 2850.379943773467,
+      "mean_error_final": 0.6202113920254761,
+      "potential_final": 277.58654603275215,
+      "ess_potential_second_half": 1122.1263812304971,
       "predicted_decay": 0.7000000000000004,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.29999999999999977,
@@ -280,5 +293,5 @@
     "state",
     "state_nocorr"
   ],
-  "runtime_seconds": 94.6363570690155
+  "runtime_seconds": 55.14799427986145
 }

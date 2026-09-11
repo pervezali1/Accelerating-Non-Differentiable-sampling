@@ -50,7 +50,7 @@ from nds.design import (  # noqa: E402
 )
 from nds.metrics import ess, iterations_to_reach  # noqa: E402
 from nds.sampler import Geometry, run_chain, stable_step_size, warm_up  # noqa: E402
-from nds.skew import ConstantSkew, LocalizedSkew, ZeroSkew  # noqa: E402
+from nds.skew import ConstantSkew, GatedSkew, ZeroSkew  # noqa: E402
 from nds.target import LogisticPosterior  # noqa: E402
 
 RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results")
@@ -74,27 +74,30 @@ def run_dataset(name: str, args) -> dict:
 
     identity_geo = identity
     r0 = float(np.sqrt(max(m_hat @ (H_hat @ m_hat), 1e-12)))  # whitened distance 0 -> bulk
-    rho = args.rho_fraction * r0
+    gate_radius = args.gate_fraction * r0
 
     def make_constant(amplitude: float):
         J_a, _ = paired_skew(H_hat, amplitude=amplitude)
         return ConstantSkew(J_a, 1.0), J_a
 
     def make_state(amplitude: float, drop: bool = False):
-        """The designed rotation, switched off where the walker is still descending.
+        """The designed rotation, gated off while the walker is still descending.
 
-        The amplitude is derived from a quadratic model of the bulk, so applying
-        it in the far field -- where that model does not hold and the gradient is
-        largest -- is what makes a constant rotation overshoot and forces its
-        amplitude down.  A profile that decays away from the bulk lets the same
-        design run at full strength where it is valid and leaves the descent
-        alone, which also means the field can keep the larger step size its bulk
-        spectrum allows.
+        The amplitude comes from a quadratic model of the bulk, so applying it in
+        the far field -- where that model does not hold and the gradient is
+        largest -- is what makes a constant rotation deflect the descent and
+        overshoot, and it is why the calibration has to back the constant field
+        off on a near-separable posterior.  A gate at a fraction of the whitened
+        distance from ``w = 0`` to the bulk separates the two regimes: outside
+        it the chain is the reversible one, but running at the *design's* step
+        size, which is the larger of the two; inside it the full rotation
+        applies.  So the gated field should not be behind the baseline at any
+        iteration, which a gradual profile cannot promise.
         """
         J_a, _ = paired_skew(H_hat, amplitude=amplitude)
-        field = LocalizedSkew(
-            J_a, 1.0, rho=rho, profile="decay", metric=H_hat, center=m_hat,
-            drop_correction=drop,
+        field = GatedSkew(
+            J_a, 1.0, radius=args.gate_fraction * r0, width=args.gate_width * r0,
+            metric=H_hat, center=m_hat, drop_correction=drop,
         )
         return field, J_a
 
@@ -194,13 +197,14 @@ def run_dataset(name: str, args) -> dict:
         "amplitude": {"constant": a_const, "state": a_state},
         "amplitude_calibration": calibrations,
         "safety": args.safety,
-        "rho": rho,
+        "gate_radius": gate_radius,
+        "gate_width": args.gate_width * r0,
         "gamma_over_drift_in_bulk": gamma_ratio,
         "n_iter": args.n_iter,
         "n_walkers": args.n_walkers,
         "prior_scale": args.prior_scale,
         "step_sizes": {"zero": h_zero, "constant": h_const, "state": h_state},
-        "rho_fraction": args.rho_fraction,
+        "gate_fraction": args.gate_fraction,
         "whitened_start_radius": r0,
         "design": {
             k: (float(v) if np.isscalar(v) or np.ndim(v) == 0 else np.asarray(v).tolist())
@@ -239,7 +243,7 @@ def main() -> None:
                         help="fixed block coupling, in units of the collision value; "
                              "omit to calibrate it from a short pilot")
     parser.add_argument("--amplitude-ladder", nargs="+", type=float,
-                        default=[0.0, 0.05, 0.1, 0.2, 0.4, 0.8],
+                        default=[0.0, 0.05, 0.1, 0.2, 0.4, 0.8, 1.0],
                         help="amplitudes the calibration tries")
     parser.add_argument("--calibrate-iter", type=int, default=300,
                         help="pilot length of the amplitude calibration")
@@ -250,9 +254,11 @@ def main() -> None:
                              "largest curvature better, which is what sets the step size")
     parser.add_argument("--guard-iter", type=int, default=150,
                         help="pilot length of the unadjusted stability guard")
-    parser.add_argument("--rho-fraction", type=float, default=0.6,
-                        help="profile scale of the state-dependent field, as a fraction "
-                             "of the whitened distance from w = 0 to the bulk")
+    parser.add_argument("--gate-fraction", type=float, default=0.75,
+                        help="gate radius of the state-dependent field, as a fraction of "
+                             "the whitened distance from w = 0 to the bulk")
+    parser.add_argument("--gate-width", type=float, default=0.1,
+                        help="gate transition width, in the same units")
     parser.add_argument("--prior-scale", type=float, default=2.0)
     parser.add_argument("--warmup-iter", type=int, default=600)
     parser.add_argument("--warmup-walkers", type=int, default=8)

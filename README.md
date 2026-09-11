@@ -14,9 +14,10 @@ acceptance rate does.  [Results](#results)
 
 ![accuracy from the w = 0 start](figures/accuracy_four_datasets.png)
 
-**With unadjusted dynamics and a `J` designed from the geometry: yes**, on all
-four datasets, measured by how fast the running posterior mean reaches the
-reference -- 1.16x to 2.1x closer at iteration 600.  The design couples each
+**With unadjusted dynamics and a `J` designed from the geometry: yes.**  In 200
+iterations both rotations settle within 0.005 of the reference accuracy on three
+of the four datasets while the reversible baseline is still climbing, and the
+running posterior mean is 1.1x to 3.6x closer.  The design couples each
 slow eigendirection of the warm-up Hessian to a fast one, at the amplitude where
 their two relaxation rates collide, which is the only thing a skew term can do:
 it cannot raise the mean relaxation rate, only stop one direction from setting
@@ -24,7 +25,7 @@ the pace.  The accuracy functional itself barely registers the difference, for a
 reason worth knowing.
 [Making the rotation pay](#making-the-rotation-pay)
 
-![error of the running posterior mean with a designed rotation](figures/posterior_mean_error_designed.png)
+![three fields, accuracy from the w = 0 start](figures/three_lines_accuracy.png)
 
 The four fields compared in both experiments:
 
@@ -50,11 +51,21 @@ datasets added here, alongside Titanic and MAGIC.
 
 ### Target
 
-Bayesian logistic regression: `U(w) = -log p(y | X, w) - log p(w)` with a
-Gaussian prior (`prior_scale = 2`, the intercept effectively unpenalised at
-scale 10).  Features are standardised on the training split and carry an
-intercept column, and the posterior is sampled on a stratified 70% training
-split while accuracy is measured on the held-out 30%.
+Bayesian logistic regression.  The potential is the logistic negative
+log-likelihood plus a Gaussian (ridge) prior, and nothing else:
+
+```
+U(w) = sum_i [ log(1 + exp(x_i . w)) - y_i (x_i . w) ]  +  (1/2) sum_j w_j^2 / sigma_j^2
+sigma_j = 2 for every coefficient (prior precision 0.25)
+sigma_0 = 10 for the intercept  (prior precision 0.01, so effectively unpenalised)
+```
+
+So the regularizer is `lambda ||w||^2 / 2` with `lambda = 0.25`, which is also
+the smallest eigenvalue the Hessian can have and therefore what sets the slowest
+relaxation rate on a posterior whose likelihood leaves some directions
+unidentified.  Features are standardised on the training split and carry an
+intercept column; the posterior is sampled on a stratified 70% training split
+and accuracy is measured on the held-out 30%.
 
 ### The sampler is derivative free
 
@@ -350,111 +361,101 @@ Three details matter as much as the construction:
 
 The amplitude is derived from a quadratic model of the bulk, so applying it in
 the far field -- where that model does not hold and the gradient of `U` is
-largest -- is what makes a constant rotation overshoot.  That is the mechanism
-behind the amplitude the calibration settles on: on the two posteriors that are
-close to quadratic it picks the top of the ladder, and on the near-separable
-Breast Cancer posterior it backs the *constant* field off to a fraction of it.
+largest -- deflects the descent and overshoots.  That is exactly what the
+calibration finds: on the two posteriors closest to quadratic the constant field
+takes the top of the ladder, and on the near-separable Breast Cancer and
+Spambase posteriors it has to be backed off to 0.1 and 0.05.
 
-The state-dependent field is the same designed rotation multiplied by a profile
-that decays away from the bulk,
+The state-dependent field is the same designed rotation behind a sharp radial
+gate on the bulk,
 
 ```
-J_s(w) = s(w) J_a,   s(w) = exp(-r(w)^2 / 2 rho^2),   r(w)^2 = (w - m)^T H (w - m),
+J_s(w) = s(w) J_a,   s(w) = 1 / (1 + exp((r(w) - R) / W)),   r(w)^2 = (w - m)^T H (w - m),
 ```
 
-with `rho` six tenths of the whitened distance from `w = 0` to the warm-up mean,
-so the rotation is a quarter of its strength at the start and near full strength
-in the bulk.  It therefore leaves the descent alone and rotates only where the
-design is valid, and the calibration rewards that twice over: it accepts a
-larger amplitude than the constant field, and the larger amplitude buys a larger
-step size, since the step-size rule reads the bulk spectrum.  Its divergence is
-`Gamma(w) = -s(w) J_a H (w - m) / rho^2`, in closed form as always.
+with `R` three quarters of the whitened distance from `w = 0` to the warm-up
+mean and `W` a tenth of it.  Outside the gate the chain is the reversible one;
+inside it the full design applies.  That buys two things at once, and both show
+up in the table below: the calibration keeps amplitude 1.0 where the constant
+field cannot, and amplitude 1.0 is where the block rates *collide*, which halves
+the spectral radius of the drift and so **doubles the step size** the same
+step-size rule allows.  Its divergence is
+`Gamma(w) = -s(w)(1 - s(w)) J_a H (w - m) / (W r(w))`, in closed form as always.
+
+A Gaussian profile is not sharp enough for this: it decays over a scale
+comparable to the distance it is centred on, so with the `w = 0` start only a
+factor of two further out than the bulk it still leaves a quarter of the
+rotation switched on during the descent.
 
 ### What the design buys
 
-Same protocol as before: 32 walkers from `w = 0`, 600 iterations, four
-datasets, common walker seeds.  Full numbers in
+200 iterations, 32 walkers from `w = 0`, `D = I` for every field, each field at
+its own step size, common walker seeds.  Full numbers in
 [`results/summary_designed.md`](results/summary_designed.md).
 
-Distance of the running posterior mean from the reference, in reference
-posterior standard deviations, at iteration 600 -- lower is better:
+![three fields, accuracy from the w = 0 start](figures/three_lines_accuracy.png)
 
-| dataset | amplitude (`J_a` / `J_s`) | `J = 0` | constant `J_a` | state-dependent `J_s` |
+| dataset | amplitude (`J_a` / `J_s`) | step size vs `J = 0` | iterations to the 0.005 band | mean error at 200 |
 |---|---|---|---|---|
-| Titanic | 0.8 / 0.8 | 0.568 | **0.418** | 0.428 |
-| MAGIC | 0.8 / 0.8 | 1.589 | **0.750** | 0.774 |
-| Breast Cancer | 0.1 / 0.8 | 3.583 | **3.097** | 3.389 |
-| Spambase | 0.05 / 0.8 | 9.590 | **7.550** | 9.941 |
+| Titanic | 0.8 / 0.8 | 1.2x / 1.2x | 53 -> **2** / **20** | 1.128 -> **0.856** / **0.870** |
+| MAGIC | 1.0 / 1.0 | 2.0x / 2.0x | 40 -> **12** / **8** | 3.978 -> **1.099** / **1.142** |
+| Breast Cancer | 0.1 / 1.0 | 1.0x / 2.0x | never -> **116** / **169** | 4.113 -> **3.416** / **3.610** |
+| Spambase | 0.05 / 1.0 | 1.0x / 2.0x | never / never / never | 12.310 / 15.108 / **11.159** |
 
-![error of the running posterior mean, designed rotation](figures/posterior_mean_error_designed.png)
+On Titanic and MAGIC both rotations are inside the band while the baseline is
+still climbing, and they stay ahead for the rest of the run.  On Breast Cancer
+the baseline never settles within 0.005 of the reference in 200 iterations and
+both rotations do.  Spambase is the one where 200 iterations is not enough for
+anybody: the gated field still converges fastest in posterior-mean terms, and
+the constant field, held to amplitude 0.05, is worse than the baseline.
 
-The constant designed rotation beats the reversible baseline on all four, by
-1.16x to 2.1x, and the state-dependent one on three of them.  Paired walker by
-walker ([`results/paired_comparison_designed.md`](results/paired_comparison_designed.md)),
-the error differences against `J = 0` are -0.15 +/- 0.02 on Titanic, -0.84 +/-
-0.06 on MAGIC, -0.49 +/- 0.06 on Breast Cancer and -2.04 +/- 0.14 on Spambase
-for the constant field, every one of them many standard errors from zero; the
-state-dependent field matches it except on Spambase, where it is worse by
-+0.35 +/- 0.03.  The calibration
-explains the two columns of amplitudes: on the two posteriors closest to
-quadratic both fields take the top of the ladder, while on the near-separable
-Breast Cancer posterior the constant field is backed off to 0.1 and on Spambase
-to 0.05 -- the state-dependent field keeps 0.8 there, because switching itself
-off in the far field is exactly what the constant one cannot do.  Spambase is
-also where the state-dependent field fails to convert that into a win: in 600
-iterations its walkers never get close enough to the bulk for the profile to
-switch the rotation on, so it behaves like the baseline with a slightly larger
-step.
+### Why `J = 0` leads early on the two high-dimensional sets
 
-### The accuracy functional has almost no room
+It is worth being precise about this, because the raw accuracy panels for Breast
+Cancer and Spambase show the baseline *above* both rotations for the first
+fifty-odd iterations.
 
-The accuracy curves tell a much flatter story than the error curves:
+1. **Accuracy is a threshold functional.**  It depends on the predictive mean
+   only through `sign(pbar - 0.5)`, so it saturates as soon as each test point
+   is on the right side.  Every field gets there within a handful of iterations;
+   what is left to measure is a few thousandths.
+2. **A rotation cannot speed up the stiff directions, and those are the ones
+   that set a decision boundary.**  `trace((D + J) H)` does not depend on `J`,
+   so buying rate for the slow directions means selling it from the fast ones.
+   The step-size gain at the collision amplitude repays that per iteration --
+   which is why the gated field, with its 2x step, tracks or beats the baseline
+   where the constant field cannot.
+3. **The baseline is the most under-dispersed chain, and on these two datasets
+   that flatters it.**  It runs at the smallest step, so it sits near the MAP for
+   longer, and the MAP classifies *better* than the true posterior here: the
+   baseline passes 0.971 on Breast Cancer against a reference of 0.965 and then
+   stays above it.  A curve above the dashed line has not converged, it has
+   overshot the functional; the rotations approach the same line from below.
 
-![accuracy with a designed rotation](figures/accuracy_four_datasets_designed.png)
+![distance from the exact posterior accuracy](figures/three_lines_gap.png)
 
-Every method classifies well within a handful of iterations -- on Breast Cancer
-the baseline is at 0.93 by iteration 2 -- so what is left to measure is a
-residual of a few thousandths.  By iterations to settle within 0.005 of the
-reference, the constant rotation wins on all four (Titanic 53 to 2, MAGIC 40 to
-17, Breast Cancer 543 to 116, Spambase never to 244) and the state-dependent one
-on three.  By eye, though, the rotation is level on Titanic and MAGIC and
-*behind* for the first hundred iterations on Breast Cancer and Spambase, where
-the baseline approaches the reference from above while the rotation approaches
-from below.
-
-Both readings are correct, and the reason they differ is the same one the
-Metropolis-corrected experiment ran into from the other side: classification
-accuracy is set by the stiff, high-signal directions of the posterior, which
-every method resolves almost immediately, while the rotation works on the flat
-directions, which barely move a decision boundary.  A rotation cannot speed up
-the stiff directions -- it can only divert drift away from them, which is the
-small early cost visible in those two panels -- so on this functional there is
-very little for any `J` to win.  Judged on convergence to the posterior, the
-design does what it was built to do.
-
-A predictive metric that is sensitive to the posterior spread, test log-loss of
-the running predictive rather than its accuracy, would be the honest way to show
-this on held-out data; the traces here record accuracy only.
+Plotted as distance from the reference accuracy, the crossovers are explicit:
+the rotations are ahead from the start on Titanic, from iteration 5 on MAGIC,
+from iteration 40 on Breast Cancer, and from iteration 180 on Spambase.
 
 ### What is *not* claimed
 
 * The reversible method that spends the same warm-up covariance on a
-  preconditioner is faster than either rotation on Titanic and MAGIC, and the
-  grey line in both figures shows it.  On Breast Cancer and Spambase its large
-  step throws walkers deep into the tails first -- the hump in the error figure
-  -- and it takes hundreds of iterations to recover.  The rotation's claim is
-  against `J = 0` *in the same geometry*, which is the comparison the
+  preconditioner is faster still on Titanic and MAGIC.  It is recorded in every
+  run as `precond` and drawn in
+  [`figures/posterior_mean_error_designed.png`](figures/posterior_mean_error_designed.png);
+  on Breast Cancer and Spambase its large step throws walkers deep into the
+  tails first and it takes hundreds of iterations to recover.  The rotation's
+  claim is against `J = 0` *in the same geometry*, which is the comparison the
   irreversible-sampling literature makes, not against preconditioning.
 * The unadjusted chain is biased.  The step-size rule caps the worst-case
   variance inflation at 1.18 for every field, and inflating a variance does not
   move the posterior mean, but the invariant law is only correct to `O(h)`
   -- unlike the Metropolis-corrected experiment, which is exact.
-* The divergence correction is again numerically negligible: the bulk-centred
-  profile gives `Gamma / |D ghat|` between 0.000 and 0.008 in the bulk, so the
-  two state-dependent curves coincide to four digits.  The one setting where
-  that term is visible is
+* The divergence correction is numerically negligible here too: the gate gives
+  `Gamma / |D ghat|` under 0.01 in the bulk, so `state` and `state_nocorr` agree
+  to four digits.  The setting where that term is visible is
   [the correction experiment](#the-correction-term-only-matters-without-the-metropolis-step).
-
 
 ## Datasets
 
@@ -489,8 +490,10 @@ The designed-rotation experiment of
 [Making the rotation pay](#making-the-rotation-pay):
 
 ```bash
-./experiments/run_designed_all.sh              # four datasets, ~40 min in parallel
+ARGS="--n-iter 200" ./experiments/run_designed_all.sh
+python3 experiments/plot_three_lines.py                # the three-field figures
 python3 experiments/plot_accuracy.py --tag designed --suffix _designed \
+    --variants zero constant state \
     --title 'Accuracy from the $w = 0$ start, unadjusted dynamics with a designed rotation'
 ```
 

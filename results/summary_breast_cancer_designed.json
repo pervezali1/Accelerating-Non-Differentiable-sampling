@@ -9,7 +9,7 @@
   "unadjusted": true,
   "amplitude": {
     "constant": 0.1,
-    "state": 0.8
+    "state": 1.0
   },
   "amplitude_calibration": {
     "constant": {
@@ -50,11 +50,17 @@
           "step_size": 0.0008451545965077367,
           "score": 29.81753478552597,
           "final_score": 16.854404659838984
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.000675713076630816,
+          "score": 38.1495345082913,
+          "final_score": 25.70839276314902
         }
       ]
     },
     "state": {
-      "amplitude": 0.8,
+      "amplitude": 1.0,
       "ladder": [
         {
           "amplitude": 0.0,
@@ -65,48 +71,55 @@
         {
           "amplitude": 0.05,
           "step_size": 0.0027067339029026344,
-          "score": 3.910382546320062,
-          "final_score": 1.907481377354198
+          "score": 3.920146521236985,
+          "final_score": 1.9147028007366438
         },
         {
           "amplitude": 0.1,
           "step_size": 0.0027118336186952915,
-          "score": 3.890928938733094,
-          "final_score": 1.895344578764577
+          "score": 3.9109686895305034,
+          "final_score": 1.9100106108177304
         },
         {
           "amplitude": 0.2,
           "step_size": 0.0027326252622489177,
-          "score": 3.840255605388923,
-          "final_score": 1.8671322997416144
+          "score": 3.8823631852004055,
+          "final_score": 1.8974446392283522
         },
         {
           "amplitude": 0.4,
           "step_size": 0.002822776596988581,
-          "score": 3.688130139770395,
-          "final_score": 1.793254771688995
+          "score": 3.780318886542528,
+          "final_score": 1.8587435364251568
         },
         {
           "amplitude": 0.8,
           "step_size": 0.003380618386030947,
-          "score": 3.0911841004071263,
-          "final_score": 1.5492404802570179
+          "score": 3.300724858369406,
+          "final_score": 1.7107872827319388
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.005405704613046528,
+          "score": 2.3670527286799805,
+          "final_score": 1.5537749006870563
         }
       ]
     }
   },
   "safety": 0.15,
-  "rho": 0.828244746914872,
-  "gamma_over_drift_in_bulk": 3.751873707410333e-09,
-  "n_iter": 600,
+  "gate_radius": 1.0353059336435901,
+  "gate_width": 0.13804079115247866,
+  "gamma_over_drift_in_bulk": 1.3676890295576846e-13,
+  "n_iter": 200,
   "n_walkers": 32,
   "prior_scale": 2.0,
   "step_sizes": {
     "zero": 0.002705042507058832,
     "constant": 0.0027118336186952915,
-    "state": 0.003380618386030947
+    "state": 0.005405704613046528
   },
-  "rho_fraction": 0.6,
+  "gate_fraction": 0.75,
   "whitened_start_radius": 1.3804079115247867,
   "design": {
     "eigenvalues_H": [
@@ -205,11 +218,11 @@
     ],
     "reversible_rate": 0.08985487489207337,
     "mean_rate_bound": 24.87683702309741,
-    "irreversible_rate": 9.92230436216551,
-    "max_real_rate": 88.74116085969064,
-    "max_abs_rate": 88.74116085969064,
+    "irreversible_rate": 14.33080119410145,
+    "max_real_rate": 55.496928055587375,
+    "max_abs_rate": 55.496928055587375,
     "condition_number": 1234.2567666929522,
-    "speedup": 110.42588812330331,
+    "speedup": 159.48829945302896,
     "block_rates": [
       55.496921115391125,
       43.15729475807486,
@@ -228,7 +241,7 @@
       14.7749286171373,
       14.330801194101465
     ],
-    "amplitude": 0.8
+    "amplitude": 1.0
   },
   "design_on_reference": {
     "eigenvalues_H": [
@@ -266,11 +279,11 @@
     ],
     "reversible_rate": 0.24464834729035026,
     "mean_rate_bound": 2.044889267719771,
-    "irreversible_rate": 0.3019368785864746,
-    "max_real_rate": 13.892169102256819,
-    "max_abs_rate": 24.405769759446315,
+    "irreversible_rate": 0.3059112581697371,
+    "max_real_rate": 12.11674922143332,
+    "max_abs_rate": 30.624368938656236,
     "condition_number": 73.51887380215409,
-    "speedup": 1.2341668436784246
+    "speedup": 1.2504121182828984
   },
   "summary": [
     {
@@ -278,12 +291,12 @@
       "variant": "zero",
       "step_size": 0.002705042507058832,
       "accuracy_at_100": 0.9714912280701755,
-      "accuracy_final": 0.9691154970760234,
-      "iters_to_ref_0.005": 543,
+      "accuracy_final": 0.9705774853801169,
+      "iters_to_ref_0.005": -1,
       "iters_to_ref_0.01": 7,
-      "mean_error_final": 3.58261528808538,
-      "potential_final": 26.778276519794403,
-      "ess_potential_second_half": 365.2337605001808,
+      "mean_error_final": 4.112895891587967,
+      "potential_final": 25.509501793517394,
+      "ess_potential_second_half": 295.3634980149523,
       "predicted_decay": 0.9997569387439504,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.002705042507058832,
@@ -295,12 +308,12 @@
       "variant": "constant",
       "step_size": 0.0027118336186952915,
       "accuracy_at_100": 0.9585160818713451,
-      "accuracy_final": 0.9618055555555556,
+      "accuracy_final": 0.9638157894736843,
       "iters_to_ref_0.005": 116,
       "iters_to_ref_0.01": 80,
-      "mean_error_final": 3.096650841210834,
-      "potential_final": 28.186531060346958,
-      "ess_potential_second_half": 301.05657028807286,
+      "mean_error_final": 3.4157773222693804,
+      "potential_final": 25.231365944765667,
+      "ess_potential_second_half": 233.59180709183298,
       "predicted_decay": 0.999003167170402,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 0.0027118336186952915,
@@ -310,34 +323,34 @@
     {
       "dataset": "breast_cancer",
       "variant": "state",
-      "step_size": 0.003380618386030947,
-      "accuracy_at_100": 0.9643640350877192,
-      "accuracy_final": 0.9671052631578947,
-      "iters_to_ref_0.005": 431,
-      "iters_to_ref_0.01": 67,
-      "mean_error_final": 3.3886906498307487,
-      "potential_final": 27.453136368986815,
-      "ess_potential_second_half": 361.7547613637696,
-      "predicted_decay": 0.9664564754414682,
+      "step_size": 0.005405704613046528,
+      "accuracy_at_100": 0.9691154970760234,
+      "accuracy_final": 0.9683845029239766,
+      "iters_to_ref_0.005": 169,
+      "iters_to_ref_0.01": 27,
+      "mean_error_final": 3.6101727609832013,
+      "potential_final": 26.859242666204764,
+      "ess_potential_second_half": 298.5635831255752,
+      "predicted_decay": 0.9225319218763931,
       "variance_inflation": 1.1764705882352942,
-      "step_size_from_rule": 0.003380618386030947,
+      "step_size_from_rule": 0.005405704613046528,
       "step_reductions": 0,
       "diverged": false
     },
     {
       "dataset": "breast_cancer",
       "variant": "state_nocorr",
-      "step_size": 0.003380618386030947,
-      "accuracy_at_100": 0.9643640350877192,
-      "accuracy_final": 0.9671052631578947,
-      "iters_to_ref_0.005": 431,
-      "iters_to_ref_0.01": 66,
-      "mean_error_final": 3.388800712142822,
-      "potential_final": 27.4528313877197,
-      "ess_potential_second_half": 361.77775665953885,
-      "predicted_decay": 0.9664564754414682,
+      "step_size": 0.005405704613046528,
+      "accuracy_at_100": 0.9691154970760234,
+      "accuracy_final": 0.9683845029239766,
+      "iters_to_ref_0.005": 169,
+      "iters_to_ref_0.01": 27,
+      "mean_error_final": 3.6104036105649078,
+      "potential_final": 26.8593892359292,
+      "ess_potential_second_half": 298.5714376264087,
+      "predicted_decay": 0.9225319218763931,
       "variance_inflation": 1.1764705882352942,
-      "step_size_from_rule": 0.003380618386030947,
+      "step_size_from_rule": 0.005405704613046528,
       "step_reductions": 0,
       "diverged": false
     },
@@ -346,12 +359,12 @@
       "variant": "precond",
       "step_size": 0.14999999999999905,
       "accuracy_at_100": 0.9716739766081871,
-      "accuracy_final": 0.9674707602339181,
-      "iters_to_ref_0.005": 261,
+      "accuracy_final": 0.9691154970760234,
+      "iters_to_ref_0.005": 183,
       "iters_to_ref_0.01": 1,
-      "mean_error_final": 4.214863757022244,
-      "potential_final": 32.53344183763663,
-      "ess_potential_second_half": 4497.894528258533,
+      "mean_error_final": 7.333498091498564,
+      "potential_final": 32.825611840256315,
+      "ess_potential_second_half": 1539.235891476269,
       "predicted_decay": 0.8500000000000021,
       "variance_inflation": 1.081081081081081,
       "step_size_from_rule": 0.2999999999999981,
@@ -365,5 +378,5 @@
     "state",
     "state_nocorr"
   ],
-  "runtime_seconds": 165.74522399902344
+  "runtime_seconds": 97.33376693725586
 }

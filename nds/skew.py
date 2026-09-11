@@ -235,3 +235,68 @@ class DirectionalSkew(SkewField):
         t = self._tanh(W)
         grad_s = self.gain * (1.0 - t**2) * self.c / self.length_scale
         return self.alpha * (self.A @ grad_s)
+
+
+class GatedSkew(SkewField):
+    r"""``J(w) = alpha s(w) A`` with a sharp radial gate around the bulk.
+
+    ``s(w) = 1 / (1 + exp((r(w) - radius) / width))`` with
+    ``r(w)^2 = (w - center)^T M (w - center)``: the field is on inside the gate
+    and off outside it, with a transition of width ``width``.
+
+    :class:`LocalizedSkew`'s Gaussian profiles decay over a scale comparable to
+    the distance they are centred on, which is too gradual when the ``w = 0``
+    start and the bulk are only a factor of two apart in whitened distance --
+    the rotation is then still a quarter of its strength during the descent,
+    where the quadratic model that designed it does not hold.  A gate separates
+    the two regimes properly: off while the chain descends, full strength once
+    it is in the bulk.
+
+        Gamma(w) = -alpha s(w) (1 - s(w)) / (width r(w)) * A M (w - center).
+    """
+
+    label = "gated $J_s$"
+
+    def __init__(
+        self,
+        A: np.ndarray,
+        alpha: float = 1.0,
+        radius: float = 1.0,
+        width: float = 0.1,
+        metric: np.ndarray | None = None,
+        center: np.ndarray | None = None,
+        drop_correction: bool = False,
+    ) -> None:
+        self.A = np.ascontiguousarray(A)
+        self.alpha = float(alpha)
+        self.radius = float(radius)
+        self.width = float(width)
+        self.metric = None if metric is None else np.ascontiguousarray(metric)
+        d = len(self.A)
+        self.center = (
+            np.zeros((d, 1)) if center is None else np.asarray(center, float).reshape(d, 1)
+        )
+        self.drop_correction = bool(drop_correction)
+        if drop_correction:
+            self.label = "gated $J_s$, correction dropped"
+
+    def _radius(self, W: np.ndarray) -> tuple:
+        Z = W - self.center
+        MZ = Z if self.metric is None else self.metric @ Z
+        r2 = (Z * MZ).sum(axis=0, keepdims=True)
+        return np.sqrt(np.maximum(r2, 1e-300)), MZ
+
+    def scale(self, W: np.ndarray) -> np.ndarray:
+        r, _ = self._radius(W)
+        return 1.0 / (1.0 + np.exp(np.clip((r - self.radius) / self.width, -500, 500)))
+
+    def apply(self, W: np.ndarray, G: np.ndarray) -> np.ndarray:
+        return self.alpha * self.scale(W) * (self.A @ G)
+
+    def divergence(self, W: np.ndarray) -> np.ndarray:
+        if self.drop_correction:
+            return np.zeros_like(W)
+        r, MZ = self._radius(W)
+        s = self.scale(W)
+        grad_s = -(s * (1.0 - s) / (self.width * r)) * MZ
+        return self.alpha * (self.A @ grad_s)

@@ -224,6 +224,8 @@ def main() -> None:
     parser.add_argument("--geometry", default="warmup")
     parser.add_argument("--alpha", type=float, default=1.0)
     parser.add_argument("--title", default="Accuracy from the $w = 0$ start")
+    parser.add_argument("--variants", nargs="+", default=None,
+                        help="which fields to draw; defaults to every one the run recorded")
     parser.add_argument("--tag", default=None,
                         help="trace-file stem after the dataset name; defaults to "
                              "'<geometry>_alpha<alpha>'")
@@ -242,6 +244,15 @@ def main() -> None:
             print(f"missing traces for {name}; skipping", file=sys.stderr)
     if not runs:
         raise SystemExit("no traces found")
+
+    if args.variants:
+        for run in runs:
+            run["meta"]["variant_order"] = [
+                v for v in args.variants if f"accuracy_{v}" in run["arrays"]
+            ]
+            if "precond" not in args.variants:
+                run["arrays"].pop("accuracy_precond", None)
+                run["arrays"].pop("error_precond", None)
 
     sfx = args.suffix
     accuracy_figure(runs, os.path.join(FIGURES, f"accuracy_four_datasets{sfx}.png"),

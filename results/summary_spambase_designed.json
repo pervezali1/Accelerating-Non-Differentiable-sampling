@@ -9,7 +9,7 @@
   "unadjusted": true,
   "amplitude": {
     "constant": 0.05,
-    "state": 0.8
+    "state": 1.0
   },
   "amplitude_calibration": {
     "constant": {
@@ -50,11 +50,17 @@
           "step_size": 1.2982445321167527e-05,
           "score": 79.25033857561635,
           "final_score": 107.68160687278453
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 1.0385723464966359e-05,
+          "score": 84.52588718217503,
+          "final_score": 117.02626489912679
         }
       ]
     },
     "state": {
-      "amplitude": 0.8,
+      "amplitude": 1.0,
       "ladder": [
         {
           "amplitude": 0.0,
@@ -65,48 +71,55 @@
         {
           "amplitude": 0.05,
           "step_size": 8.314026448127471e-05,
-          "score": 17.791834404056292,
-          "final_score": 14.225573547058682
+          "score": 17.764637302672654,
+          "final_score": 14.215315341688253
         },
         {
           "amplitude": 0.1,
           "step_size": 8.329703041523744e-05,
-          "score": 17.818726839647628,
-          "final_score": 14.231601620071126
+          "score": 17.766259584054133,
+          "final_score": 14.211424702422706
         },
         {
           "amplitude": 0.2,
           "step_size": 8.393617304921949e-05,
-          "score": 17.84561184571846,
-          "final_score": 14.22604795137828
+          "score": 17.7480118953405,
+          "final_score": 14.186446892464746
         },
         {
           "amplitude": 0.4,
           "step_size": 8.67075464126838e-05,
-          "score": 17.786706516969197,
-          "final_score": 14.14177251594658
+          "score": 17.61834356107038,
+          "final_score": 14.061253997039605
         },
         {
           "amplitude": 0.8,
           "step_size": 0.00010385956256934022,
-          "score": 17.05178930822249,
-          "final_score": 13.54576803371487
+          "score": 16.77835263303114,
+          "final_score": 13.332814096971761
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.00016617157543946174,
+          "score": 14.708974714314097,
+          "final_score": 11.584406311879958
         }
       ]
     }
   },
   "safety": 0.15,
-  "rho": 0.5630346851773771,
-  "gamma_over_drift_in_bulk": 1.997099616415012e-37,
-  "n_iter": 600,
+  "gate_radius": 0.7037933564717214,
+  "gate_width": 0.09383911419622952,
+  "gamma_over_drift_in_bulk": 6.029954451468019e-31,
+  "n_iter": 200,
   "n_walkers": 32,
   "prior_scale": 2.0,
   "step_sizes": {
     "zero": 8.308827085259585e-05,
     "constant": 8.314026448127471e-05,
-    "state": 0.00010385956256934022
+    "state": 0.00016617157543946174
   },
-  "rho_fraction": 0.6,
+  "gate_fraction": 0.75,
   "whitened_start_radius": 0.9383911419622951,
   "design": {
     "eigenvalues_H": [
@@ -272,11 +285,11 @@
     ],
     "reversible_rate": 0.10790827500226952,
     "mean_rate_bound": 694.482028473395,
-    "irreversible_rate": 236.41872359268038,
-    "max_real_rate": 2888.515920714664,
-    "max_abs_rate": 2888.515920714664,
+    "irreversible_rate": 323.0225917253995,
+    "max_real_rate": 1805.3629160499445,
+    "max_abs_rate": 1805.3629160501819,
     "condition_number": 33460.0652614356,
-    "speedup": 2190.9230185331758,
+    "speedup": 2993.4923129723434,
     "block_rates": [
       1805.3629160499388,
       1566.5112417555902,
@@ -308,7 +321,7 @@
       323.02259172539914,
       335.33445732774135
     ],
-    "amplitude": 0.8
+    "amplitude": 1.0
   },
   "design_on_reference": {
     "eigenvalues_H": [
@@ -373,11 +386,11 @@
     ],
     "reversible_rate": 0.3351645636893579,
     "mean_rate_bound": 107.31503886624398,
-    "irreversible_rate": 2.2706954954025806,
-    "max_real_rate": 316.8076833017109,
-    "max_abs_rate": 3901.47172123901,
+    "irreversible_rate": 3.044230875434409,
+    "max_real_rate": 316.6137745582781,
+    "max_abs_rate": 4876.414765235977,
     "condition_number": 1432.5220879332558,
-    "speedup": 6.7748674573698064
+    "speedup": 9.082794558961513
   },
   "summary": [
     {
@@ -385,12 +398,12 @@
       "variant": "zero",
       "step_size": 8.308827085259585e-05,
       "accuracy_at_100": 0.9285326086956522,
-      "accuracy_final": 0.9361639492753624,
+      "accuracy_final": 0.9321331521739131,
       "iters_to_ref_0.005": -1,
       "iters_to_ref_0.01": 163,
-      "mean_error_final": 9.590102485309275,
-      "potential_final": 550.6084663821002,
-      "ess_potential_second_half": 205.46540105564517,
+      "mean_error_final": 12.309883882334255,
+      "potential_final": 574.7075073462693,
+      "ess_potential_second_half": 118.52421043838402,
       "predicted_decay": 0.9999910340880194,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 8.308827085259585e-05,
@@ -402,12 +415,12 @@
       "variant": "constant",
       "step_size": 8.314026448127471e-05,
       "accuracy_at_100": 0.9167798913043479,
-      "accuracy_final": 0.9398097826086956,
-      "iters_to_ref_0.005": 244,
+      "accuracy_final": 0.9333333333333333,
+      "iters_to_ref_0.005": -1,
       "iters_to_ref_0.01": 180,
-      "mean_error_final": 7.549762772089812,
-      "potential_final": 529.450171032064,
-      "ess_potential_second_half": 233.8420755183563,
+      "mean_error_final": 15.107587739768674,
+      "potential_final": 561.5769273243444,
+      "ess_potential_second_half": 100.45084812390147,
       "predicted_decay": 0.9998032993498451,
       "variance_inflation": 1.1764705882352942,
       "step_size_from_rule": 8.314026448127471e-05,
@@ -417,34 +430,34 @@
     {
       "dataset": "spambase",
       "variant": "state",
-      "step_size": 0.00010385956256934022,
-      "accuracy_at_100": 0.9050951086956522,
-      "accuracy_final": 0.9340579710144927,
+      "step_size": 0.00016617157543946174,
+      "accuracy_at_100": 0.925294384057971,
+      "accuracy_final": 0.9315670289855071,
       "iters_to_ref_0.005": -1,
-      "iters_to_ref_0.01": 404,
-      "mean_error_final": 9.941408945933386,
-      "potential_final": 549.4703788248125,
-      "ess_potential_second_half": 201.51926397212924,
-      "predicted_decay": 0.9754456547844624,
+      "iters_to_ref_0.01": 191,
+      "mean_error_final": 11.159061411165949,
+      "potential_final": 559.5071206873342,
+      "ess_potential_second_half": 152.9692696834135,
+      "predicted_decay": 0.9463228270304523,
       "variance_inflation": 1.1764705882352942,
-      "step_size_from_rule": 0.00010385956256934022,
+      "step_size_from_rule": 0.00016617157543946174,
       "step_reductions": 0,
       "diverged": false
     },
     {
       "dataset": "spambase",
       "variant": "state_nocorr",
-      "step_size": 0.00010385956256934022,
-      "accuracy_at_100": 0.9051630434782609,
-      "accuracy_final": 0.9340579710144927,
+      "step_size": 0.00016617157543946174,
+      "accuracy_at_100": 0.9253170289855073,
+      "accuracy_final": 0.9315670289855071,
       "iters_to_ref_0.005": -1,
-      "iters_to_ref_0.01": 404,
-      "mean_error_final": 9.941435056422904,
-      "potential_final": 549.4736375053939,
-      "ess_potential_second_half": 201.49389270625255,
-      "predicted_decay": 0.9754456547844624,
+      "iters_to_ref_0.01": 189,
+      "mean_error_final": 11.159508451848025,
+      "potential_final": 559.5224922553459,
+      "ess_potential_second_half": 152.93001572909228,
+      "predicted_decay": 0.9463228270304523,
       "variance_inflation": 1.1764705882352942,
-      "step_size_from_rule": 0.00010385956256934022,
+      "step_size_from_rule": 0.00016617157543946174,
       "step_reductions": 0,
       "diverged": false
     },
@@ -453,12 +466,12 @@
       "variant": "precond",
       "step_size": 0.018749999999999507,
       "accuracy_at_100": 0.9412590579710145,
-      "accuracy_final": 0.9400135869565218,
+      "accuracy_final": 0.9404664855072464,
       "iters_to_ref_0.005": 1,
       "iters_to_ref_0.01": 1,
-      "mean_error_final": 19.010942598933163,
-      "potential_final": 544.3621986625534,
-      "ess_potential_second_half": 5857.927413615627,
+      "mean_error_final": 50.7425874111308,
+      "potential_final": 542.8561948872818,
+      "ess_potential_second_half": 1876.1226216372422,
       "predicted_decay": 0.981250000000001,
       "variance_inflation": 1.0094637223974763,
       "step_size_from_rule": 0.2999999999999921,
@@ -472,5 +485,5 @@
     "state",
     "state_nocorr"
   ],
-  "runtime_seconds": 2335.891069173813
+  "runtime_seconds": 1462.2020435333252
 }
