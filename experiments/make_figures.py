@@ -369,22 +369,28 @@ def fig_three_way(mode):
                 ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
                         markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
                 sp = row.get("speedup")
-                txt = f"{hit:d} iters" + (f"   {sp:.1f}x" if sp and sp > 1.01 else "")
-                ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, -14),
-                            textcoords="offset points", ha="center",
-                            color=colour, fontsize=8, zorder=5)
+                txt = f"{hit:d} iters" + (f"  ({sp:.1f}x)" if sp and sp > 1.01 else "")
+                ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, 11),
+                            textcoords="offset points", ha="center", va="bottom",
+                            color=colour, fontsize=8.5, zorder=5,
+                            bbox=dict(boxstyle="round,pad=0.18", fc=p["surface"],
+                                      ec="none", alpha=0.85))
         ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
-        ax.annotate("measurement floor (exact draws)", xy=(1.0, floor * 1.12),
-                    xytext=(2, 3), textcoords="offset points",
-                    color=p["text_secondary"], fontsize=8)
         ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+        ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor),
+                    xytext=(0, 4), textcoords="offset points",
+                    color=p["text_secondary"], fontsize=8, va="bottom")
+        ax.annotate("measurement floor", xy=(ax.get_xlim()[0], floor * 0.78),
+                    xytext=(6, 0), textcoords="offset points",
+                    color=p["text_secondary"], fontsize=8, ha="left", va="center")
         ax.set_xscale("log")
         ax.set_yscale("log")
         ax.set_xlabel("iteration")
         ax.set_ylabel("sliced 2-Wasserstein distance")
         which = "heavy tailed and non-differentiable" if "composite" in path else "heavy tailed"
         ax.set_title(f"Anchored Langevin on a {which} target", loc="left")
-        ax.legend(loc="lower left", fontsize=8.5)
+        ax.legend(loc="upper right", fontsize=9)
+        ax.set_ylim(top=ax.get_ylim()[1] * 2.2)
         tag = os.path.basename(path)[:-5]
         print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig10_{tag}_{mode}.png")))
 

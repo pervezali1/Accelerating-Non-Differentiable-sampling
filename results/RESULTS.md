@@ -320,6 +320,26 @@ Stepsizes here are taken from the Student-t core's exact analysis; the composite
 potential is not log-quadratic, so its second-moment recursion is not exact and
 the equal-bias property is approximate.
 
+## 6b. Three fields, one figure
+
+`exp8` reduces the comparison to the three cases that matter, as three members
+of one family with a single parameter changed, each at the stepsize that
+equalises accuracy and each with the warm-up ramp:
+
+$$c = \delta\, e^{U-U_0} J_0\big[(1 + a w_1)\nabla U_0 - a\nabla w_1\big].$$
+
+| field | $\delta$ | $a$ | $\eta$ | hump | iterations to 2× floor | speed-up |
+|---|---|---|---|---|---|---|
+| $J = 0$, reversible anchored | 0 | — | 1.07e-3 | 1.00× | 2721 | 1.00× |
+| $J$ constant | 4.95 | 0 | 6.49e-4 | 1.00× | 309 | 8.81× |
+| $J$ state dependent | 4.95 | −3 | 7.50e-4 | 1.00× | **94** | **28.95×** |
+
+![three fields](figures/fig10_exp8_three_way_composite_light.png)
+
+Same target, same rotation strength, same measurement: the only difference
+between the second and third rows is where in space the rotation is applied,
+and it is worth 3.3×.
+
 ## 7. Figures
 
 Regenerate with `python experiments/make_figures.py`; a dark-mode variant of
