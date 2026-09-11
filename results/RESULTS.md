@@ -295,7 +295,24 @@ off the Student-t core (acceptance rate 0.54).  Estimator floor 0.068.
 
 The acceleration survives the non-smoothness intact — 4.77×, slightly better
 than the 4.0× on the smooth target — and the optimum sits at the same
-$\|J\|$.  Subgradient ULA, which is what one would otherwise reach for when
+$\|J\|$.
+
+**With the warm-up ramp** (`--ramp 5`), which removes the transient overshoot
+described in [`RESULTS_STATE_DEPENDENT.md`](RESULTS_STATE_DEPENDENT.md) § 9,
+every curve descends monotonically *and* converges sooner:
+
+| $\|J\|_2$ | hump | iterations to 2× floor | iterations to 10 % slow-direction error | speed-up |
+|---|---|---|---|---|
+| 0 | 1.00× | 3073 | 3841 | 1.00× |
+| 0.49 | 1.00× | 2458 | 3073 | 1.25× |
+| 1.48 | 1.00× | 1007 | 1574 | 2.44× |
+| 2.47 | 1.00× | 806 | 806 | 4.77× |
+| 3.46 | 1.00× | **645** | **645** | **5.96×** |
+| 4.95 | 1.00× | 645 | 645 | 5.96× |
+| 8.41 | 1.00× | 1007 | 1007 | 3.81× |
+
+No configuration now exceeds its starting distance at any point, and the best
+speed-up rises from 4.77× to 5.96×.  Subgradient ULA, which is what one would otherwise reach for when
 $\nabla U$ does not exist at $x_i = 0$, fails to reach $2\times$ floor within
 6 000 iterations at any of three stepsizes spanning 16×.
 

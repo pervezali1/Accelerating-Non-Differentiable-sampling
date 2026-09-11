@@ -107,6 +107,19 @@
     subgradient ULA eta=4.29e-03 iters_to_2xfloor=    -1 final W2=0.2062
     subgradient ULA eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.1562
 
+== exp4_nonsmooth_d2_k100_ramp.json ==
+  two-sample floor 0.0677; |J_opt| = 4.950
+    |J|=   0.00 eta=1.07e-03 iters_to_2xfloor=  3073 iters_to_slow10=  3841 speedup= 1.00x diverged=0
+    |J|=   0.49 eta=1.05e-03 iters_to_2xfloor=  2458 iters_to_slow10=  3073 speedup= 1.25x diverged=0
+    |J|=   1.48 eta=8.97e-04 iters_to_2xfloor=  1007 iters_to_slow10=  1574 speedup= 2.44x diverged=0
+    |J|=   2.47 eta=6.95e-04 iters_to_2xfloor=   806 iters_to_slow10=   806 speedup= 4.77x diverged=0
+    |J|=   3.46 eta=5.18e-04 iters_to_2xfloor=   645 iters_to_slow10=   645 speedup= 5.96x diverged=0
+    |J|=   4.95 eta=3.36e-04 iters_to_2xfloor=   645 iters_to_slow10=   645 speedup= 5.96x diverged=0
+    |J|=   8.41 eta=1.45e-04 iters_to_2xfloor=  1007 iters_to_slow10=  1007 speedup= 3.81x diverged=0
+    subgradient ULA eta=1.07e-03 iters_to_2xfloor=    -1 final W2=0.8396
+    subgradient ULA eta=4.29e-03 iters_to_2xfloor=    -1 final W2=0.2062
+    subgradient ULA eta=1.72e-02 iters_to_2xfloor=    -1 final W2=0.1562
+
 == exp7_bias_audit.json ==
     Euler, J=0                       eta=0.001072  frobenius=0.01691  per_direction_variance=0.07571  quantile_mid=0.0434  quantile_99=0.03161
     Euler, constant |J|=4.95         eta=0.00083  frobenius=0.04889  per_direction_variance=0.09478  quantile_mid=0.04544  quantile_99=0.04698
