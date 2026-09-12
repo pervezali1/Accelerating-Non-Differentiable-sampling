@@ -236,8 +236,9 @@ def fig_iact(mode):
 
 def fig_nonsmooth(mode):
     """The composite target, with and without the warm-up ramp side by side."""
-    plain = sorted(glob.glob(os.path.join(DATA, "exp4_nonsmooth_*[0-9].json")))
-    ramped = sorted(glob.glob(os.path.join(DATA, "exp4_nonsmooth_*_ramp.json")))
+    every = sorted(glob.glob(os.path.join(DATA, "exp4_nonsmooth_*.json")))
+    plain = [f for f in every if "_ramp" not in os.path.basename(f)]
+    ramped = [f for f in every if os.path.basename(f).endswith("_ramp.json")]
     if not plain:
         print("  skip: no exp4 data")
         return
@@ -245,8 +246,8 @@ def fig_nonsmooth(mode):
     panels = [("no warm-up: the rotation flings the prior's stiff-direction\n"
                "excess along the soft axis", plain[0])]
     if ramped:
-        panels.append(("with a warm-up ramp: the hump is gone and it converges\n"
-                       "no later", ramped[0]))
+        panels.append(("with a ten-relaxation warm-up ramp: no rise out of a\n"
+                       "trough at any field strength", ramped[0]))
     fig, axes = plt.subplots(1, len(panels), figsize=(5.8 * len(panels), 4.1), squeeze=False)
     for ax, (title, path) in zip(axes[0], panels):
         res = runner.load_json(path)

@@ -98,8 +98,9 @@ def main():
                     help="warm-up length in relaxations of the fastest direction; "
                          "10 leaves no hump in d=3 and costs no iterations")
     ap.add_argument("--jnorm", type=float, default=6.0)
-    ap.add_argument("--sphere-s", type=float, nargs="*", default=[0.1, 0.3])
-    ap.add_argument("--hyper-s", type=float, nargs="*", default=[0.3, 1.0, 3.0, 10.0])
+    ap.add_argument("--sphere-s", type=float, nargs="*", default=[0.1, 0.3, 0.5, 1.0])
+    ap.add_argument("--hyper-s", type=float, nargs="*",
+                    default=[0.3, 0.5, 0.7, 1.0, 1.5, 2.0, 3.0])
     ap.add_argument("--smoke", action="store_true", help="tiny run, to check it works")
     args = ap.parse_args()
 

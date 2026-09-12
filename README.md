@@ -225,7 +225,7 @@ python experiments/exp6_estimator_noise.py      # is the metric trustworthy here
 python experiments/exp0_paper_replication.py    # the paper's Figure 8 + the control
 python experiments/exp2_anisotropic.py --setting d2_nu5_k100
 python experiments/exp3_single_chain.py
-python experiments/exp4_nonsmooth_heavy.py --ramp 5   # --ramp removes the transient hump
+python experiments/exp4_nonsmooth_heavy.py --ramp 10  # --ramp removes the transient hump
 python experiments/exp7_state_dependent.py      # state-dependent J and the integrators
 python experiments/make_figures.py
 python experiments/summarize.py                 # read everything back

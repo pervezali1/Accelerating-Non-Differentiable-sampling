@@ -128,7 +128,7 @@ def main():
         hit = int(it[np.argmax(w <= 2 * floor)]) if (w <= 2 * floor).any() else -1
         row = {"label": label, "delta": delta, "tilt": a, "eta": eta,
                "iters": it.tolist(), "w2": w.tolist(), "iters_to_2xfloor": hit,
-               "hump": float(np.max(w) / w[0]), "final_w2": float(w[-1])}
+               "hump": metrics.transient_rise(w, floor), "final_w2": float(w[-1])}
         results["rows"].append(row)
         print(f"  {label:38s} eta={eta:.2e} hump={row['hump']:5.2f}x "
               f"iters_to_2xfloor={hit:6d} final_W2={w[-1]:.4f}  ({time.time() - t0:.0f}s)")

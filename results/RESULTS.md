@@ -297,24 +297,42 @@ The acceleration survives the non-smoothness intact — 4.77×, slightly better
 than the 4.0× on the smooth target — and the optimum sits at the same
 $\|J\|$.
 
-**With the warm-up ramp** (`--ramp 5`), which removes the transient overshoot
-described in [`RESULTS_STATE_DEPENDENT.md`](RESULTS_STATE_DEPENDENT.md) § 9,
-every curve descends monotonically *and* converges sooner:
+**With the warm-up ramp**, which removes the transient overshoot described in
+[`RESULTS_STATE_DEPENDENT.md`](RESULTS_STATE_DEPENDENT.md) § 9, every curve
+descends monotonically *and*, at the shorter ramp, converges sooner. The hump
+column is the rise out of a trough (`metrics.transient_rise`), not peak over
+start: the peak of these curves is the first point, so peak-over-start reports
+1.00× for a curve with a plainly visible hump and is useless here.
 
-| $\|J\|_2$ | hump | iterations to 2× floor | iterations to 10 % slow-direction error | speed-up |
-|---|---|---|---|---|
-| 0 | 1.00× | 3073 | 3841 | 1.00× |
-| 0.49 | 1.00× | 2458 | 3073 | 1.25× |
-| 1.48 | 1.00× | 1007 | 1574 | 2.44× |
-| 2.47 | 1.00× | 806 | 806 | 4.77× |
-| 3.46 | 1.00× | **645** | **645** | **5.96×** |
-| 4.95 | 1.00× | 645 | 645 | 5.96× |
-| 8.41 | 1.00× | 1007 | 1007 | 3.81× |
+| $\|J\|_2$ | rise, `--ramp 5` | rise, `--ramp 10` | 2× floor (either) | 10 % slow-direction, ramp 5 | ramp 10 |
+|---|---|---|---|---|---|
+| 0 | 1.00× | 1.00× | 3073 | 3841 | 3841 |
+| 0.49 | 1.00× | 1.00× | 2458 | 3073 | 3073 |
+| 1.48 | 1.00× | 1.00× | 1007 | 1574 | 1574 |
+| 2.47 | 1.01× | 1.00× | 806 | **806** | **806** |
+| 3.46 | 1.05× | 1.00× | **645** | **645** | 806 |
+| 4.95 | 1.15× | 1.00× | **645** | 645 | 806 |
+| 8.41 | 1.35× | 1.01× | 1007 | 1007 | 1259 |
 
-No configuration now exceeds its starting distance at any point, and the best
-speed-up rises from 4.77× to 5.96×.  Subgradient ULA, which is what one would otherwise reach for when
-$\nabla U$ does not exist at $x_i = 0$, fails to reach $2\times$ floor within
-6 000 iterations at any of three stepsizes spanning 16×.
+Both are recorded (`exp4_nonsmooth_d2_k100_ramp5.json` and `..._ramp.json`),
+because they are a genuine trade and the figure and the headline want opposite
+ends of it:
+
+* On **iterations to 2× floor** the two ramps are identical, and both beat the
+  no-ramp run at every field strength above 0.49. Best speed-up 3073/645 =
+  **4.76×** either way.
+* On **iterations to 10 % slow-direction error** the shorter ramp is better for
+  the three strongest fields by one grid step, so the best speed-up is
+  3841/645 = **5.96×** at `--ramp 5` against 3841/806 = **4.77×** at
+  `--ramp 10`. The ramp itself is 193 iterations at $\|J\|=3.46$, a quarter of
+  that run, so this is the ramp paying for itself and no more.
+* The hump, though, only disappears completely at ten. Five leaves 1.15× and
+  1.35× on the two strongest fields — small, but visible in Figure 7, which
+  plots all seven. Figure 7 therefore uses the ten-relaxation run.
+
+Subgradient ULA, which is what one would otherwise reach for when $\nabla U$
+does not exist at $x_i = 0$, fails to reach $2\times$ floor within 6 000
+iterations at any of three stepsizes spanning 16×.
 
 Stepsizes here are taken from the Student-t core's exact analysis; the composite
 potential is not log-quadratic, so its second-moment recursion is not exact and

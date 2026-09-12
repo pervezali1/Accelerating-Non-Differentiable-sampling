@@ -39,6 +39,7 @@ __all__ = [
     "axis_sliced_w2",
     "w2_reference_floor",
     "energy_distance",
+    "transient_rise",
     "mmd2_imq",
     "ks_statistic",
     "moment_errors",
@@ -394,3 +395,24 @@ def ess(chain):
     tau = iact_geyer(chain)
     n = np.asarray(chain).size
     return float(n / tau) if np.isfinite(tau) and tau > 0 else np.nan
+
+
+def transient_rise(curve, floor):
+    r"""Size of the transient overshoot in a convergence curve.
+
+    The overshoot the eye reads as a hump is a rise *out of a trough*: the
+    curve falls, the rotation carries the prior's excess stiff spread down the
+    soft axis, and it climbs again before finally converging.  Peak over start,
+    the obvious metric, misses that entirely -- the peak is usually the first
+    point -- and reports 1.00 for a curve with a visible hump.
+
+    Measured here as ``max_j w[j] / min_{i<=j} w[i]``, restricted to levels
+    above ``3 * floor``.  The restriction matters: below a few times the
+    estimator floor the curve is sampling jitter, and a "rise" there is noise,
+    not a transient.  Returns 1.0 for a monotone curve.
+    """
+    w = np.asarray(curve, dtype=float)
+    w = w[np.isfinite(w) & (w > 3.0 * float(floor))]
+    if w.size < 3:
+        return 1.0
+    return float(np.max(w / np.minimum.accumulate(w)))

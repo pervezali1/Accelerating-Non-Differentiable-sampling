@@ -114,8 +114,8 @@ def main():
                                 "slow": slow.tolist(), "n_diverged": n_div,
                                 "iters_to_2xfloor": hit, "iters_to_slow10": hit_slow,
                                 "final_w2": float(w2[-1]),
-                                "hump": float(np.max(w2) / w2[0]), "ramp": args.ramp})
-        print(f"  |J|={frac * norm_opt:6.2f} eta={eta:.2e} hump={np.max(w2) / w2[0]:5.2f}x "
+                                "hump": metrics.transient_rise(w2, floor), "ramp": args.ramp})
+        print(f"  |J|={frac * norm_opt:6.2f} eta={eta:.2e} hump={metrics.transient_rise(w2, floor):5.2f}x "
               f"iters_to_2xfloor={hit:6d} iters_to_slow<10%={hit_slow:6d} "
               f"final_W2={w2[-1]:.4f} diverged={n_div}/{args.reps} ({time.time() - t0:.0f}s)")
 
