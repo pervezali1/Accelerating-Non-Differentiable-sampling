@@ -410,11 +410,11 @@ def fig_curl_potentials(mode):
     rows = blob["rows"] if isinstance(blob, dict) else blob   # older files are bare lists
     keep = ["J = 0",
             "f linear  (= constant J), |J|=6",
-            "f = s x_stiff x_soft, s=0.3",
+            "f = s x_stiff x_soft, s=0.5",
             "f = |x|^2/2  (yours), s=0.1"]
     pretty = {keep[0]: "$J = 0$ (reversible anchored)",
               keep[1]: "$f$ linear  $\\Rightarrow$  constant $J$,  $\\|J\\|$=6",
-              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=0.3",
+              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=0.5  (best)",
               keep[3]: "$f = s\\|x\\|^2/2$  (cross product),  $s$=0.1"}
     sel = [r for k in keep for r in rows if r["label"] == k]
     if len(sel) < 2:

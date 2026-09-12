@@ -46,7 +46,13 @@ matching the stationary error of the 50th, 70th and 90th percentiles of
 2 % stationary covariance bias of the exact analysis.  The stepsize search is
 adaptive, halving the probe until the measurement is finite, so a field is never
 reported as divergent merely because the first stepsize tried was too large.
-All fields carry the warm-up ramp.
+All fields carry the warm-up ramp, ten relaxations of the fastest direction by
+default -- in ``d = 3`` that removes the transient overshoot completely and
+costs no iterations, and it is what rescues the larger ``s``, whose divergences
+at a shorter ramp came from the wide prior rather than from stationarity.
+
+The overshoot itself is not stored: the curves and the floor are, so
+``metrics.transient_rise(row["w2"], meta["floor"])`` recovers it exactly.
 """
 
 import argparse
@@ -179,28 +185,66 @@ def main():
             if np.isfinite(qbias(make(field(kind, mag), eta))):
                 break
             eta *= 0.4
-        curves = []
-        for r in range(args.reps):
-            x = runner.make_prior("normal10", 3, args.n, np.random.default_rng(500 + r))
-            st = make(field(kind, mag), eta)()
-            rr = np.random.default_rng(9000 + r)
-            w, k = [], 0
-            for tk in record_at:
-                while k < tk:
-                    x = st(x, rr)
-                    k += 1
-                    if not np.all(np.isfinite(x)):
+
+        def ensemble(eta):
+            """Curves from the wide prior, and how many replications blew up.
+
+            The count is not decoration.  Averaging the replications with
+            ``nanmean`` keeps the mean finite as long as *one* chain survives,
+            so a field that diverges in two runs out of five would otherwise be
+            reported as converged, at whatever iteration the survivors reached
+            the floor.  A field is only stable here if every replication is.
+            """
+            curves, diverged = [], 0
+            for r in range(args.reps):
+                x = runner.make_prior("normal10", 3, args.n,
+                                      np.random.default_rng(500 + r))
+                st = make(field(kind, mag), eta)()
+                rr = np.random.default_rng(9000 + r)
+                w, k, blew = [], 0, False
+                for tk in record_at:
+                    while k < tk:
+                        x = st(x, rr)
+                        k += 1
+                        if not np.all(np.isfinite(x)):
+                            blew = True
+                            break
+                    w.append(metrics.axis_sliced_w2(x, T))
+                    if blew:
                         break
-                w.append(metrics.axis_sliced_w2(x, T))
-            curves.append(w)
-        w = np.nanmean(curves, axis=0)
+                diverged += int(blew)
+                curves.append(w + [np.nan] * (len(record_at) - len(w)))
+            return np.nanmean(curves, axis=0), diverged
+
+        # The stepsize above equalises *stationary* accuracy, measured from
+        # exact draws.  The run itself starts from a prior ten times too wide,
+        # and a field can be stable at stationarity yet blow up on that
+        # transient -- which would be reported as "the field diverges" when
+        # what diverged is this particular stepsize.  So back off until the run
+        # survives.  The fallback stepsize is *smaller* than the equal-accuracy
+        # one, hence more accurate, so the comparison stays conservative for
+        # that field: it is charged the extra iterations and given no credit
+        # for the extra accuracy.  ``eta_ratio`` in the output records it.
+        eta_equal = eta
+        w, div = ensemble(eta)
+        for _ in range(5):
+            if div == 0 and np.all(np.isfinite(w)):
+                break
+            eta *= 0.4
+            w, div = ensemble(eta)
+
         it = np.asarray(record_at)
-        hit = int(it[np.argmax(w <= 2 * floor)]) if (w <= 2 * floor).any() else -1
+        ok = np.isfinite(w) & (w <= 2 * floor)
+        hit = int(it[np.argmax(ok)]) if ok.any() and div == 0 else -1
         rows.append({"label": label, "kind": kind, "mag": mag, "eta": eta,
+                     "eta_equal_accuracy": eta_equal, "eta_ratio": eta / eta_equal,
+                     "diverged": div, "reps": args.reps,
                      "iters": hit, "final": float(w[-1]),
                      "w2": np.asarray(w).tolist(), "rec": record_at})
+        backed = "" if eta == eta_equal else f" [backed off {eta_equal / eta:.1f}x]"
         print(f"  {label:40s} eta={eta:.2e} iters={hit:6d} final_W2={w[-1]:.4f}"
-              f"  ({time.time() - t0:.0f}s)", flush=True)
+              f" diverged={div}/{args.reps}{backed}  ({time.time() - t0:.0f}s)",
+              flush=True)
 
     evaluate("J = 0", "zero", 0.0)
     evaluate(f"f linear  (= constant J), |J|={args.jnorm:g}", "linear", args.jnorm)
