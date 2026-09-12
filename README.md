@@ -227,6 +227,8 @@ python experiments/exp2_anisotropic.py --setting d2_nu5_k100
 python experiments/exp3_single_chain.py
 python experiments/exp4_nonsmooth_heavy.py --ramp 10  # --ramp removes the transient hump
 python experiments/exp7_state_dependent.py      # state-dependent J and the integrators
+python experiments/exp10_curl_potentials.py    # d=3: the divergence-free family, by potential
+python experiments/exp11_seed_robustness.py    # is a speed-up an artefact of one seed set?
 python experiments/make_figures.py
 python experiments/summarize.py                 # read everything back
 ```

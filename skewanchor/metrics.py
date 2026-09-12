@@ -410,6 +410,11 @@ def transient_rise(curve, floor):
     above ``3 * floor``.  The restriction matters: below a few times the
     estimator floor the curve is sampling jitter, and a "rise" there is noise,
     not a transient.  Returns 1.0 for a monotone curve.
+
+    Only meaningful for a curve whose replications all converged.  A chain that
+    blew up passes through finite but enormous values on its way to overflow,
+    and this will faithfully report the rise between them -- ``6e61`` was
+    observed.  Check the divergence count before reading the number.
     """
     w = np.asarray(curve, dtype=float)
     w = w[np.isfinite(w) & (w > 3.0 * float(floor))]

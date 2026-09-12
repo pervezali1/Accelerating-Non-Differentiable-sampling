@@ -101,8 +101,16 @@ def main():
     ap.add_argument("--reps", type=int, default=5)
     ap.add_argument("--bias", type=float, default=0.02)
     ap.add_argument("--ramp", type=float, default=10.0,
-                    help="warm-up length in relaxations of the fastest direction; "
-                         "10 leaves no hump in d=3 and costs no iterations")
+                    help="warm-up length for a CONSTANT field, in relaxations of "
+                         "the fastest direction; 10 leaves no hump in d=3 and "
+                         "costs no iterations")
+    ap.add_argument("--ramp-growth", type=float, default=40.0,
+                    help="warm-up length for a field whose strength grows with "
+                         "|x| (both non-constant potentials here). Measured: at "
+                         "10 the s=0.5 hyperbolic field still rises 1.18x out of "
+                         "a trough, at 20 1.03x, at 40 1.00x; 697, 824 and 824 "
+                         "iterations. Unlike a constant field this is a real "
+                         "trade, 3.24x against 2.74x")
     ap.add_argument("--jnorm", type=float, default=6.0)
     ap.add_argument("--sphere-s", type=float, nargs="*", default=[0.1, 0.3, 0.5, 1.0])
     ap.add_argument("--hyper-s", type=float, nargs="*",
@@ -141,8 +149,20 @@ def main():
                                                   + np.outer(x @ e_soft, e_stiff)))
         raise ValueError(kind)
 
-    def make(fld, eta):
-        sch = samplers.warmup_schedule(T, eta, args.ramp) if fld is not None else None
+    def make(fld, eta, kind="linear"):
+        # The ramp length is computed from the target's stiff relaxation time,
+        # a property of the *linear* drift.  Both non-constant potentials here
+        # have grad f linear in x, so their field strength is proportional to
+        # |x|: started from a prior ten times too wide they are ten times
+        # stronger through the transient than they will ever be at
+        # stationarity, and a hold long enough for a constant field is not long
+        # enough for them.  Each field gets the ramp it needs, as each gets its
+        # own stepsize.
+        if fld is None:
+            sch = None
+        else:
+            n_relax = args.ramp if kind == "linear" else args.ramp_growth
+            sch = samplers.warmup_schedule(T, eta, n_relax)
         return lambda: samplers.field_anchored_step(T, eta, fld, "euler", schedule=sch)
 
     def qbias(mk, n=12000, burn=2500, avg=1500, seed=11):
@@ -173,7 +193,7 @@ def main():
         t0 = time.time()
         probe = 4e-4
         for _ in range(14):                        # adaptive: never blame the stepsize
-            b = qbias(make(field(kind, mag), probe))
+            b = qbias(make(field(kind, mag), probe, kind))
             if np.isfinite(b) and b > 0:
                 break
             probe *= 0.35
@@ -182,7 +202,7 @@ def main():
             return
         eta = probe * (level / b)
         for _ in range(6):
-            if np.isfinite(qbias(make(field(kind, mag), eta))):
+            if np.isfinite(qbias(make(field(kind, mag), eta, kind))):
                 break
             eta *= 0.4
 
@@ -199,7 +219,7 @@ def main():
             for r in range(args.reps):
                 x = runner.make_prior("normal10", 3, args.n,
                                       np.random.default_rng(500 + r))
-                st = make(field(kind, mag), eta)()
+                st = make(field(kind, mag), eta, kind)()
                 rr = np.random.default_rng(9000 + r)
                 w, k, blew = [], 0, False
                 for tk in record_at:
@@ -264,7 +284,8 @@ def main():
     # the floor and the ramp are needed to read the curves, so they travel with
     # them rather than being hardcoded in the figure
     out = {"meta": {"d": 3, "nu": args.nu, "kappa": args.kappa, "bias": args.bias,
-                    "ramp": args.ramp, "jnorm": args.jnorm, "floor": float(floor),
+                    "ramp": args.ramp, "ramp_growth": args.ramp_growth,
+                    "jnorm": args.jnorm, "floor": float(floor),
                     "floor_std": float(fstd), "n": args.n, "steps": args.steps,
                     "reps": args.reps},
            "rows": rows}

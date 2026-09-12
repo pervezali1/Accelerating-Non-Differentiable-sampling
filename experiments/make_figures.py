@@ -410,11 +410,11 @@ def fig_curl_potentials(mode):
     rows = blob["rows"] if isinstance(blob, dict) else blob   # older files are bare lists
     keep = ["J = 0",
             "f linear  (= constant J), |J|=6",
-            "f = s x_stiff x_soft, s=0.5",
+            "f = s x_stiff x_soft, s=1",
             "f = |x|^2/2  (yours), s=0.1"]
     pretty = {keep[0]: "$J = 0$ (reversible anchored)",
               keep[1]: "$f$ linear  $\\Rightarrow$  constant $J$,  $\\|J\\|$=6",
-              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=0.5  (best)",
+              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=1  (best)",
               keep[3]: "$f = s\\|x\\|^2/2$  (cross product),  $s$=0.1"}
     sel = [r for k in keep for r in rows if r["label"] == k]
     if len(sel) < 2:
@@ -439,7 +439,9 @@ def fig_curl_potentials(mode):
                     markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
             sp = base / hit
             txt = f"{hit:d} iters  ({sp:.2f}x)"
-            ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, 12 + 15 * i),
+            # two of these land within a few dozen iterations of each other,
+            # so the rows need more than the text height between them
+            ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, 12 + 27 * i),
                         textcoords="offset points", ha="center", va="bottom",
                         color=colour, fontsize=8.5, zorder=5,
                         arrowprops=dict(arrowstyle="-", color=colour, lw=0.7,
