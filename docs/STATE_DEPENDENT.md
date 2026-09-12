@@ -88,6 +88,56 @@ $J(x)v = v\times\nabla f(x)$ for an arbitrary scalar $f$. No such family exists
 in $d = 2$, which is precisely why two dimensions are confined to radial
 modulation under (INV).
 
+## 3b. The curl family in three dimensions, and what it can and cannot do
+
+In $d \ge 3$ the field $J(x)v = \nabla f(x)\times v$ has $\operatorname{div}J
+\equiv 0$ for **every** scalar $f$, so it satisfies (INV) outright: it goes
+straight into the anchored drift with no correction term and preserves any
+target with any anchor. Two familiar objects are members:
+
+| $f$ | field | conserves besides $U_0$ |
+|---|---|---|
+| linear | a **constant** $J$ | nothing |
+| $s\|x\|^2/2$ | $J_s(x)v = s\,(x\times v)$ | $\|x\|$ |
+| $s\,x_{\text{stiff}}x_{\text{soft}}$ | hyperbolic | $x_{\text{stiff}}x_{\text{soft}}$ |
+
+**Every** field of the form $c = e^{U-U_0}J\nabla U_0$ conserves $U_0$, because
+$\langle\nabla U_0, J\nabla U_0\rangle = 0$ for skew $J$. The curl family
+conserves a *second* function as well, namely $f$, since
+$\nabla f\times\nabla U_0$ is orthogonal to both. Two conserved functions in
+three dimensions pin the flow to a one-dimensional curve, and which curve
+decides whether the field is any use.
+
+For $J_s(x)v = s(x\times v)$ the second conserved quantity is $\|x\|$, and with
+the canonical anchor the drift reduces exactly to the quadratic field
+$c(x) = s(2\beta/\nu)(x\times\Sigma^{-1}x)$. That is an attractive object — it
+vanishes identically on an isotropic target, which is precisely where no skew
+perturbation can help, and grows with the anisotropy. But conserving $\|x\|$ is
+fatal for the mechanism that actually accelerates. The useful transport carries
+mass from the soft axis to the stiff axis **at fixed $q$**, where the reversible
+drift is $\kappa$ times faster; those two points differ in $\|x\|$ by a factor
+$1/\sqrt\kappa$. A field that conserves $\|x\|$ cannot connect them.
+
+The measurements agree. On the three-dimensional anisotropic Student-t
+($\nu=6$, $\kappa=100$), at stepsizes chosen to equalise accuracy with an
+adaptive search, and with the warm-up ramp:
+
+| field | iterations to 2× floor | speed-up |
+|---|---|---|
+| $J = 0$ | 1907 | 1.00× |
+| constant, $\|J\|=6$ | 421 | **4.53×** |
+| $J_s$, $s = 0.15$ | 2256 | 0.85× |
+| $J_s$, $s = 0.2$ | 1907 | 1.00× |
+| $J_s$, $s = 0.3$ | 4415 | 0.43× |
+| $J_s$, $s \ge 0.5$ | diverged | — |
+
+Below $s\approx 0.2$ the added drift is under a fifth of the reversible one in
+root-mean-square and changes nothing; above it the quadratic growth costs more
+in stepsize than the rotation returns. The divergences are transient, from the
+wide $\mathcal N(0,10I)$ prior rather than at stationarity, so a longer ramp
+than the three relaxations used here might rescue the larger $s$; that is
+untested.
+
 ## 4. The price
 
 A constant $J$ makes the anchored drift linear in $x$ (for the canonical anchor
