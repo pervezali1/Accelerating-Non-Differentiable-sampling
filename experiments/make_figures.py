@@ -395,6 +395,73 @@ def fig_three_way(mode):
         print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig10_{tag}_{mode}.png")))
 
 
+# ----------------------------------------------------------------- fig 11
+
+
+def fig_curl_potentials(mode):
+    """d = 3: the divergence-free curl family, by choice of potential f."""
+    path = os.path.join(DATA, "exp9_curl_potentials.json")
+    if not os.path.exists(path):
+        print("  skip: exp9_curl_potentials.json not found")
+        return
+    rows = runner.load_json(path)
+    keep = ["J = 0",
+            "f linear  (= constant J), |J|=6",
+            "f = s x_stiff x_soft, s=0.3",
+            "f = |x|^2/2  (yours), s=0.1"]
+    pretty = {keep[0]: "$J = 0$ (reversible anchored)",
+              keep[1]: "$f$ linear  $\\Rightarrow$  constant $J$,  $\\|J\\|$=6",
+              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=0.3",
+              keep[3]: "$f = s\\|x\\|^2/2$  (cross product),  $s$=0.1"}
+    sel = [r for k in keep for r in rows if r["label"] == k]
+    if len(sel) < 2:
+        return
+    p = plotting.use_style(mode)
+    floor = 0.0460
+    fig, ax = plt.subplots(figsize=(6.6, 4.6))
+    base = sel[0]["iters"]
+    for i, row in enumerate(sel):
+        colour = p["categorical"][i % len(p["categorical"])]
+        it = np.asarray(row["rec"], dtype=float)
+        it[0] = max(it[1] * 0.5, 0.5)
+        w = np.asarray(row["w2"], dtype=float)
+        # the cross-product curve lies exactly on top of J = 0; dash it so both show
+        dashed = "cross product" in pretty[row["label"]]
+        ax.plot(it, w, color=colour, label=pretty[row["label"]], zorder=3 - 0.1 * i,
+                ls=(0, (5, 3)) if dashed else "-", lw=2.1 if dashed else 1.8)
+        hit = row["iters"]
+        if hit and hit > 0:
+            j = int(np.argmin(np.abs(it - hit)))
+            ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
+                    markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
+            sp = base / hit
+            txt = f"{hit:d} iters  ({sp:.2f}x)"
+            ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, 12 + 15 * i),
+                        textcoords="offset points", ha="center", va="bottom",
+                        color=colour, fontsize=8.5, zorder=5,
+                        arrowprops=dict(arrowstyle="-", color=colour, lw=0.7,
+                                        shrinkA=1, shrinkB=3),
+                        bbox=dict(boxstyle="round,pad=0.2", fc=p["surface"], ec="none",
+                                  alpha=0.9))
+    ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
+    ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+    ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
+                textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                va="bottom")
+    ax.annotate("measurement floor", xy=(ax.get_xlim()[0], floor * 0.78), xytext=(6, 0),
+                textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                ha="left", va="center")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("sliced 2-Wasserstein distance")
+    ax.set_title("Three dimensions: the divergence-free family, by choice of potential",
+                 loc="left")
+    ax.legend(loc="upper right", fontsize=8.5)
+    ax.set_ylim(top=ax.get_ylim()[1] * 3.0)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig11_curl_potentials_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -412,6 +479,7 @@ def main():
         fig_flow_field(mode)
         fig_state_dependent(mode)
         fig_three_way(mode)
+        fig_curl_potentials(mode)
 
 
 if __name__ == "__main__":

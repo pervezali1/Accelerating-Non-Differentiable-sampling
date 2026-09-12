@@ -152,6 +152,10 @@ $2.2\times10^{3}$. The speed-up moves with it:
 | $s\|x\|^2/2$, $s=0.1$ | $\|x\|$ | 1.00× |
 | $s\|x\|^2/2$, $s=0.3$ | $\|x\|$ | 0.43× |
 
+![curl potentials](../results/figures/fig11_curl_potentials_light.png)
+
+The cross-product curve lies exactly on top of $J=0$, which is why it is dashed.
+
 So the diagnosis holds — breaking the $\|x\|$ conservation doubles the gain —
 but it is not enough. The best member of the three-dimensional curl family we
 found is still the linear potential, which is a *constant* $J$. State dependence
