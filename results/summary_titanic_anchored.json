@@ -1,0 +1,263 @@
+{
+  "dataset": "titanic",
+  "pretty_name": "Titanic (survival)",
+  "dim": 10,
+  "n_train": 623,
+  "n_test": 268,
+  "penalty": 5.0,
+  "delta": 0.02,
+  "clock_floor": 0.4065696597405991,
+  "reference_accuracy": 0.7723880597014925,
+  "reference_loss": 0.4607895192629962,
+  "reference_accuracy_halves": [
+    0.7761194029850746,
+    0.7723880597014925
+  ],
+  "reference_loss_halves": [
+    0.46082878057837173,
+    0.46075086689563916
+  ],
+  "reference_l1_of_mean": 3.286487797250991,
+  "amplitude": {
+    "constant": 1.0,
+    "state": 1.0
+  },
+  "amplitude_calibration": {
+    "constant": {
+      "amplitude": 1.0,
+      "ladder": [
+        {
+          "amplitude": 0.0,
+          "step_size": 0.0016098446508742705,
+          "score": 0.40013916298640095,
+          "final_score": 0.13368493847189586
+        },
+        {
+          "amplitude": 0.2,
+          "step_size": 0.0016247303768505373,
+          "score": 0.36976431494286593,
+          "final_score": 0.12057628155761321
+        },
+        {
+          "amplitude": 0.5,
+          "step_size": 0.0017139746843690066,
+          "score": 0.30415741689082054,
+          "final_score": 0.10341000302903351
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.0027289619193501696,
+          "score": 0.23636097270156003,
+          "final_score": 0.22935043077100425
+        }
+      ]
+    },
+    "state": {
+      "amplitude": 1.0,
+      "ladder": [
+        {
+          "amplitude": 0.0,
+          "step_size": 0.0016098446508742705,
+          "score": 0.40013916298640095,
+          "final_score": 0.13368493847189586
+        },
+        {
+          "amplitude": 0.2,
+          "step_size": 0.0016247303768505373,
+          "score": 0.36942660683275713,
+          "final_score": 0.12056957382701144
+        },
+        {
+          "amplitude": 0.5,
+          "step_size": 0.0017139746843690066,
+          "score": 0.3085412847797169,
+          "final_score": 0.10353011390468794
+        },
+        {
+          "amplitude": 1.0,
+          "step_size": 0.0027289619193501696,
+          "score": 0.2385588112698698,
+          "final_score": 0.22922270370870448
+        }
+      ]
+    }
+  },
+  "step_sizes": {
+    "zero": 0.0016098446508742705,
+    "constant": 0.0027289619193501696,
+    "state": 0.0027289619193501696
+  },
+  "gate_radius": 9.997122949293129,
+  "whitened_start_radius": 13.329497265724171,
+  "n_iter": 200,
+  "n_walkers": 24,
+  "safety": 0.15,
+  "design": {
+    "eigenvalues_H": [
+      17.34181744991512,
+      38.511186993142935,
+      59.14867812430997,
+      69.68530533704207,
+      80.86005416650741,
+      87.88322559198512,
+      98.2741246460132,
+      131.39853166136916,
+      181.35263585670975,
+      186.35338499095326
+    ],
+    "reversible_rate": 17.34181744991512,
+    "mean_rate_bound": 95.0808944817948,
+    "irreversible_rate": 83.97971499152766,
+    "max_real_rate": 109.9319114249264,
+    "max_abs_rate": 109.93191142492647,
+    "condition_number": 10.745897050822974,
+    "speedup": 4.842613251700369,
+    "block_rates": [
+      101.84760122043411,
+      109.9319114249264,
+      95.27360489283956,
+      83.97971499152763,
+      84.37163987924629
+    ],
+    "amplitude": 1.0
+  },
+  "design_state": {
+    "eigenvalues_H": [
+      17.34181744991512,
+      38.511186993142935,
+      59.14867812430997,
+      69.68530533704207,
+      80.86005416650741,
+      87.88322559198512,
+      98.2741246460132,
+      131.39853166136916,
+      181.35263585670975,
+      186.35338499095326
+    ],
+    "reversible_rate": 17.34181744991512,
+    "mean_rate_bound": 95.0808944817948,
+    "irreversible_rate": 83.97971499152766,
+    "max_real_rate": 109.9319114249264,
+    "max_abs_rate": 109.93191142492647,
+    "condition_number": 10.745897050822974,
+    "speedup": 4.842613251700369,
+    "block_rates": [
+      101.84760122043411,
+      109.9319114249264,
+      95.27360489283956,
+      83.97971499152763,
+      84.37163987924629
+    ],
+    "amplitude": 1.0
+  },
+  "summary": [
+    {
+      "dataset": "titanic",
+      "variant": "zero",
+      "scheme": "anchored",
+      "amplitude": 0.0,
+      "step_size": 0.0016098446508742705,
+      "mean_clock": 0.9156986363017888,
+      "accuracy_final": 0.7772077114427861,
+      "accuracy_gap": 0.004819651741293618,
+      "loss_final": 0.46286232784212783,
+      "loss_gap": 0.002072808579131613,
+      "iters_to_acc_band": 198,
+      "iters_to_loss_band": 98,
+      "mean_error_final": 1.051057498797082,
+      "l1_of_mean": 3.138726279573732,
+      "l1_of_mean_vs_reference": -0.1477615176772593
+    },
+    {
+      "dataset": "titanic",
+      "variant": "constant",
+      "scheme": "anchored",
+      "amplitude": 1.0,
+      "step_size": 0.0027289619193501696,
+      "mean_clock": 0.9187035920345233,
+      "accuracy_final": 0.7770522388059701,
+      "accuracy_gap": 0.004664179104477584,
+      "loss_final": 0.46159103638124926,
+      "loss_gap": 0.0008015171182530478,
+      "iters_to_acc_band": 156,
+      "iters_to_loss_band": 43,
+      "mean_error_final": 0.6797182247471013,
+      "l1_of_mean": 3.2326262237850636,
+      "l1_of_mean_vs_reference": -0.05386157346592757
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state",
+      "scheme": "anchored",
+      "amplitude": 1.0,
+      "step_size": 0.0027289619193501696,
+      "mean_clock": 0.9181417612102936,
+      "accuracy_final": 0.7767412935323383,
+      "accuracy_gap": 0.0043532338308458485,
+      "loss_final": 0.461604103833924,
+      "loss_gap": 0.0008145845709277566,
+      "iters_to_acc_band": 172,
+      "iters_to_loss_band": 44,
+      "mean_error_final": 0.6813479552554172,
+      "l1_of_mean": 3.2307634182550635,
+      "l1_of_mean_vs_reference": -0.05572437899592764
+    },
+    {
+      "dataset": "titanic",
+      "variant": "state_nocorr",
+      "scheme": "anchored",
+      "amplitude": 1.0,
+      "step_size": 0.0027289619193501696,
+      "mean_clock": 0.9181429244524288,
+      "accuracy_final": 0.7767412935323383,
+      "accuracy_gap": 0.0043532338308458485,
+      "loss_final": 0.46160421454377937,
+      "loss_gap": 0.0008146952807831509,
+      "iters_to_acc_band": 172,
+      "iters_to_loss_band": 44,
+      "mean_error_final": 0.6816438573820681,
+      "l1_of_mean": 3.230720147035126,
+      "l1_of_mean_vs_reference": -0.05576765021586505
+    },
+    {
+      "dataset": "titanic",
+      "variant": "anchor_only",
+      "scheme": "anchor",
+      "amplitude": 0.0,
+      "step_size": 0.0016098446508742705,
+      "mean_clock": 0.9970476102474657,
+      "accuracy_final": 0.7778296019900498,
+      "accuracy_gap": 0.005441542288557311,
+      "loss_final": 0.46241561849432156,
+      "loss_gap": 0.0016260992313253397,
+      "iters_to_acc_band": -1,
+      "iters_to_loss_band": 85,
+      "mean_error_final": 0.9748516076381559,
+      "l1_of_mean": 3.1724475821324725,
+      "l1_of_mean_vs_reference": -0.1140402151185187
+    },
+    {
+      "dataset": "titanic",
+      "variant": "fd_nonsmooth",
+      "scheme": "fd",
+      "amplitude": 0.0,
+      "step_size": 0.0016098446508742705,
+      "mean_clock": 0.9970476102474657,
+      "accuracy_final": 0.7775186567164178,
+      "accuracy_gap": 0.005130597014925353,
+      "loss_final": 0.4624502377143987,
+      "loss_gap": 0.0016607184514024764,
+      "iters_to_acc_band": -1,
+      "iters_to_loss_band": 86,
+      "mean_error_final": 0.9763000516050825,
+      "l1_of_mean": 3.168426550786717,
+      "l1_of_mean_vs_reference": -0.1180612464642743
+    }
+  ],
+  "variant_order": [
+    "zero",
+    "constant",
+    "state"
+  ],
+  "runtime_seconds": 57.18753004074097
+}

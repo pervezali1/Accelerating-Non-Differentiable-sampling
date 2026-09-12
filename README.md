@@ -457,6 +457,131 @@ from iteration 40 on Breast Cancer, and from iteration 180 on Spambase.
   to four digits.  The setting where that term is visible is
   [the correction experiment](#the-correction-term-only-matters-without-the-metropolis-step).
 
+## A non-differentiable regularizer, and anchored Langevin
+
+Everything above uses a Gaussian prior, which makes `U` smooth; the
+derivative-free claim is then about the *method*, not about the target.  Swap
+the prior for a Laplace one and the potential has a kink at every `w_j = 0`,
+which is the case the repository is named for.
+
+### The target, the anchor `U_0`, and the clock
+
+```
+U(w)   = U_nll(w) + lambda ||w||_1                          the target, non-differentiable
+U_0(w) = U_nll(w) + lambda sum_{j>=1} sqrt(w_j^2 + delta^2)  the anchor, smooth
+a(w)   = exp(U(w) - U_0(w))                                  the clock, in (0, 1]
+```
+
+with `U_nll` the logistic negative log-likelihood, `lambda = 5` (Laplace scale
+0.2, strong enough to pull coefficients onto the kink), the intercept
+unpenalised, and `delta = 0.02`.  `U_0` is a smooth majorant of `U`: it agrees
+with it to within `lambda (d - 1) delta`, which bounds the clock below by
+`exp(-lambda (d - 1) delta)` -- 0.41 on Titanic, 0.37 on MAGIC.  Note what `a`
+costs: the likelihood cancels in `U - U_0`, so the clock is `O(d)` arithmetic on
+the penalties and never touches the data.
+
+### The dynamics
+
+Anchored Langevin ([Gürbüzbalaban, Hu, Yuan and Zhu, *Anchored Langevin
+Algorithms*, arXiv:2509.19455](https://arxiv.org/abs/2509.19455)) follows the
+gradient of the *anchor* and scales the diffusion by the clock:
+
+```
+dw = -a(w) grad U_0(w) dt + sqrt(2 a(w)) dB
+```
+
+and `exp(-U)` is exactly invariant.  The one-line reason is the random time
+change the authors point to: the anchored process is the `U_0`-diffusion run on
+a state-dependent clock of rate `a`, and time-changing a diffusion whose
+invariant density is `p` at rate `a` leaves invariant density proportional to
+`p / a`, here `exp(-U_0) / exp(U - U_0) = exp(-U)`.
+
+The same argument composes with the skew term of this repository, which is why
+the two ideas fit together at all.  The irreversible `U_0`-diffusion
+`dy = [-(I + J(y)) grad U_0(y) + div J(y)] dt + sqrt(2) dB` has invariant
+density `exp(-U_0)`, so time-changing *it* at rate `a` gives
+
+```
+dw = a(w) [ -(I + J(w)) ghat_0(w) + (div J)(w) ] dt + sqrt(2 a(w)) dB
+```
+
+with invariant density `exp(-U)` for any skew `J`, state-dependent or not.  The
+`ell_1` term never appears inside a gradient: it enters only through the scalar
+clock, which is an evaluation.  `ghat_0` is the central-difference surrogate of
+`grad U_0`, and differencing the *anchor* is meaningful precisely because the
+anchor is smooth -- differencing `U` instead returns
+`clip(w / eps, -1, 1)` at the kink, the gradient of an `eps`-Huber smoothing,
+so that chain targets the wrong law however small the step size gets.
+
+The gold standard here cannot be the gradient-based MALA reference used
+elsewhere in this repository.  It is random-walk Metropolis on `U` itself:
+no gradients, no smoothing, exact whatever the kink does.  Its halves agree to
+four decimals on both datasets.
+
+### Results
+
+200 iterations, 24 walkers from `w = 0`, three fields, unadjusted, each at its
+own step size, on Titanic and MAGIC.  `loss gap` is the predictive log-loss
+minus the reference's; `iters to loss band` is the first iteration from which
+the loss stays within 1% of the reference; `mean error` is the distance of the
+running posterior mean from the reference in reference standard deviations.
+Full numbers in `results/summary_{titanic,magic}_anchored.json`.
+
+![anchored Langevin on the l1 target](figures/anchored_accuracy_loss.png)
+
+| dataset | field | step size | loss gap | iters to loss band | mean error |
+|---|---|---|---|---|---|
+| Titanic | `J = 0` | 0.00161 | +0.0021 | 98 | 1.051 |
+| Titanic | constant `J_a` | 0.00273 | **+0.0008** | **43** | **0.680** |
+| Titanic | gated `J_s` | 0.00273 | **+0.0008** | **44** | **0.681** |
+| MAGIC | `J = 0` | 8.97e-05 | +0.0006 | 81 | 4.732 |
+| MAGIC | constant `J_a` | 1.76e-04 | **+0.0001** | **36** | **1.491** |
+| MAGIC | gated `J_s` | 1.76e-04 | **-0.0000** | **36** | **1.581** |
+
+The design does the same work it does on the smooth target: the slowest
+relaxation rate of the anchor's Hessian goes from 17.3 to 84 on Titanic and from
+63 to 1050 on MAGIC, and the collision amplitude (which the calibration picks on
+both datasets) also buys a step size 1.7x and 2.0x larger.  Both rotations reach
+the loss band in less than half the iterations the reversible baseline needs and
+end with a posterior mean 1.5x and 3.2x closer.  Accuracy moves in the same
+direction but, as before, has very little room: 0.7772 against 0.7771 on
+Titanic, 0.7936 against 0.7945 on MAGIC, against references of 0.7724 and
+0.7950.
+
+### What the clock costs, and what it corrects
+
+The clock is not free: the effective step is `h a(w)`, so a coarse anchor slows
+the chain in proportion.  Long runs on Titanic, against the same
+random-walk-Metropolis reference, with `E ||w||_1` under the posterior mean as
+the functional that actually feels the kink (reference value 3.287):
+
+| `delta` | scheme | mean clock | `||w||_1` of the mean |
+|---|---|---|---|
+| 0.02 | anchored | 0.92 | 3.291 |
+| 0.02 | anchor only, `exp(-U_0)` | 1.00 | 3.297 |
+| 0.02 | differences of `U` | 1.00 | 3.292 |
+| 0.1 | anchored | 0.30 | 3.268 |
+| 0.1 | anchor only, `exp(-U_0)` | 1.00 | **3.336** |
+| 0.1 | differences of `U` | 1.00 | 3.289 |
+
+![the clock's cost and correction](figures/anchored_clock_bias.png)
+
+At `delta = 0.02` the clock costs 8% of the step and corrects a bias smaller
+than the Monte Carlo error of a 30000-iteration run: all three schemes agree.
+At `delta = 0.1` the anchor-only chain is visibly wrong -- it is sampling a
+posterior whose prior is smoother and therefore shrinks less, `3.336` against
+`3.287` -- and the clock removes that, at the cost of a chain running three
+times slower.  The chain that differences `U` directly is not badly wrong here
+because its implicit smoothing (`eps = 0.01`) is finer than either anchor, but
+its bias is set by `eps` and no step size removes it, whereas the anchored
+chain is exact for *any* `delta`.  So `delta` is the knob: large enough that the
+anchor is well conditioned, small enough that the clock does not crawl.
+
+Caveats specific to this section: the step size still leaves the unadjusted
+`O(h)` bias of every run in this repository; `lambda` and `delta` are fixed
+rather than swept; and the comparison is on the two low-dimensional datasets,
+where the random-walk reference can be trusted without argument.
+
 ## Datasets
 
 | dataset | n (train/test) | d | source |
@@ -495,6 +620,16 @@ python3 experiments/plot_three_lines.py                # the three-field figures
 python3 experiments/plot_accuracy.py --tag designed --suffix _designed \
     --variants zero constant state \
     --title 'Accuracy from the $w = 0$ start, unadjusted dynamics with a designed rotation'
+```
+
+The non-differentiable target of
+[A non-differentiable regularizer](#a-non-differentiable-regularizer-and-anchored-langevin):
+
+```bash
+python3 experiments/run_anchored.py                 # Titanic and MAGIC, ~20 min
+python3 experiments/run_anchored_bias.py --delta 0.02 --n-iter 30000
+python3 experiments/run_anchored_bias.py --delta 0.1  --n-iter 20000
+python3 experiments/plot_anchored.py
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they
@@ -573,6 +708,7 @@ nds/data.py        dataset loaders, caching, standardisation, splits
 nds/target.py      logistic posterior, central-difference surrogate, prediction
 nds/skew.py        J = 0, constant, radial and directional fields, and their divergence
 nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
+nds/anchored.py    the l1 target, its smooth anchor, anchored Langevin, an exact reference
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference

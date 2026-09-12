@@ -31,14 +31,17 @@ class LogisticPosterior:
         self,
         X: np.ndarray,
         y: np.ndarray,
-        prior_scale: float = 2.0,
+        prior_scale: float | None = 2.0,
         intercept_scale: float = 10.0,
     ) -> None:
         self.X = np.ascontiguousarray(X, dtype=np.float64)
         self.y = np.ascontiguousarray(y, dtype=np.float64)
         self.n, self.d = self.X.shape
-        self.prior_precision = np.full(self.d, 1.0 / prior_scale**2)
-        self.prior_precision[0] = 1.0 / intercept_scale**2
+        if prior_scale is None:  # likelihood only; a prior is added by the caller
+            self.prior_precision = np.zeros(self.d)
+        else:
+            self.prior_precision = np.full(self.d, 1.0 / prior_scale**2)
+            self.prior_precision[0] = 1.0 / intercept_scale**2
         # Sufficient statistics reused by the potential and its surrogate.
         self._Xty = self.X.T @ self.y  # (d,)
 

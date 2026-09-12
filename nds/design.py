@@ -173,6 +173,7 @@ def calibrate_amplitude(
     seed: int = 0,
     guard_iter: int = 150,
     fd_eps: float = 1e-2,
+    runner=None,
 ) -> dict:
     """Pick the rotation amplitude from a short unadjusted pilot.
 
@@ -196,8 +197,11 @@ def calibrate_amplitude(
     whose spectrum sets the step size; it defaults to the constant field, and
     each field being compared should be calibrated with its own factory, since
     a field that switches itself off in the tails tolerates a larger amplitude
-    than one that does not.
+    than one that does not.  ``runner`` defaults to :func:`nds.sampler.run_chain`
+    and can be swapped for another chain with the same signature, which is how
+    the anchored dynamics of :mod:`nds.anchored` calibrates its own amplitude.
     """
+    chain = run_chain if runner is None else runner
     if make_field is None:
 
         def make_field(amplitude):
@@ -210,17 +214,19 @@ def calibrate_amplitude(
     rows = []
     for amplitude in amplitudes:
         field, J = (ZeroSkew(), None) if amplitude == 0.0 else make_field(amplitude)
-        h = stable_step_size(
-            target, field, explicit_step_size(H, J, safety=safety),
-            n_iter=guard_iter, n_walkers=8, seed=seed + 3,
-            geometry=geometry, fd_eps=fd_eps,
-        )["step_size"]
+        h = explicit_step_size(H, J, safety=safety)
+        if runner is None:
+            h = stable_step_size(
+                target, field, h, n_iter=guard_iter, n_walkers=8, seed=seed + 3,
+                geometry=geometry, fd_eps=fd_eps,
+            )["step_size"]
         W = np.zeros((len(H), n_walkers))
         scores = []
         for step in range(n_checkpoints):
-            res = run_chain(
+            kwargs = {} if runner is not None else {"metropolis": False}
+            res = chain(
                 target, field, h, segment, n_walkers=n_walkers, seed=seed + 13 + step,
-                geometry=geometry, fd_eps=fd_eps, metropolis=False, W0=W,
+                geometry=geometry, fd_eps=fd_eps, W0=W, **kwargs,
             )
             W = res.final_state
             if not np.isfinite(W).all():

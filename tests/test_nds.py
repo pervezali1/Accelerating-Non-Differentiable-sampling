@@ -12,6 +12,11 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from nds.anchored import (  # noqa: E402
+    LassoLogistic,
+    reference_posterior_rwm,
+    run_anchored_chain,
+)
 from nds.design import (  # noqa: E402
     discrete_decay,
     explicit_step_size,
@@ -29,7 +34,7 @@ from nds.skew import (  # noqa: E402
     random_skew,
     whiten,
 )
-from nds.target import LogisticPosterior  # noqa: E402
+from nds.target import LogisticPosterior, _sigmoid  # noqa: E402
 
 
 def _toy(n: int = 120, d: int = 4, seed: int = 0):
@@ -170,6 +175,43 @@ def test_designed_field_converges_faster_unadjusted():
         )
         errors[key] = float(res.mean_error[-1].mean())
     assert errors["designed"] < 0.6 * errors["zero"], errors
+
+
+def test_anchor_bounds_the_target_and_its_clock():
+    X, y = _toy(n=150, d=5, seed=4)
+    target = LassoLogistic(X, y, penalty=5.0, delta=0.05)
+    rng = np.random.default_rng(9)
+    W = rng.normal(size=(target.d, 6))
+    U, U0 = target.potential(W), target.anchor_potential(W)
+    assert np.all(U <= U0 + 1e-12)                      # the anchor majorises
+    assert np.allclose(target.log_weight(W), U - U0)    # and the likelihood cancels
+    clock = target.clock(W)
+    assert np.all(clock > 0) and np.all(clock <= 1.0 + 1e-12)
+    assert clock.min() >= target.clock_floor - 1e-12
+    # the anchor is smooth, so its difference quotient matches its true gradient
+    Z = target.linear(W)
+    exact = target.X.T @ (_sigmoid(Z) - target.y[:, None]) + target.weights * W / np.sqrt(
+        W**2 + target.delta**2
+    )
+    fd = target.anchor_fd_grad(W, eps=1e-3)
+    assert np.abs(fd - exact).max() / np.abs(exact).max() < 1e-4
+
+
+def test_anchored_chain_hits_the_metropolis_reference():
+    """The clock is what makes the smooth-anchor drift target the kinked law."""
+    X, y = _toy(n=200, d=4, seed=6)
+    target = LassoLogistic(X, y, penalty=5.0, delta=0.05)
+    ref = reference_posterior_rwm(target, X, y, n_iter=30000, n_warmup=5000, seed=0)
+    metric = np.linalg.pinv(ref["posterior_cov"])
+    h = explicit_step_size(metric, None, safety=0.15)
+    res = run_anchored_chain(
+        target, ZeroSkew(), h, 20000, n_walkers=16, seed=3,
+        geometry=Geometry.identity(target.d), ref_mean=ref["posterior_mean"],
+        ref_metric=metric, scheme="anchored",
+    )
+    assert np.isfinite(res.potential[-1]).all()
+    assert res.mean_error[-1].mean() < 0.4, res.mean_error[-1].mean()
+    assert 0.0 < res.meta["mean_clock"] <= 1.0
 
 
 def test_every_variant_samples_the_same_posterior():

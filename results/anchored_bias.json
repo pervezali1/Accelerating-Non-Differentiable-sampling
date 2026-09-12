@@ -1,0 +1,48 @@
+{
+  "titanic": {
+    "dataset": "titanic",
+    "pretty_name": "Titanic (survival)",
+    "n_iter": 20000,
+    "penalty": 5.0,
+    "delta": 0.1,
+    "step_size": 0.0014390701390737557,
+    "clock_floor": 0.011108996538242306,
+    "reference_loss": 0.4607895192629962,
+    "reference_accuracy": 0.7723880597014925,
+    "reference_l1_of_mean": 3.286487797250991,
+    "rows": [
+      {
+        "dataset": "titanic",
+        "scheme": "anchored",
+        "step_size": 0.0014390701390737557,
+        "mean_clock": 0.30274993084921314,
+        "error_tail": 0.1963907722642186,
+        "loss_final": 0.46125931970355816,
+        "l1_of_mean": 3.2677118069719904
+      },
+      {
+        "dataset": "titanic",
+        "scheme": "anchor",
+        "step_size": 0.0014390701390737557,
+        "mean_clock": 0.9999505579219309,
+        "error_tail": 0.2043824832175366,
+        "loss_final": 0.46059348003784417,
+        "l1_of_mean": 3.336226774574592
+      },
+      {
+        "dataset": "titanic",
+        "scheme": "fd",
+        "step_size": 0.0014390701390737557,
+        "mean_clock": 0.9999505579219309,
+        "error_tail": 0.10946729242931125,
+        "loss_final": 0.4610103072847596,
+        "l1_of_mean": 3.2890673340848027
+      }
+    ],
+    "schemes": [
+      "anchored",
+      "anchor",
+      "fd"
+    ]
+  }
+}
