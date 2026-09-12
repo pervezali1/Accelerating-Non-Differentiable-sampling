@@ -138,6 +138,32 @@ wide $\mathcal N(0,10I)$ prior rather than at stationarity, so a longer ramp
 than the three relaxations used here might rescue the larger $s$; that is
 untested.
 
+**Testing the diagnosis.** If conserving $\|x\|$ is what blocks the transport,
+then a potential whose level sets contain *both* endpoints should do better.
+Take $f = s\,x_{\text{stiff}}x_{\text{soft}}$, which vanishes on both axes. It is
+still divergence free, so it still needs no correction term, and it does break
+the conservation: $\langle x, c\rangle$ goes from $5\times10^{-13}$ to
+$2.2\times10^{3}$. The speed-up moves with it:
+
+| curl potential $f$ | conserves | speed-up |
+|---|---|---|
+| linear (a constant $J$) | — | **4.53×** |
+| $s\,x_{\text{stiff}}x_{\text{soft}}$, $s=0.3$ | $x_{\text{stiff}}x_{\text{soft}}$ | 1.96× |
+| $s\|x\|^2/2$, $s=0.1$ | $\|x\|$ | 1.00× |
+| $s\|x\|^2/2$, $s=0.3$ | $\|x\|$ | 0.43× |
+
+So the diagnosis holds — breaking the $\|x\|$ conservation doubles the gain —
+but it is not enough. The best member of the three-dimensional curl family we
+found is still the linear potential, which is a *constant* $J$. State dependence
+pays in two dimensions, through the stream construction of Section 3, precisely
+because there the correction term of Section 2 frees the field from the second
+conservation law. The curl family buys freedom from the correction term and pays
+for it with an extra invariant.
+
+Note the dimensions differ: the 29–79× figures elsewhere are $d = 2$ stream
+fields, and are not comparable with these $d = 3$ numbers. The like-for-like
+comparison here is the table above, all at $d = 3$.
+
 ## 4. The price
 
 A constant $J$ makes the anchored drift linear in $x$ (for the canonical anchor
