@@ -251,9 +251,43 @@ It is not a trade-off. Convergence gets *faster*:
 
 The one caveat is the tilted field, which converges in 134 iterations — fewer
 than a five-relaxation ramp takes. There a shorter ramp is worth more, and
-three relaxations removes the hump for a 21 % cost. Hence the default of three,
-with five recommended for a constant field. Smoothstep beat linear and
+three relaxations removes the hump for a 21 % cost. Smoothstep beat linear and
 exponential ramps at every length tried.
+
+**How long, exactly, and in what unit.** The table above is coarse and its hump
+metric (peak over start) misses a rise out of a trough, which is what the eye
+actually reads as a hump in the later figures. Re-measured as the largest rise
+out of a running minimum, counting only levels above three times the estimator
+floor — below that the curve is jitter and a "rise" there is noise — on the same
+grid in both dimensions, for the constant field on an anisotropic Student-t at
+$\kappa=100$:
+
+| ramp, in relaxations of the fastest direction | 0 | 1 | 2 | 3 | 5 | 7 | 10 | 15 |
+|---|---|---|---|---|---|---|---|---|
+| $d=2$ ($\nu=5$, $\eta=8.3\cdot10^{-4}$), rise | 3.31× | 2.54× | 1.94× | 1.55× | 1.15× | 1.03× | 1.00× | 1.00× |
+| $d=3$ ($\nu=6$, $\eta=7.9\cdot10^{-4}$), rise | 2.43× | 1.80× | 1.44× | 1.23× | 1.06× | 1.01× | 1.00× | 1.00× |
+| $d=2$, iterations to 2× floor | 350 | 293 | 293 | 246 | 206 | 206 | 206 | 246 |
+| $d=3$, iterations to 2× floor | 418 | 418 | 418 | 418 | 418 | 418 | 418 | 418 |
+
+Three conclusions, none of which was visible on the coarse grid:
+
+1. **The fastest direction is the right unit, in every dimension.** The two
+   rows agree to within the measurement. One might expect $d=3$ to need a
+   longer ramp because its middle direction relaxes ten times slower than its
+   stiffest (108 against 11 iterations here) — it does not. Keying the length
+   on that middle direction instead would break the agreement: $d=3$ would want
+   one such unit and $d=2$ ten.
+2. **$\text{rise} - 1$ decays geometrically** in the ramp length, with a
+   constant of about 2.3 relaxations in both dimensions.
+3. **Three relaxations is too short.** It leaves a 1.2–1.55× hump — exactly the
+   residual visible in Figure 11 before this was measured. Seven is the
+   shortest length tested that leaves nothing; ten is flat with margin, and
+   costs no iterations in $d=3$ and none in $d=2$ either (206 against 350 with
+   no ramp: the longer ramp is still the faster run).
+
+`warmup_schedule` therefore defaults to seven relaxations, and takes a
+`max_iters` cap for the one case that wants less — a field fast enough to
+converge inside its own ramp, like the tuned tilted field at 34 iterations.
 
 **What does not work: gating on the radius.** Switching the rotation off where
 $q$ is large also removes the hump — and wrecks the accuracy, because the gate

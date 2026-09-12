@@ -400,11 +400,13 @@ def fig_three_way(mode):
 
 def fig_curl_potentials(mode):
     """d = 3: the divergence-free curl family, by choice of potential f."""
-    path = os.path.join(DATA, "exp9_curl_potentials.json")
+    path = os.path.join(DATA, "exp10_curl_potentials.json")
     if not os.path.exists(path):
-        print("  skip: exp9_curl_potentials.json not found")
+        print("  skip: exp10_curl_potentials.json not found")
         return
-    rows = runner.load_json(path)
+    blob = runner.load_json(path)
+    meta = blob.get("meta", {}) if isinstance(blob, dict) else {}
+    rows = blob["rows"] if isinstance(blob, dict) else blob   # older files are bare lists
     keep = ["J = 0",
             "f linear  (= constant J), |J|=6",
             "f = s x_stiff x_soft, s=0.3",
@@ -417,7 +419,7 @@ def fig_curl_potentials(mode):
     if len(sel) < 2:
         return
     p = plotting.use_style(mode)
-    floor = 0.0460
+    floor = float(meta.get("floor", 0.0460))
     fig, ax = plt.subplots(figsize=(6.6, 4.6))
     base = sel[0]["iters"]
     for i, row in enumerate(sel):

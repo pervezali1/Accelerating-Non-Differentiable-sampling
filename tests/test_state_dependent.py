@@ -137,19 +137,6 @@ def test_rotation_aware_integrators_preserve_the_target():
         assert np.all(np.abs(got - truth) / truth < 0.15), (integ, got, truth)
 
 
-if __name__ == "__main__":
-    failed = 0
-    for name, fn in sorted(dict(globals()).items()):
-        if name.startswith("test_") and callable(fn):
-            try:
-                fn()
-                print(f"PASS {name}")
-            except AssertionError as exc:
-                failed += 1
-                print(f"FAIL {name}: {exc}")
-    sys.exit(1 if failed else 0)
-
-
 # --------------------------------------------------------------- warm-up ramp
 
 
@@ -165,6 +152,22 @@ def test_warmup_schedule_shape_and_length():
         vals = [sch(k) for k in range(0, int(4 * k_relax), 5)]
         assert all(b >= a - 1e-12 for a, b in zip(vals, vals[1:])), shape  # monotone
         assert all(0.0 <= v <= 1.0 + 1e-12 for v in vals), shape
+
+
+def test_warmup_schedule_cap():
+    """``max_iters`` shortens the ramp and never lengthens it."""
+    t = anisotropic_student_t(2, 5.0, 100.0)
+    eta = 3e-4
+    c = 2 * t.beta / t.nu
+    k_relax = 1.0 / (eta * c * (1.0 / t.Sigma_evals.min()))
+    uncapped = samplers.warmup_schedule(t, eta, 10.0)
+    capped = samplers.warmup_schedule(t, eta, 10.0, max_iters=k_relax)
+    assert uncapped(k_relax) < 0.5                      # a tenth of the way in
+    assert capped(k_relax) > 0.999                      # the cap ends it here
+    # a cap longer than the ramp changes nothing
+    loose = samplers.warmup_schedule(t, eta, 3.0, max_iters=100 * k_relax)
+    plain = samplers.warmup_schedule(t, eta, 3.0)
+    assert max(abs(loose(k) - plain(k)) for k in range(0, int(5 * k_relax), 7)) < 1e-12
 
 
 def test_schedule_matches_the_unramped_step_once_warm():
@@ -357,3 +360,19 @@ def test_cross_product_sampler_preserves_the_target():
     assert res.diverged_at is None
     got, truth = res.final_state.var(axis=0), np.diag(t.cov())
     assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
+
+if __name__ == "__main__":
+    import traceback
+    failed = ran = 0
+    for name, fn in sorted(dict(globals()).items()):
+        if name.startswith("test_") and callable(fn):
+            ran += 1
+            try:
+                fn()
+                print(f"PASS {name}")
+            except AssertionError as exc:
+                failed += 1
+                print(f"FAIL {name}: {exc}")
+                traceback.print_exc()
+    print(f"{ran} run, " + ("all passed" if not failed else f"{failed} failures"))
+    sys.exit(1 if failed else 0)

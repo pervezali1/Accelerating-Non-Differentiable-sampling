@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 r"""The divergence-free family in three dimensions, by choice of potential.
 
-Produces ``results/data/exp9_curl_potentials.json`` and, through
+Produces ``results/data/exp10_curl_potentials.json`` and, through
 ``make_figures.py``, ``fig11_curl_potentials_*.png``.
 
 The family
@@ -94,7 +94,9 @@ def main():
     ap.add_argument("--steps", type=int, default=20000)
     ap.add_argument("--reps", type=int, default=5)
     ap.add_argument("--bias", type=float, default=0.02)
-    ap.add_argument("--ramp", type=float, default=3.0)
+    ap.add_argument("--ramp", type=float, default=10.0,
+                    help="warm-up length in relaxations of the fastest direction; "
+                         "10 leaves no hump in d=3 and costs no iterations")
     ap.add_argument("--jnorm", type=float, default=6.0)
     ap.add_argument("--sphere-s", type=float, nargs="*", default=[0.1, 0.3])
     ap.add_argument("--hyper-s", type=float, nargs="*", default=[0.3, 1.0, 3.0, 10.0])
@@ -212,9 +214,16 @@ def main():
         for r in rows:
             if r["iters"] > 0:
                 print(f"    {r['label']:40s} {base / r['iters']:6.2f}x")
-    path = os.path.join(OUT, "exp9_curl_potentials.json" if not args.smoke
+    path = os.path.join(OUT, "exp10_curl_potentials.json" if not args.smoke
                         else "exp10_smoke.json")
-    print("\nwrote", runner.save_json(rows, path))
+    # the floor and the ramp are needed to read the curves, so they travel with
+    # them rather than being hardcoded in the figure
+    out = {"meta": {"d": 3, "nu": args.nu, "kappa": args.kappa, "bias": args.bias,
+                    "ramp": args.ramp, "jnorm": args.jnorm, "floor": float(floor),
+                    "floor_std": float(fstd), "n": args.n, "steps": args.steps,
+                    "reps": args.reps},
+           "rows": rows}
+    print("\nwrote", runner.save_json(out, path))
 
 
 if __name__ == "__main__":

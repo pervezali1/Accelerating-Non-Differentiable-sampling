@@ -170,7 +170,7 @@ def generic_skew_anchored_step(target, eta, J=None, schedule=None):
     return step
 
 
-def warmup_schedule(target, eta, n_relax=3.0, shape="smooth"):
+def warmup_schedule(target, eta, n_relax=7.0, shape="smooth", max_iters=None):
     r"""Warm-up of the skew field over ``n_relax`` stiff relaxation times.
 
     Starting from a prior that is much wider than the target, the skew drift
@@ -181,21 +181,46 @@ def warmup_schedule(target, eta, n_relax=3.0, shape="smooth"):
     hundred times faster -- so holding it back until the contraction is done
     removes the hump at no cost, and usually converges sooner as well.
 
-    One stiff relaxation takes ``1 / (eta c lambda_max(Sigma^{-1}))``
-    iterations with ``c = 2 beta / nu``.  Returns a callable ``k -> [0, 1]``.
+    Length.  The unit is one relaxation of the *fastest* direction,
+
+        k_relax = 1 / (eta c lambda_max(Sigma^{-1})),    c = 2 beta / nu,
+
+    and that is the right unit in every dimension: with the hump measured as
+    the largest rise out of a trough (counting only levels above three times
+    the estimator floor, below which the curve is jitter), an ill-conditioned
+    Student-t at kappa = 100 gives
+
+        n_relax          0     1     2     3     5     7    10    15
+        d=2 rise      3.31  2.54  1.94  1.55  1.15  1.03  1.00  1.00
+        d=3 rise      2.43  1.80  1.44  1.23  1.06  1.01  1.00  1.00
+
+    The two dimensions agree to within the measurement once the same criterion
+    is used, and ``rise - 1`` decays geometrically with a constant of about
+    2.3 relaxations in both.  Keying the length on a slower direction instead
+    breaks that agreement -- d=3 would then need one such unit and d=2 ten.
+
+    Hence the default of ``n_relax = 7``, the shortest tested ramp that leaves
+    no visible hump; ``10`` is flat with margin.  In d=3 the longer ramp costs
+    nothing at all (418 iterations to twice the floor at every length above),
+    and in d=2 it *helps* (350 iterations at no ramp, 206 at ``n_relax = 10``).
+
+    The one situation that wants a short ramp is a field so fast that it
+    converges inside the ramp: the best tilted d=2 field of Section 7 reaches
+    tolerance in 34 iterations, where seven relaxations would be 110.  Pass
+    ``max_iters`` -- typically the caller's iteration budget, or an estimate of
+    it -- to cap the length; the ramp then never outlasts the run it precedes.
 
     ``shape`` is ``smooth`` (a smoothstep, the default and the best of the three
     at every length tested), ``linear``, or ``exponential``.
 
-    ``n_relax = 3`` is a good default everywhere.  A constant field does better
-    still at ``5`` -- the hump vanishes completely and convergence is unchanged
-    -- but a tilted field can converge in fewer iterations than a five-relaxation
-    ramp takes, so there the shorter ramp is worth more.
+    Returns a callable ``k -> [0, 1]``.
     """
     c = 2.0 * target.beta / target.nu
     lam_max = 1.0 / float(np.min(target.Sigma_evals))
     k_relax = 1.0 / (eta * c * lam_max)
     K = max(1.0, n_relax * k_relax)
+    if max_iters is not None:
+        K = max(1.0, min(K, float(max_iters)))
     if shape == "linear":
         return lambda k: min(1.0, k / K)
     if shape == "exponential":
