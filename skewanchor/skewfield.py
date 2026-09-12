@@ -77,6 +77,7 @@ __all__ = [
     "ConstantSkew",
     "RadialModulated",
     "CurlSkew",
+    "CrossProductSkew",
     "StreamField2D",
     "PROFILES",
     "make_profile",
@@ -186,6 +187,41 @@ class CurlSkew(SkewField):
     def apply(self, x, v):
         x = np.atleast_2d(x)
         return np.cross(np.atleast_2d(v), self.grad_f(x))
+
+    def divergence(self, x, h=None):
+        return np.zeros_like(np.atleast_2d(x))
+
+
+class CrossProductSkew(SkewField):
+    r"""``J_s(x) v = s (x \times v)`` in three dimensions:
+
+        J_s(x) = [[ 0,     -s x3,   s x2 ],
+                  [ s x3,   0,     -s x1 ],
+                  [-s x2,   s x1,   0    ]]
+
+    Three properties make this a good choice, all verified in the tests.
+
+    * ``div J_s = 0`` identically, so it needs no correction term: plain
+      substitution into the anchored drift preserves the target, for any target
+      and any anchor.  (It is the curl family with potential ``s|x|^2/2``.)
+    * With the canonical anchor the ``q`` factors cancel exactly and the added
+      drift is the pure quadratic field
+      ``c(x) = s (2 beta / nu) (x \times Sigma^{-1} x)``.
+    * That field is orthogonal to both ``x`` and ``grad U_0``, so it is tangent
+      to spheres *and* to the level sets of the anchor, and it moves along their
+      intersection curves.  It therefore vanishes identically when ``Sigma`` is
+      isotropic -- exactly the case where no skew perturbation can help -- and
+      grows with the anisotropy.
+    """
+
+    def __init__(self, s, d=3):
+        if d != 3:
+            raise ValueError("the cross-product form is three-dimensional")
+        self.s = float(s)
+        self.d = 3
+
+    def apply(self, x, v):
+        return self.s * np.cross(np.atleast_2d(x), np.atleast_2d(v))
 
     def divergence(self, x, h=None):
         return np.zeros_like(np.atleast_2d(x))

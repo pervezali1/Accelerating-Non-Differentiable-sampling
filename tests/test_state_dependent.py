@@ -281,3 +281,79 @@ def test_stream_euler_step_preserves_a_composite_target():
         assert res.diverged_at is None, a
         got = res.final_state.var(axis=0)
         assert np.all(np.abs(got - truth) / truth < 0.15), (a, got, truth)
+
+
+# ------------------------------------------------- the cross-product field
+
+
+def test_cross_product_field_matrix_and_algebra():
+    """Js(x) = [[0,-s x3, s x2],[s x3,0,-s x1],[-s x2, s x1,0]] and Js v = s (x cross v)."""
+    s = 1.7
+    fld = sf.CrossProductSkew(s)
+    rng = np.random.default_rng(0)
+    x = rng.standard_normal((6, 3)) * 2
+    v = rng.standard_normal((6, 3))
+    M = fld.matrix_at(x)
+    for k in range(x.shape[0]):
+        want = np.array([[0.0, -s * x[k, 2], s * x[k, 1]],
+                         [s * x[k, 2], 0.0, -s * x[k, 0]],
+                         [-s * x[k, 1], s * x[k, 0], 0.0]])
+        assert np.allclose(M[k], want), k
+    assert np.abs(M + np.transpose(M, (0, 2, 1))).max() < 1e-12
+    assert np.allclose(fld.apply(x, v), s * np.cross(x, v))
+
+
+def test_cross_product_field_is_divergence_free():
+    """Identically zero, so no correction term is needed anywhere."""
+    fld = sf.CrossProductSkew(1.3)
+    x = np.random.default_rng(1).standard_normal((8, 3)) * 3
+    assert np.abs(fld.divergence(x)).max() == 0.0
+    assert np.abs(sf.SkewField.divergence(fld, x)).max() < 1e-8   # finite differences agree
+
+
+def test_cross_product_field_preserves_the_target_without_correction():
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    fld = sf.CrossProductSkew(1.0)
+    x = t.sample(300, np.random.default_rng(2))
+
+    def added(y):                      # the added field alone, no correction
+        return t.anchor_scale(y)[:, None] * fld.apply(y, t.grad_U0(y))
+
+    res = np.abs(_div_pi_c(t, added, x)).max()
+    assert res < 1e-5 * np.abs(added(x)).max(), res
+
+
+def test_cross_product_drift_reduces_to_a_quadratic_field():
+    """The q factors cancel: c = s (2 beta/nu) (x cross Sigma^{-1} x)."""
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    s = 0.8
+    fld = sf.CrossProductSkew(s)
+    x = t.sample(200, np.random.default_rng(3))
+    got = t.anchor_scale(x)[:, None] * fld.apply(x, t.grad_U0(x))
+    want = s * (2 * t.beta / t.nu) * np.cross(x, x @ t.Sigma_inv)
+    assert np.abs(got - want).max() < 1e-9 * max(1.0, np.abs(want).max())
+    # tangent to spheres and to the level sets of the anchor
+    assert np.abs(np.einsum("ni,ni->n", x, got)).max() < 1e-9 * np.abs(got).max()
+    assert np.abs(np.einsum("ni,ni->n", t.grad_U0(x), got)).max() < 1e-9 * np.abs(got).max()
+
+
+def test_cross_product_field_vanishes_on_an_isotropic_target():
+    """x cross x = 0, so the field is automatically inert where no J can help."""
+    from skewanchor.targets import isotropic_polynomial
+
+    t = isotropic_polynomial(3, 4.0)
+    fld = sf.CrossProductSkew(2.0)
+    x = t.sample(200, np.random.default_rng(4))
+    added = t.anchor_scale(x)[:, None] * fld.apply(x, t.grad_U0(x))
+    assert np.abs(added).max() < 1e-12
+
+
+def test_cross_product_sampler_preserves_the_target():
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    rng = np.random.default_rng(5)
+    x0 = t.sample(100_000, rng)
+    step = samplers.field_anchored_step(t, 2e-5, sf.CrossProductSkew(1.0), "euler")
+    res = samplers.simulate(step, x0, 600, np.random.default_rng(6))
+    assert res.diverged_at is None
+    got, truth = res.final_state.var(axis=0), np.diag(t.cov())
+    assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
