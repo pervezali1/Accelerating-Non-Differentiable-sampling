@@ -645,10 +645,13 @@ python3 experiments/paired_comparison.py --datasets titanic breast_cancer \
     --geometry identity
 ```
 
-A narrower walkthrough of the same machinery on Titanic and MAGIC only, scoring
-both accuracy and predictive log-loss, is in
-[`notebooks/titanic_magic.ipynb`](notebooks/titanic_magic.ipynb); it runs in
-about ten minutes and needs nothing beyond `requirements.txt` plus Jupyter.
+Two notebooks walk the machinery on Titanic and MAGIC only, scoring both
+accuracy and predictive log-loss, and each runs in about ten minutes on nothing
+beyond `requirements.txt` plus Jupyter:
+[`notebooks/titanic_magic.ipynb`](notebooks/titanic_magic.ipynb) for the smooth
+ridge target, and
+[`notebooks/anchored_l1_titanic_magic.ipynb`](notebooks/anchored_l1_titanic_magic.ipynb)
+for the non-differentiable `ell_1` target and anchored Langevin.
 
 Single runs are configurable, for instance
 
@@ -714,6 +717,7 @@ nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference
 experiments/       runners, plotting scripts, diagnostics
 notebooks/         titanic_magic.ipynb: the two-dataset walkthrough, accuracy and loss
+                   anchored_l1_titanic_magic.ipynb: the same for the non-differentiable target
 tests/test_nds.py  divergence identities, surrogate accuracy, invariance
 results/           traces (.npz), per-dataset summaries, summary.csv
 figures/           the figures referenced above
