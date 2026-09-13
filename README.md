@@ -548,6 +548,42 @@ direction but, as before, has very little room: 0.7772 against 0.7771 on
 Titanic, 0.7936 against 0.7945 on MAGIC, against references of 0.7724 and
 0.7950.
 
+### Is it non-reversible, or only irreversible-looking?
+
+Worth checking rather than asserting, since a skew term can be present in the
+code and absent from the dynamics.  Writing the scheme in the complete-recipe
+form, the diffusion matrix is `D(w) = a(w) I` and the antisymmetric part is
+`a(w) J(w)`.  The reversible drift for that `D` is
+`D grad log pi + div D = -a grad U + grad a = -a grad U_0`, which is exactly the
+`J = 0` scheme: anchored Langevin on its own is `pi`-reversible, in a
+state-dependent metric rather than a flat one.  Everything beyond it is the
+antisymmetric part, so `J != 0` should carry a stationary probability current.
+
+`experiments/check_current.py` measures that current directly, as the mean
+signed area swept per step in the slow-fast planes the design couples, with
+walkers started at stationarity ([`results/stationary_current.txt`](results/stationary_current.txt)):
+
+| field | current in the (slow, fast) plane | max \|z\| |
+|---|---|---|
+| `J = 0` | +0.0003 +/- 0.0007 | 1.6 |
+| constant `J_a` | **-0.0923 +/- 0.0010** | 89 |
+| constant `-J_a` | **+0.0999 +/- 0.0011** | 89 |
+| gated `J_s` | **-0.0913 +/- 0.0010** | 88 |
+
+So yes: the reversible baseline sweeps no area, the designed rotation sweeps it
+at ninety standard errors from zero, and negating the rotation reverses the
+current, which is what a probability current does and what a reparametrisation
+could not.  The gated field matches the constant one because this measurement is
+taken in the bulk, where its gate is open.
+
+Two caveats on the name.  The chains here are unadjusted: adding a Metropolis
+step would make them reversible again, for the reason the first experiment
+measures.  And the anchored construction is from arXiv:2509.19455 while the
+composition with a skew term is derived in `nds/anchored.py` from the time
+change; the paper was not reachable from the environment this was written in, so
+whether it also treats an irreversible variant is not something this repository
+can claim either way.
+
 ### What the clock costs, and what it corrects
 
 The clock is not free: the effective step is `h a(w)`, so a coarse anchor slows
