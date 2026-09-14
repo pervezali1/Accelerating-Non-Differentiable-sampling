@@ -141,6 +141,9 @@ off (2.5× and 6.2×) until every replication survived. A backed-off row runs at
 *smaller* stepsize than equal accuracy requires, hence more accurately: it is
 charged the extra iterations and given no credit for the extra accuracy.
 
+Every row here runs the paper's explicit Euler scheme, which is what caps them
+all — see § 3b2, where changing only the integrator beats the best of them.
+
 ![curl potentials](../results/figures/fig11_curl_potentials_light.png)
 
 The cross-product curve lies almost exactly on top of $J=0$, which is why it is
@@ -166,7 +169,8 @@ the back-off costs more than the extra rotation returns.
 
 So the conclusion is quantitative rather than qualitative. The best member of
 the three-dimensional curl family we found is still the linear potential — a
-*constant* $J$, at 5.36× — but it leads a tuned state-dependent member
+*constant* $J$, at 5.36× under Euler and 7.50× once it is given the integrator
+it can use (§ 3b2) — but it leads a tuned state-dependent member
 by only 18 %, not by the factor of two it looked like before the ramp and the
 divergence accounting were fixed. State dependence pays much more in two
 dimensions, through the stream construction of § 3, precisely because there the
@@ -195,6 +199,68 @@ between blocks — which is the honest error bar on any single number here.
 Note the dimensions differ: the 29–79× figures elsewhere are $d = 2$ stream
 fields, and are not comparable with any of these. Every number in this section
 is $d = 3$ and like-for-like with every other number in it.
+
+## 3b2. The integrator is worth more than the potential
+
+Everything above runs the explicit Euler scheme of the paper. That is the wrong
+default, and it is what caps the whole $d = 3$ comparison.
+
+Euler amplifies a rotation by $\sqrt{1 + \theta^2}$ per step, so the stronger
+the field the smaller the stepsize that equal accuracy allows, and the constant
+field's optimum lands at $\|J\| \approx 3.5$. The Cayley transform has unit
+modulus on the skew part and the matrix exponential integrates the linear drift
+outright, so neither pays that penalty. From the exact second-moment recursion,
+at 2 % stationary covariance bias — no Monte Carlo in these numbers:
+
+| $\|J\|$ | 3.5 | 7 | 12 | 20 | 30 | 60 | 90 |
+|---|---|---|---|---|---|---|---|
+| Euler | **3.57×** | 2.98× | 1.94× | 0.60× | 0.34× | — | — |
+| Cayley | 3.54× | 6.21× | **7.33×** | 7.03× | 6.26× | 4.41× | 3.33× |
+| exponential | 3.54× | 6.32× | 7.74× | 8.07× | 8.15× | 8.19× | **8.19×** |
+
+Euler peaks early and then *loses*; the exponential integrator climbs to a
+plateau and stays there, because its stepsize is set by the noise treatment
+alone and stops caring about $\|J\|$. The continuous-time rate for such a field
+is 15.7× the reversible one, so the exponential integrator recovers a little
+over half of what the SDE has to offer, and Euler under a quarter.
+
+Measured, at the same equal-accuracy protocol as the table in § 3b:
+
+| method | ramp | rise | iterations | speed-up | ms/iter | **wall clock** |
+|---|---|---|---|---|---|---|
+| $J = 0$, Euler | — | 1.00× | 2256 | 1.00× | 1.037 | 1.00× |
+| constant $\|J\|=6$, Euler | 10 | 1.00× | 421 | 5.36× | 1.094 | 5.08× |
+| **constant $\|J\|=60$, exponential** | **25** | **1.00×** | **301** | **7.50×** | **0.522** | **14.88×** |
+| $f = s\,x_{\rm stiff}x_{\rm soft}$, $s=1$, Euler | 40 | 1.01× | 498 | 4.53× | 1.267 | 3.71× |
+
+Two separate gains, and the second is the larger:
+
+* **Fewer iterations, 7.50× against 5.36×.** The field can be run ten times
+  stronger without the stepsize collapsing.
+* **Cheaper iterations, 2.0× .** For a constant field on a log-quadratic target
+  with the canonical anchor the drift is linear, so the whole step is
+  `x @ M.T` plus noise — one $d\times d$ multiply, with no per-particle
+  gradient, anchor scale or diffusion coefficient. The propagator is built once
+  and reused, including after the warm-up ramp saturates.
+
+Together, **14.9× in wall clock against 5.08×**, and the curve is monotone.
+
+Three cautions. The stronger field has a larger transient, so it needs a
+25-relaxation ramp rather than 10 — at ramp 10 it reaches the floor just as
+fast but rises 1.38× on the way, and at ramp 20 it still rises 1.05×. On three
+disjoint seed sets the ordering holds in every one (6.27×, 6.56×, 5.74× against
+Euler's 5.50×, 5.50×, 4.42× on a grid fine enough to separate them). And the
+exponential integrator does *not* help a reversible sampler: at $J=0$ it needs
+a smaller stepsize for the same bias and its rate is 0.52× Euler's, which the
+halved cost per iteration almost exactly cancels. It pays only against the
+rotation, which is precisely the part Euler gets wrong.
+
+**What it cannot do.** Cayley and the exponential need the drift's linear part
+to be a fixed matrix, so they take a constant or a radially modulated field and
+nothing else. The curl potentials of § 3b are neither, so they are stuck on
+Euler — and that, not the extra conserved quantity, is now the main reason the
+best of them trails. Splitting the exponential reversible part from an explicit
+skew part would give them the same benefit; that is not implemented here.
 
 ## 3c. Two ways to fool yourself, both of which we did
 

@@ -312,14 +312,23 @@ def field_anchored_step(target, eta, field=None, integrator="euler", n_bins=512,
     if field is None or field.is_constant:
         full = 1.0 if J0 is not None else 0.0
         M_full = _prop(full)
-        counter = {"k": 0}
+        # The propagator depends on the iteration only through the ramp, and the
+        # ramp saturates.  Rebuilding the matrix exponential for the whole run
+        # would charge every iteration for a transient lasting a few hundred, so
+        # once the schedule reaches 1 the constant propagator is reused.
+        state = {"k": 0, "warm": schedule is None}
 
         def step(x, rng):
-            if schedule is None:
+            if state["warm"]:
                 M = M_full
             else:
-                M = _prop(full * float(schedule(counter["k"])))
-                counter["k"] += 1
+                u = float(schedule(state["k"]))
+                state["k"] += 1
+                if u >= 1.0:
+                    state["warm"] = True
+                    M = M_full
+                else:
+                    M = _prop(full * u)
             noise = target.sigma(x)[:, None] * rng.standard_normal(x.shape)
             return x @ M.T + sq * noise
         return step

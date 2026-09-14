@@ -231,6 +231,25 @@ def test_warmup_removes_the_transient_hump():
     assert warm[-1] < 1.3 * plain[-1]          # and it still converges
 
 
+def test_strong_field_preserves_the_target_under_expm():
+    """|J| = 60 is the recommended d=3 setting, ten times anything else tested.
+
+    A field that strong is where an integrator that mishandles rotation shows
+    it, so the check is that the exponential integrator still leaves the target
+    alone -- started *at* stationarity, so any drift in the variance is the
+    integrator's doing and not an unconverged chain.
+    """
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    J = 60.0 * skew.lnp_optimal(t.Sigma_inv) / np.linalg.norm(skew.lnp_optimal(t.Sigma_inv), 2)
+    x0 = t.sample(200_000, np.random.default_rng(3))
+    truth = np.diag(t.cov())
+    step = samplers.field_anchored_step(t, 6.6e-4, sf.ConstantSkew(J), "expm")
+    res = samplers.simulate(step, x0, 600, np.random.default_rng(4))
+    assert res.diverged_at is None
+    got = res.final_state.var(axis=0)
+    assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
+
+
 def test_stream_quadrupole_rewrite_matches_the_stream_form():
     """c = delta e^{U-U0} J0 [F grad U0 - grad F]  is  e^U J0 grad Phi."""
     t = anisotropic_student_t(2, 5.0, 100.0)

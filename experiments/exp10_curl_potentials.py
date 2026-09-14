@@ -104,6 +104,15 @@ def main():
                     help="warm-up length for a CONSTANT field, in relaxations of "
                          "the fastest direction; 10 leaves no hump in d=3 and "
                          "costs no iterations")
+    ap.add_argument("--ramp-expm", type=float, default=25.0,
+                    help="warm-up for the constant field under the exponential "
+                         "integrator, which is run much stronger than the Euler "
+                         "one and so has a larger transient")
+    ap.add_argument("--expm-jnorm", type=float, default=60.0,
+                    help="field strength for the exponential integrator. Euler "
+                         "is stepsize-limited and its optimum is |J| ~ 3.5; expm "
+                         "is not, and the exact analysis has it still gaining at "
+                         "|J| = 90")
     ap.add_argument("--ramp-growth", type=float, default=40.0,
                     help="warm-up length for a field whose strength grows with "
                          "|x| (both non-constant potentials here). Measured: at "
@@ -137,10 +146,18 @@ def main():
     print(f"  sliced-W2 floor at n={args.n}: {floor:.4f} +- {fstd:.4f}")
     print(f"  optimal constant field |J| = {nopt:.2f}\n")
 
+    # Warm-up length per field kind, in relaxations of the fastest direction.
+    # A constant field advanced by Euler wants 10; the same field advanced by
+    # the exponential integrator is run an order of magnitude stronger, so its
+    # transient is correspondingly larger and it wants 25; a field whose
+    # strength grows with |x| wants 40 (see the module docstring).
+    RAMP_OF = {"linear": args.ramp, "expm": args.ramp_expm,
+               "sphere": args.ramp_growth, "hyper": args.ramp_growth}
+
     def field(kind, mag):
         if kind == "zero":
             return None
-        if kind == "linear":                       # a constant J
+        if kind in ("linear", "expm"):             # a constant J
             return sf.ConstantSkew(mag * Jopt / nopt)
         if kind == "sphere":                       # f = s |x|^2 / 2
             return GradCurl(lambda x, s=mag: s * x)
@@ -149,7 +166,7 @@ def main():
                                                   + np.outer(x @ e_soft, e_stiff)))
         raise ValueError(kind)
 
-    def make(fld, eta, kind="linear"):
+    def make(fld, eta, kind="linear", integ="euler"):
         # The ramp length is computed from the target's stiff relaxation time,
         # a property of the *linear* drift.  Both non-constant potentials here
         # have grad f linear in x, so their field strength is proportional to
@@ -161,9 +178,9 @@ def main():
         if fld is None:
             sch = None
         else:
-            n_relax = args.ramp if kind == "linear" else args.ramp_growth
+            n_relax = RAMP_OF[kind]
             sch = samplers.warmup_schedule(T, eta, n_relax)
-        return lambda: samplers.field_anchored_step(T, eta, fld, "euler", schedule=sch)
+        return lambda: samplers.field_anchored_step(T, eta, fld, integ, schedule=sch)
 
     def qbias(mk, n=12000, burn=2500, avg=1500, seed=11):
         if args.smoke:
@@ -188,12 +205,13 @@ def main():
     print(f"  calibration: J=0 at eta={eta0:.3e} -> quantile bias {level:.4f}\n")
 
     rows = []
+    COST_ITERS = 400          # enough to time a step without lengthening the run
 
-    def evaluate(label, kind, mag):
+    def evaluate(label, kind, mag, integ="euler"):
         t0 = time.time()
         probe = 4e-4
         for _ in range(14):                        # adaptive: never blame the stepsize
-            b = qbias(make(field(kind, mag), probe, kind))
+            b = qbias(make(field(kind, mag), probe, kind, integ))
             if np.isfinite(b) and b > 0:
                 break
             probe *= 0.35
@@ -202,7 +220,7 @@ def main():
             return
         eta = probe * (level / b)
         for _ in range(6):
-            if np.isfinite(qbias(make(field(kind, mag), eta, kind))):
+            if np.isfinite(qbias(make(field(kind, mag), eta, kind, integ))):
                 break
             eta *= 0.4
 
@@ -219,7 +237,7 @@ def main():
             for r in range(args.reps):
                 x = runner.make_prior("normal10", 3, args.n,
                                       np.random.default_rng(500 + r))
-                st = make(field(kind, mag), eta, kind)()
+                st = make(field(kind, mag), eta, kind, integ)()
                 rr = np.random.default_rng(9000 + r)
                 w, k, blew = [], 0, False
                 for tk in record_at:
@@ -253,38 +271,62 @@ def main():
             eta *= 0.4
             w, div = ensemble(eta)
 
+        # Iterations are only a fair currency if an iteration costs the same.
+        # It does not: for a constant field on a log-quadratic target the whole
+        # drift collapses to one matrix multiply under the exponential
+        # integrator, where Euler recomputes grad U0, the anchor scale and the
+        # diffusion coefficient per particle every step.  Time it so the run
+        # carries both currencies.
+        xc = T.sample(args.n, np.random.default_rng(77))
+        stc = make(field(kind, mag), eta, kind, integ)()
+        rc = np.random.default_rng(78)
+        stc(xc, rc)                                # warm any lazy setup
+        t_cost = time.time()
+        for _ in range(COST_ITERS):
+            xc = stc(xc, rc)
+        ms_iter = (time.time() - t_cost) / COST_ITERS * 1e3
+
         it = np.asarray(record_at)
         ok = np.isfinite(w) & (w <= 2 * floor)
         hit = int(it[np.argmax(ok)]) if ok.any() and div == 0 else -1
         rows.append({"label": label, "kind": kind, "mag": mag, "eta": eta,
+                     "integrator": integ, "ramp": RAMP_OF.get(kind, 0.0),
+                     "ms_per_iter": ms_iter,
                      "eta_equal_accuracy": eta_equal, "eta_ratio": eta / eta_equal,
                      "diverged": div, "reps": args.reps,
                      "iters": hit, "final": float(w[-1]),
                      "w2": np.asarray(w).tolist(), "rec": record_at})
         backed = "" if eta == eta_equal else f" [backed off {eta_equal / eta:.1f}x]"
         print(f"  {label:40s} eta={eta:.2e} iters={hit:6d} final_W2={w[-1]:.4f}"
-              f" diverged={div}/{args.reps}{backed}  ({time.time() - t0:.0f}s)",
-              flush=True)
+              f" diverged={div}/{args.reps} {ms_iter:.3f}ms/it{backed}"
+              f"  ({time.time() - t0:.0f}s)", flush=True)
 
     evaluate("J = 0", "zero", 0.0)
     evaluate(f"f linear  (= constant J), |J|={args.jnorm:g}", "linear", args.jnorm)
+    evaluate(f"f linear, |J|={args.expm_jnorm:g}, exponential integrator",
+             "expm", args.expm_jnorm, integ="expm")
     for s in args.sphere_s:
         evaluate(f"f = |x|^2/2  (yours), s={s:g}", "sphere", s)
     for s in args.hyper_s:
         evaluate(f"f = s x_stiff x_soft, s={s:g}", "hyper", s)
 
-    base = next((r["iters"] for r in rows if r["kind"] == "zero"), -1)
-    if base > 0:
-        print("\n  speed-ups vs J = 0")
+    zero = next((r for r in rows if r["kind"] == "zero"), None)
+    if zero is not None and zero["iters"] > 0:
+        base, base_ms = zero["iters"], zero["ms_per_iter"]
+        print("\n  speed-ups vs J = 0, in iterations and in wall clock")
+        print(f"    {'':40s} {'iters':>8} {'wall':>8}")
         for r in rows:
             if r["iters"] > 0:
-                print(f"    {r['label']:40s} {base / r['iters']:6.2f}x")
+                it_sp = base / r["iters"]
+                wall = it_sp * base_ms / r["ms_per_iter"]
+                print(f"    {r['label']:40s} {it_sp:7.2f}x {wall:7.2f}x")
     path = os.path.join(OUT, "exp10_curl_potentials.json" if not args.smoke
                         else "exp10_smoke.json")
     # the floor and the ramp are needed to read the curves, so they travel with
     # them rather than being hardcoded in the figure
     out = {"meta": {"d": 3, "nu": args.nu, "kappa": args.kappa, "bias": args.bias,
                     "ramp": args.ramp, "ramp_growth": args.ramp_growth,
+                    "ramp_expm": args.ramp_expm, "expm_jnorm": args.expm_jnorm,
                     "jnorm": args.jnorm, "floor": float(floor),
                     "floor_std": float(fstd), "n": args.n, "steps": args.steps,
                     "reps": args.reps},

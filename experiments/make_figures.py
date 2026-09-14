@@ -409,13 +409,16 @@ def fig_curl_potentials(mode):
     meta = blob.get("meta", {}) if isinstance(blob, dict) else {}
     rows = blob["rows"] if isinstance(blob, dict) else blob   # older files are bare lists
     keep = ["J = 0",
+            "f linear, |J|=60, exponential integrator",
             "f linear  (= constant J), |J|=6",
             "f = s x_stiff x_soft, s=1",
             "f = |x|^2/2  (yours), s=0.1"]
     pretty = {keep[0]: "$J = 0$ (reversible anchored)",
-              keep[1]: "$f$ linear  $\\Rightarrow$  constant $J$,  $\\|J\\|$=6",
-              keep[2]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=1  (best)",
-              keep[3]: "$f = s\\|x\\|^2/2$  (cross product),  $s$=0.1"}
+              keep[1]: "constant $J$, $\\|J\\|$=60, "
+                       "exponential integrator  (fastest)",
+              keep[2]: "constant $J$,  $\\|J\\|$=6,  Euler",
+              keep[3]: "$f = s\\,x_{\\rm stiff}x_{\\rm soft}$,  $s$=1,  Euler",
+              keep[4]: "$f = s\\|x\\|^2/2$  (cross product),  $s$=0.1,  Euler"}
     sel = [r for k in keep for r in rows if r["label"] == k]
     if len(sel) < 2:
         return
@@ -428,26 +431,21 @@ def fig_curl_potentials(mode):
         it = np.asarray(row["rec"], dtype=float)
         it[0] = max(it[1] * 0.5, 0.5)
         w = np.asarray(row["w2"], dtype=float)
-        # the cross-product curve lies exactly on top of J = 0; dash it so both show
+        # the cross-product curve lies almost exactly on J = 0; dash it so both show
         dashed = "cross product" in pretty[row["label"]]
-        ax.plot(it, w, color=colour, label=pretty[row["label"]], zorder=3 - 0.1 * i,
-                ls=(0, (5, 3)) if dashed else "-", lw=2.1 if dashed else 1.8)
         hit = row["iters"]
+        # The counts go in the legend rather than in callouts on the curve.  On
+        # a log axis the crossings sit 0.2 to 0.8 decades apart while the labels
+        # are wider than that, so every callout layout collides with something.
+        lab = pretty[row["label"]]
+        if hit and hit > 0:
+            lab += f"   $\\bf{{{hit:d}}}$ it, {base / hit:.2f}$\\times$"
+        ax.plot(it, w, color=colour, label=lab, zorder=3 - 0.1 * i,
+                ls=(0, (5, 3)) if dashed else "-", lw=2.1 if dashed else 1.8)
         if hit and hit > 0:
             j = int(np.argmin(np.abs(it - hit)))
             ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
                     markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
-            sp = base / hit
-            txt = f"{hit:d} iters  ({sp:.2f}x)"
-            # two of these land within a few dozen iterations of each other,
-            # so the rows need more than the text height between them
-            ax.annotate(txt, xy=(it[j], w[j]), xytext=(0, 12 + 27 * i),
-                        textcoords="offset points", ha="center", va="bottom",
-                        color=colour, fontsize=8.5, zorder=5,
-                        arrowprops=dict(arrowstyle="-", color=colour, lw=0.7,
-                                        shrinkA=1, shrinkB=3),
-                        bbox=dict(boxstyle="round,pad=0.2", fc=p["surface"], ec="none",
-                                  alpha=0.9))
     ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
     ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
     ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
@@ -460,10 +458,27 @@ def fig_curl_potentials(mode):
     ax.set_yscale("log")
     ax.set_xlabel("iteration")
     ax.set_ylabel("sliced 2-Wasserstein distance")
-    ax.set_title("Three dimensions: the divergence-free family, by choice of potential",
+    ax.set_title("Three dimensions: the divergence-free family, and the integrator",
                  loc="left")
-    ax.legend(loc="upper right", fontsize=8.5)
-    ax.set_ylim(top=ax.get_ylim()[1] * 3.0)
+    # Iterations understate the exponential integrator: for a constant field on
+    # a log-quadratic target its whole drift is one matrix multiply, so it is
+    # also about half the cost per iteration.  Put the wall-clock number where
+    # it cannot be missed rather than leaving it in the data file.
+    fast = next((r for r in sel if r.get("integrator") == "expm"), None)
+    zero = next((r for r in sel if r["label"] == "J = 0"), None)
+    if fast and zero and fast.get("ms_per_iter") and zero.get("ms_per_iter"):
+        wall = (zero["iters"] / fast["iters"]) * zero["ms_per_iter"] / fast["ms_per_iter"]
+        ax.text(0.008, 0.015,
+                f"the exponential integrator is also "
+                f"{zero['ms_per_iter'] / fast['ms_per_iter']:.1f}$\\times$ cheaper per "
+                f"iteration\n(one matrix multiply, no per-particle gradient): "
+                f"{wall:.1f}$\\times$ in wall clock, not {zero['iters'] / fast['iters']:.1f}$\\times$",
+                transform=ax.transAxes, fontsize=8.5, va="bottom", ha="left",
+                color=p["text_secondary"])
+    ax.legend(loc="upper right", fontsize=8.0, framealpha=0.93,
+              title="iterations to twice the floor", title_fontsize=8.0)
+    ax.set_ylim(top=ax.get_ylim()[1] * 4.5)
+    ax.set_ylim(bottom=ax.get_ylim()[0] * 0.45)
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig11_curl_potentials_{mode}.png")))
 
 
