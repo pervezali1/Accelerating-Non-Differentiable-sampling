@@ -27,7 +27,20 @@ reason worth knowing.
 
 ![three fields, accuracy from the w = 0 start](figures/three_lines_accuracy.png)
 
-The four fields compared in both experiments:
+**With a constrained posterior, a stochastic gradient and skew reflection at the
+boundary: both prescribed fields win, and the constant one wins twice over.**
+Titanic and MAGIC in `d = 9`, restricted to a centred ball `K_r`, sampled by
+projected SGLD against skew-reflected non-reversible SGLD at one shared step
+size: the running posterior mean is 1.53x +/- 0.12 and 2.04x +/- 0.02 closer to
+the exact constrained posterior with the constant tridiagonal `J_a`, and
+1.22x +/- 0.04 and 1.065x +/- 0.003 closer with the block-diagonal
+state-dependent `J_s(x)`.  The gap between the two fields is predicted to within
+a few per cent by how many pairs of directions each one couples.
+[Constrained sampling](#constrained-sampling-in-d--9-psgld-against-skew-reflected-srnsgld)
+
+![accuracy and log-loss, constrained d = 9](figures/srnsgld_accuracy_loss.png)
+
+The four fields compared in the first two experiments:
 
 | variant | field | divergence correction |
 |---|---|---|
@@ -710,6 +723,223 @@ Caveats specific to this section: the step size still leaves the unadjusted
 rather than swept; and the comparison is on the two low-dimensional datasets,
 where the random-walk reference can be trusted without argument.
 
+## Constrained sampling in `d = 9`: PSGLD against skew-reflected SRNSGLD
+
+This is a different experiment from the ones above, in the setting the
+skew-reflected non-reversible dynamics are stated in: a *constrained* posterior,
+a *stochastic* (mini-batch) gradient, and the two specific skew fields that
+construction prescribes.  Both datasets are reduced to exactly nine features --
+Titanic to `n = 891` passengers with `d = 9` engineered features and no
+intercept column, MAGIC to its `n = 19020` events with nine of its ten
+attributes, dropping `fConc1`, the second-largest pixel's share of the total,
+which correlates 0.98 with `fConc`.  Nine is not cosmetic: the state-dependent
+field is three `3 x 3` blocks.
+
+The target is the likelihood restricted to a centred ball, with no other
+regularisation -- the constraint *is* the prior:
+
+```
+pi(x) prop. exp(-U(x)) 1_{K_r}(x),   U(x) = sum_i softplus(x . a_i) - y_i (x . a_i),   K_r = {|x| <= r},   r = 2.
+```
+
+Walkers start from the uniform law on the centred *unit* ball, inside `K_2` and
+away from the bulk: the constrained MAP sits at `|x*| = 1.734` on Titanic and at
+`|x*| = 2.000` -- flat against the boundary -- on MAGIC.
+
+### The two fields, and the two things the block form gives for free
+
+```
+J_a          = a on the whole superdiagonal, -a on the subdiagonal, constant;
+J_s(x)       = diag( J1(x1,x2,x3), J2(x4,x5,x6), J3(x7,x8,x9) ),
+Jk(u,v,w)    = a [[0, w, -v], [-w, 0, u], [v, -u, 0]].
+```
+
+Each block of `J_s` is `a` times the hat map of its own coordinate triple, so
+`Jk(z) g = a (g x z)`: a step costs one cross product per block, `O(d)` rather
+than `O(d^2)`.  Two properties follow, and both are checked in
+[`tests/test_nds.py`](tests/test_nds.py):
+
+1. **`div J_s = 0` exactly.**  Row `i` of the correction is
+   `sum_j d_j (J_s)_ij`, and every entry of a hat map is free of the coordinate
+   it would be differentiated by.  So the Ma-Chen-Fox term vanishes, the drift
+   is just `-(I + J_s(x)) ghat(x)`, and -- unlike the gated field earlier in
+   this README -- there is no derivative of `J` to estimate or to drop.  The
+   same holds trivially for the constant `J_a`.
+2. **`J_s(x) x = 0`.**  Each block rotates its triple about itself, so the field
+   is tangential to every centred sphere.  That matters at the boundary.  The
+   reflection has to be *oblique* when `J != 0`: the stationary current has a
+   tangential component, and reflecting along the normal `n` would let it leak
+   out and change the invariant law, so the push is along
+   `gamma(x_b) = (I + J(x_b)) n`.  It always points inward, because `n . J n = 0`
+   for skew `J` gives `n . gamma = 1`.  For `J_s` it gives more than that:
+   `J_s(x_b) n = 0`, so `gamma = n` and **skew reflection is plain projection**.
+   The state-dependent field needs no boundary machinery that PSGLD does not
+   already have; the constant `J_a` does.
+
+The push length is explicit.  With `n = y / |y|` and `gamma = n + J(r n) n`,
+`|y - lambda gamma| = r` has the root
+`lambda = (|y| - sqrt(|y|^2 - (1 + |Jn|^2)(|y|^2 - r^2))) / (1 + |Jn|^2)`,
+using `y . gamma = |y|` and `|gamma|^2 = 1 + |Jn|^2`.  A Langevin step overshoots
+the sphere by a little, and for a little the discriminant is positive; when it is
+not, the oblique ray misses the sphere altogether and the closest approach is
+projected instead.  Every run counts those, and they are what the strongest
+rotation below falls over on: none at all up to `rho = 1`, four of 64000 walker
+steps at `rho = 2`, and 9424 at `rho = 4`.
+
+### What is held fixed
+
+The step size is `h = 2 safety / lambda_max(H)` at the constrained MAP, with
+`safety = 0.15` -- the same rule as before, and here it is computed once per
+dataset and **shared by all three fields**.  Nothing in the comparison can be a
+difference of step size, which is the flaw the gate measurement above exposed in
+the earlier experiment.  Mini-batch sizes are chosen so that the gradient noise
+is about the size of the injected Brownian noise (`h |ghat - grad U|` against
+`sqrt(2h)`, measured at 1.4-1.6 in the runs): 256 of 623 on Titanic, 4096 of
+13314 on MAGIC.  One mini-batch per iteration is shared by all walkers, and the
+three fields share the seed, so they run on common random numbers.  The two
+fields are applied at matched *operator norm* `rho = |J|`, since `rho = 1` means
+"rotates as hard as it descends" for both, and a shared `a` would not.
+
+### Results
+
+200 iterations, 32 walkers, `rho = 2`.  Full tables in
+[`results/summary_srnsgld.md`](results/summary_srnsgld.md).
+
+![accuracy and log-loss, constrained d = 9](figures/srnsgld_accuracy_loss.png)
+
+![distance from the exact constrained posterior mean](figures/srnsgld_mean_error.png)
+
+| dataset | field | accuracy at 200 | loss at 200 | whitened error at 200 | error at 2000 |
+|---|---|---|---|---|---|
+| Titanic | `J = 0` | 0.7463 | 0.5012 | 0.464 | 0.140 |
+| Titanic | constant `J_a` | 0.7463 | **0.4999** | **0.227** | 0.149 |
+| Titanic | state `J_s` | 0.7463 | 0.5003 | 0.407 | 0.186 |
+| MAGIC | `J = 0` | 0.7855 | 0.4890 | 23.14 | 1.977 |
+| MAGIC | constant `J_a` | **0.7886** | 0.4890 | **11.73** | **1.016** |
+| MAGIC | state `J_s` | 0.7855 | 0.4889 | 21.75 | 1.853 |
+
+Exact constrained posteriors, from a random-walk Metropolis chain that rejects
+every proposal outside `K_r`: accuracy 0.7500 and loss 0.5002 on Titanic,
+0.7860 and 0.4874 on MAGIC, both with acceptance 0.22 and halves that agree to
+four digits.  The posterior mean sits at `|mean| = 1.740` of `r = 2` on Titanic
+and 1.987 on MAGIC, where 45% of all steps end up outside the ball and get
+pushed back -- the constraint is not decoration.
+
+Both rotations beat `J = 0`, and by more than the seed noise
+([`results/srnsgld_seeds.md`](results/srnsgld_seeds.md), six seeds, common
+random numbers, ratio of whitened errors at iteration 200):
+
+| dataset | constant `J_a` | state-dependent `J_s` |
+|---|---|---|
+| Titanic | **1.53x +/- 0.12** | **1.22x +/- 0.04** |
+| MAGIC | **2.04x +/- 0.02** | **1.065x +/- 0.003** |
+
+Accuracy is again the least discriminating of the three metrics, for the reason
+given [above](#accuracy-is-a-flattering-diagnostic): it reads the predictive
+mean only through `sign(pbar - 0.5)`, and every field gets most test points on
+the right side within a handful of iterations.  On MAGIC it is also
+non-monotone -- `J = 0` leads for the first sixty iterations and the constant
+field passes it after, overshooting the reference slightly on the way.  The
+log-loss and the whitened error are the metrics that separate the fields at
+every iteration.
+
+### Why the constant field wins more than the block-diagonal one
+
+`trace((I + J) H) = trace H`, so a skew term cannot add relaxation rate; it can
+only move rate from the fast directions into the slow one.  How much it can move
+depends on how many pairs of directions it couples, and the two fields differ
+exactly there: `J_a` couples the nine coordinates in one connected chain
+`x1 - x2 - ... - x9` and has a single null direction (odd `d`), while `J_s` is
+three disconnected triples, each hat map annihilating its own coordinate vector
+-- three null directions, and no coupling at all between blocks.
+
+That turns into a prediction.  Near the mode both drifts linearise to
+`-(I + J(x*)) H`, so the rate is `min Re mu` over the eigenvalues of
+`(I + J(x*)) H`, and [`experiments/srnsgld_spectrum.py`](experiments/srnsgld_spectrum.py)
+prints it beside the measured ratio
+([`results/srnsgld_spectrum.md`](results/srnsgld_spectrum.md)):
+
+| dataset | field, `rho = 2` | null directions | predicted rate gain | measured |
+|---|---|---|---|---|
+| Titanic | constant `J_a` | 1 | 2.10 | 2.04 |
+| Titanic | state `J_s` | 3 | 1.20 | 1.14 |
+| MAGIC | constant `J_a` | 1 | 2.02 | 1.97 |
+| MAGIC | state `J_s` | 3 | 1.69 | 1.07 |
+
+Three of the four agree to within a few per cent.  The fourth is the one where
+the interior linearisation should not be trusted: MAGIC's posterior mean is
+pressed against the boundary and 45% of steps are reflected, so a rate computed
+from the interior Hessian overstates what the field can deliver -- and it
+overstates it for `J_s`, whose remaining coupling is the weaker one.
+
+The sweep in [`figures/srnsgld_rho.png`](figures/srnsgld_rho.png) says how far
+this goes: monotone improvement up to `rho = 2` on Titanic and `rho = 4` on
+MAGIC, then a collapse on Titanic at `rho = 4`, where both fields end up ten
+times worse than the baseline (1.47 and 1.37 against 0.14) -- and for different
+reasons.  The constant field throws walkers so far past the sphere that the
+oblique ray misses it in 9424 of 64000 walker steps, so the push degrades to a
+projection.  The state-dependent field never misses, because its reflection *is*
+a projection; it fails the other way, by orbiting -- being tangential, at that
+strength it drives walkers around the sphere rather than into the bulk, and they
+are outside the ball on 56% of steps against the baseline's 6%.
+
+### Choosing which directions share a block
+
+If the block structure is what limits `J_s`, the obvious fix is to choose which
+directions share a block.  Conjugating by an orthogonal `V` costs nothing and
+keeps every property used above -- the matrix stays skew, the divergence stays
+zero, `J(x) x = 0` survives, and the ball is `V`-invariant, so the boundary
+behaviour is unchanged (`nds.constrained.FramedField`).  So write both fields in
+the Hessian eigenbasis with each `3`-block pairing a slow direction with a fast
+one, which is what the [designed rotation](#the-design) earlier in this README
+does.  Whitened error at iteration 200, `rho = 2`, against `J = 0` at 0.464 and
+23.14:
+
+| dataset | field | feature order | eigen frame | predicted rate gain |
+|---|---|---|---|---|
+| Titanic | constant `J_a` | **0.227** | 0.499 | 2.10 -> 1.71 |
+| Titanic | state `J_s` | 0.407 | **0.394** | 1.20 -> 1.59 |
+| MAGIC | constant `J_a` | **11.73** | 15.88 | 2.02 -> 1.75 |
+| MAGIC | state `J_s` | 21.75 | **19.96** | 1.69 -> 1.05 |
+
+The state-dependent field does improve, in the intended direction and on both
+datasets, but by 3-8%, which is the size of the seed noise.  The constant field
+gets much worse, and the spectrum says why: pairing slow with fast *lowers* its
+predicted rate gain, from 2.10 to 1.71 and from 2.02 to 1.75.  In hindsight the
+pairing argument never applied to it: the tridiagonal chain
+`x1 - x2 - ... - x9` already couples every coordinate to two others, so
+reordering it in the eigenbasis changes which two and nothing says the new pair
+is the better one.  Here it is the worse one.
+
+For the block field the reason the fix cannot do much is worth stating, because
+it is a property of the hat map and not of these datasets.  Inside a block the
+rotation axis is the block's *own coordinate vector* `z_k`, and the rotation
+mixes the plane orthogonal to it.  So the frame chooses which triple of
+directions shares a block, but not which two of them get mixed -- that is fixed
+by where the mode sits.  A construction that could choose would not be a hat
+map, and would not have a vanishing divergence for free.  `--frame eigen`
+reproduces the table.
+
+### How exact any of this is
+
+The reference is exact: rejecting proposals outside `K_r` is the
+Metropolis-Hastings rule for a uniform prior on the ball, so the reference chain
+has no discretisation, projection or mini-batch bias.  The samplers have all
+three.  What they do not have is a *wrong invariant law*: on a small toy problem
+where the ball binds, all three fields land within 0.6 posterior standard
+deviations of the exact constrained mean and within 0.2 of each other, and
+quartering the step size roughly halves the residual error (0.377 to 0.205 in
+those units, and 0.283 and 0.153 at the two steps in between) -- consistent with
+the `O(sqrt(h))` boundary bias of a projected Euler scheme, and not with a
+biased target.  Both tests are in
+[`tests/test_nds.py`](tests/test_nds.py).
+
+The gradients are optional: `--grad fd` replaces the mini-batch gradient with
+central differences of the mini-batch potential, `2d` evaluations and no
+gradient formula anywhere, and reproduces the Titanic numbers to four digits
+(0.1402 against 0.1400 for `J = 0`, 0.1349 against 0.1347 for the constant field
+at `rho = 1`).
+
 ## Datasets
 
 | dataset | n (train/test) | d | source |
@@ -718,6 +948,13 @@ where the random-walk reference can be trusted without argument.
 | MAGIC Gamma Telescope | 13314 / 5706 | 11 | UCI `magic04.data` (19020 events) |
 | Breast Cancer Wisconsin | 398 / 171 | 31 | shipped with scikit-learn (`load_breast_cancer`) |
 | Spambase | 3221 / 1380 | 58 | UCI `spambase.data`, features `log1p`-scaled |
+
+The `d` column is the unconstrained preprocessing, which standardises every
+feature and prepends an intercept.  The
+[constrained experiment](#constrained-sampling-in-d--9-psgld-against-skew-reflected-srnsgld)
+uses `nds.data.load_nine` instead, which drops the intercept and, on MAGIC, the
+redundant `fConc1`, giving `d = 9` on both -- a multiple of three, as the
+block-diagonal field needs, and a dimension where the ball is the only prior.
 
 `nds/data.py` caches the raw files under `data/` (git-ignored) and checks each
 one against the SHA256 digest in `EXPECTED_SHA256`, so a mirror that changes its
@@ -759,6 +996,19 @@ python3 experiments/run_anchored.py                 # Titanic and MAGIC, ~20 min
 python3 experiments/run_anchored_bias.py --delta 0.02 --n-iter 30000
 python3 experiments/run_anchored_bias.py --delta 0.1  --n-iter 20000
 python3 experiments/plot_anchored.py
+```
+
+The constrained `d = 9` experiment of
+[Constrained sampling](#constrained-sampling-in-d--9-psgld-against-skew-reflected-srnsgld):
+
+```bash
+python3 experiments/run_srnsgld.py                  # both datasets, ~6 min, most of it
+                                                    # the two Metropolis references
+python3 experiments/plot_srnsgld.py                 # the three figures and the tables
+python3 experiments/srnsgld_spectrum.py             # predicted rate gain vs measured
+python3 experiments/srnsgld_seeds.py                # the same comparison over six seeds
+python3 experiments/run_srnsgld.py --frame eigen    # the pairing that did not help
+python3 experiments/run_srnsgld.py --grad fd --tag-suffix _fd   # derivative free
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they
@@ -809,6 +1059,13 @@ python3 experiments/run_accuracy.py --datasets magic --alpha 0.5 --geometry iden
   a genuinely non-differentiable target -- a Laplace prior, or a hinge
   pseudo-likelihood -- would be a stronger test of the derivative-free claim,
   and `nds.target` is the only file that would have to change.
+* In the constrained experiment the mini-batch noise is of the same size as the
+  injected Brownian noise (ratio 1.4-1.6), which is normal for SGLD and is part
+  of why the unadjusted chains sit a little off the exact constrained posterior.
+  It is the same for all three fields, and shrinking it means a larger batch,
+  not a different field.
+* The constrained runs use one split and `rho` on a five-point ladder; the
+  quoted speed-ups carry standard errors over six walker seeds only.
 * Cost is counted in iterations, not in potential evaluations.  Every variant
   pays the same `2 d` evaluations per step, so the ranking is unaffected, but a
   fair comparison against a gradient-based sampler would have to count them.
@@ -841,6 +1098,7 @@ nds/target.py      logistic posterior, central-difference surrogate, prediction
 nds/skew.py        J = 0, constant, radial and directional fields, and their divergence
 nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
 nds/anchored.py    the l1 target, its smooth anchor, anchored Langevin, an exact reference
+nds/constrained.py constrained target, ball with skew reflection, J_a and block-diagonal J_s
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference

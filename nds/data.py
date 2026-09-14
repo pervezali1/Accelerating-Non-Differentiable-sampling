@@ -85,12 +85,14 @@ def _cached(fname: str) -> str:
     return path
 
 
-def _standardise(X: np.ndarray, n_train: int) -> np.ndarray:
+def _standardise(X: np.ndarray, n_train: int, intercept: bool = True) -> np.ndarray:
     """Centre and scale by training-set moments, then prepend an intercept."""
     mean = X[:n_train].mean(axis=0)
     scale = X[:n_train].std(axis=0)
     scale[scale < 1e-12] = 1.0
     Z = (X - mean) / scale
+    if not intercept:
+        return Z
     return np.column_stack([np.ones(len(Z)), Z])
 
 
@@ -101,6 +103,7 @@ def _split(
     feature_names: list,
     test_fraction: float = 0.3,
     seed: int = 0,
+    intercept: bool = True,
 ) -> Dataset:
     """Stratified train/test split, standardised with training-set moments."""
     rng = np.random.default_rng(seed)
@@ -116,7 +119,7 @@ def _split(
 
     order = np.concatenate([train_idx, test_idx])
     n_train = len(train_idx)
-    Xs = _standardise(X[order].astype(np.float64), n_train)
+    Xs = _standardise(X[order].astype(np.float64), n_train, intercept=intercept)
     ys = y[order].astype(np.float64)
     return Dataset(
         name=name,
@@ -124,11 +127,11 @@ def _split(
         y_train=np.ascontiguousarray(ys[:n_train]),
         X_test=np.ascontiguousarray(Xs[n_train:]),
         y_test=np.ascontiguousarray(ys[n_train:]),
-        feature_names=["intercept"] + list(feature_names),
+        feature_names=(["intercept"] if intercept else []) + list(feature_names),
     )
 
 
-def load_titanic(seed: int = 0) -> Dataset:
+def load_titanic(seed: int = 0, intercept: bool = True) -> Dataset:
     """Titanic survival: 891 passengers, 9 engineered features."""
     import pandas as pd
 
@@ -149,10 +152,10 @@ def load_titanic(seed: int = 0) -> Dataset:
         "embarked_Q": (embarked == "Q").astype(float),
     }
     X = np.column_stack([v.to_numpy() for v in columns.values()])
-    return _split("titanic", X, y, list(columns), seed=seed)
+    return _split("titanic", X, y, list(columns), seed=seed, intercept=intercept)
 
 
-def load_magic(seed: int = 0) -> Dataset:
+def load_magic(seed: int = 0, intercept: bool = True, drop: tuple = ()) -> Dataset:
     """MAGIC Gamma Telescope: 19020 events, gamma (1) versus hadron (0)."""
     import pandas as pd
 
@@ -162,8 +165,9 @@ def load_magic(seed: int = 0) -> Dataset:
     ]
     df = pd.read_csv(_cached("magic04.data"), header=None, names=names)
     y = (df["class"] == "g").to_numpy().astype(float)
-    X = df[names[:-1]].to_numpy(dtype=float)
-    return _split("magic", X, y, names[:-1], seed=seed)
+    kept = [c for c in names[:-1] if c not in drop]
+    X = df[kept].to_numpy(dtype=float)
+    return _split("magic", X, y, kept, seed=seed, intercept=intercept)
 
 
 def load_breast_cancer(seed: int = 0) -> Dataset:
@@ -205,3 +209,34 @@ PRETTY_NAMES = {
 
 def load(name: str, seed: int = 0) -> Dataset:
     return LOADERS[name](seed=seed)
+
+
+# The d = 9 preprocessing of the constrained experiment.  Nine is not a
+# cosmetic choice: the state-dependent field is three 3x3 blocks, so the
+# dimension has to be a multiple of three, and both datasets reduce to nine
+# naturally.
+#
+# * Titanic: the nine engineered features above (female, age, sibsp, parch,
+#   log fare, two class dummies, two embarkation dummies), no intercept column.
+#   The intercept is what the unconstrained version needs and the constrained
+#   one does not: on standardised features the classes are close enough to
+#   balanced (38% survived) that dropping it costs 0.003 of test accuracy, and
+#   keeping it would put an unpenalised, unbounded coordinate inside a ball.
+# * MAGIC: ten attributes, one of which is redundant -- ``fConc1`` is the
+#   second-largest pixel's share of the total and correlates 0.98 with
+#   ``fConc``, the largest's.  Dropping it leaves nine informative features and
+#   loses nothing.
+NINE_DROP = {"titanic": (), "magic": ("fConc1",)}
+
+
+def load_nine(name: str, seed: int = 0) -> Dataset:
+    """Load ``name`` reduced to exactly nine standardised features, no intercept."""
+    if name not in NINE_DROP:
+        raise KeyError(f"no d = 9 preprocessing for {name!r}; have {sorted(NINE_DROP)}")
+    kwargs = {"intercept": False}
+    if NINE_DROP[name]:
+        kwargs["drop"] = NINE_DROP[name]
+    ds = LOADERS[name](seed=seed, **kwargs)
+    if ds.dim != 9:
+        raise AssertionError(f"{name}: expected d = 9, got {ds.dim}")
+    return ds

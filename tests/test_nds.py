@@ -12,6 +12,20 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from nds.constrained import (  # noqa: E402
+    Ball,
+    BlockHatField,
+    ConstantField,
+    FramedField,
+    MinibatchLogistic,
+    ZeroField,
+    curvature_step_size,
+    eigen_frame,
+    field_from_rho,
+    reference_constrained_rwm,
+    run_constrained_sgld,
+    superdiagonal_skew,
+)
 from nds.anchored import (  # noqa: E402
     LassoLogistic,
     reference_posterior_rwm,
@@ -241,6 +255,152 @@ def test_every_variant_samples_the_same_posterior():
         )
         # error is measured in units of reference posterior standard deviations
         assert res.mean_error[-1].mean() < 0.5, (field.label, res.mean_error[-1].mean())
+
+
+# --------------------------------------------------------------------------
+# The constrained d = 9 construction: a constant tridiagonal J_a, a
+# block-diagonal state-dependent J_s of 3x3 hat maps, and a ball to reflect in.
+# --------------------------------------------------------------------------
+def _numeric_divergence(field, x: np.ndarray, eps: float = 1e-5) -> np.ndarray:
+    """``Gamma_i = sum_j d_j J_ij``, by central differences of the matrix."""
+    d = len(x)
+    out = np.zeros(d)
+    for j in range(d):
+        xp, xm = x.astype(float).copy(), x.astype(float).copy()
+        xp[j] += eps
+        xm[j] -= eps
+        out += (field.matrix(xp)[:, j] - field.matrix(xm)[:, j]) / (2.0 * eps)
+    return out
+
+
+def test_constrained_fields_are_skew_and_divergence_free():
+    """The reason for the block form: no correction term to estimate."""
+    rng = np.random.default_rng(0)
+    d = 9
+    x = rng.normal(size=d)
+    V = eigen_frame(np.diag(np.linspace(1.0, 9.0, d)))
+    fields = [
+        ConstantField(d, 0.7),
+        BlockHatField(d, 0.7),
+        FramedField(BlockHatField(d, 0.7), V),
+        FramedField(ConstantField(d, 0.7), V),
+    ]
+    for field in fields:
+        J = field.matrix(x)
+        assert np.abs(J + J.T).max() < 1e-12, field.label
+        assert np.abs(_numeric_divergence(field, x)).max() < 1e-8, field.label
+        assert np.abs(field.divergence(x[:, None])).max() == 0.0, field.label
+        g = rng.normal(size=(d, 1))
+        assert np.abs(field.apply(x[:, None], g) - J @ g).max() < 1e-12, field.label
+
+    # the superdiagonal pattern, and its operator norm 2 a cos(pi / (d + 1))
+    J = superdiagonal_skew(d, 0.5)
+    assert np.allclose(np.diag(J, 1), 0.5) and np.allclose(np.diag(J, -1), -0.5)
+    assert np.abs(J).sum() == 2 * (d - 1) * 0.5
+    sv = np.linalg.svd(J, compute_uv=False)[0]
+    assert abs(sv - 2 * 0.5 * np.cos(np.pi / (d + 1))) < 1e-10
+
+
+def test_block_hat_field_is_tangential_and_needs_no_oblique_reflection():
+    """``J_s(x) x = 0`` makes skew reflection on a centred ball plain projection."""
+    rng = np.random.default_rng(1)
+    d, r = 9, 2.0
+    ball = Ball(r)
+    V = eigen_frame(np.diag(np.linspace(1.0, 9.0, d)))
+    for field in (BlockHatField(d, 0.9), FramedField(BlockHatField(d, 0.9), V)):
+        X = rng.normal(size=(d, 64))
+        assert np.abs(field.apply(X, X)).max() < 1e-12, field.label
+        Y = X * (1.02 * r / np.sqrt((X * X).sum(axis=0)))  # just outside
+        oblique, out, missed = ball.reflect(Y, field)
+        assert out.all() and missed == 0
+        assert np.abs(oblique - ball.project(Y)).max() < 1e-12, field.label
+
+    # the constant field is *not* tangential, so its reflection is oblique, but
+    # it still points inward: n . (I + J) n = 1 because n . J n = 0
+    field = ConstantField(d, 0.9)
+    X = rng.normal(size=(d, 64))
+    N = X / np.sqrt((X * X).sum(axis=0))
+    gamma = N + field.apply(r * N, N)
+    assert np.abs((N * gamma).sum(axis=0) - 1.0).max() < 1e-12
+    Y = N * (1.02 * r)
+    oblique, out, missed = ball.reflect(Y, field)
+    assert out.all() and missed == 0
+    assert np.abs(np.sqrt((oblique * oblique).sum(axis=0)) - r).max() < 1e-10
+    assert np.abs(oblique - ball.project(Y)).max() > 1e-6  # genuinely oblique
+
+
+def test_field_amplitudes_are_matched_by_operator_norm():
+    """``rho`` has to mean the same rotation for both fields, or the comparison
+    between them is a comparison of amplitudes."""
+    rng = np.random.default_rng(2)
+    d, r = 9, 2.0
+    for rho in (0.5, 2.0):
+        assert abs(np.linalg.svd(field_from_rho("constant", d, rho, r).matrix(np.zeros(d)),
+                                 compute_uv=False)[0] - rho) < 1e-10
+        field = field_from_rho("state", d, rho, r)
+        X = rng.normal(size=(d, 400))
+        X *= r / np.sqrt((X * X).sum(axis=0))
+        norms = [np.linalg.svd(field.matrix(X[:, i]), compute_uv=False)[0] for i in range(400)]
+        assert abs(np.mean(norms) / rho - 1.0) < 0.05, (rho, np.mean(norms))
+
+
+def _constrained_toy(n: int = 200, d: int = 3, seed: int = 7, radius: float = 0.7):
+    """A toy whose unconstrained mode is outside ``K_r``, so the ball binds."""
+    X, y = _toy(n=n, d=d, seed=seed)
+    return MinibatchLogistic(X, y), X, y, Ball(radius)
+
+
+def test_reflected_chains_all_hit_the_constrained_reference():
+    """Whatever ``J`` is, the invariant law has to stay the constrained posterior.
+
+    The reference is a random-walk Metropolis chain that rejects every proposal
+    outside the ball, which is exact.  The remaining error is the projected
+    Euler scheme's boundary bias, shared by all three fields.
+    """
+    model, X, y, ball = _constrained_toy()
+    h, geom = curvature_step_size(model, ball, safety=0.05)
+    ref = reference_constrained_rwm(
+        model, ball, X, y, n_iter=60000, n_warmup=10000, seed=0,
+        start=np.asarray(geom["map"], float),
+    )
+    metric = np.linalg.pinv(ref["posterior_cov"])
+    assert 0.1 < ref["acceptance"] < 0.5
+    errors = {}
+    for key in ("zero", "constant", "state"):
+        field = field_from_rho(key, model.d, 1.0, ball.radius)
+        out = run_constrained_sgld(
+            model, field, ball, X, y, n_iter=20000, n_walkers=16, step_size=h,
+            batch_size=model.n, seed=2, start_radius=ball.radius,
+            reference_mean=ref["posterior_mean"], reference_metric=metric,
+        )
+        assert out["missed_reflections"] == 0, key
+        assert out["boundary_rate"] > 0.05, key  # the constraint is doing something
+        errors[key] = out["mean_error"][-1]
+        # error in units of posterior standard deviations
+        assert errors[key] < 0.6, (key, errors[key])
+    assert max(errors.values()) - min(errors.values()) < 0.2, errors
+
+
+def test_projection_bias_shrinks_with_the_step_size():
+    """The shared error floor is discretisation, not a wrong invariant law."""
+    model, X, y, ball = _constrained_toy()
+    h, geom = curvature_step_size(model, ball, safety=0.05)
+    ref = reference_constrained_rwm(
+        model, ball, X, y, n_iter=60000, n_warmup=10000, seed=0,
+        start=np.asarray(geom["map"], float),
+    )
+    metric = np.linalg.pinv(ref["posterior_cov"])
+    errs = []
+    for div in (1, 4):
+        out = run_constrained_sgld(
+            model, ZeroField(model.d), ball, X, y, n_iter=20000 * div, n_walkers=16,
+            step_size=h / div, batch_size=model.n, seed=2, start_radius=ball.radius,
+            reference_mean=ref["posterior_mean"], reference_metric=metric,
+        )
+        errs.append(out["mean_error"][-1])
+    # O(sqrt(h)) would predict a factor of two; anything clearly below one is
+    # enough to rule out a biased invariant law
+    assert errs[1] < 0.75 * errs[0], errs
 
 
 if __name__ == "__main__":
