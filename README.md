@@ -548,6 +548,43 @@ direction but, as before, has very little room: 0.7772 against 0.7771 on
 Titanic, 0.7936 against 0.7945 on MAGIC, against references of 0.7724 and
 0.7950.
 
+### Ridge against lasso: the same conclusions
+
+The `ell_1` penalty above *is* the lasso regularizer, so the natural question is
+whether swapping it for the ridge changes anything.  It does not.  Same protocol
+on both targets, and each rotation compared with the reversible baseline inside
+its own target, since the two priors give different posteriors
+([`results/ridge_vs_lasso.md`](results/ridge_vs_lasso.md), from
+`experiments/compare_ridge_lasso.py`):
+
+| dataset | prior | iterations to the loss band, `J = 0` -> `J_a` / `J_s` | speedup | error ratio |
+|---|---|---|---|---|
+| Titanic | ridge | 74 -> 19 / 21 | 3.9x / 3.5x | 1.61x / 1.60x |
+| Titanic | lasso | 97 -> 37 / 42 | 2.6x / 2.3x | 1.65x / 1.64x |
+| MAGIC | ridge | 60 -> 25 / 24 | 2.4x / 2.5x | 3.60x / 3.39x |
+| MAGIC | lasso | 84 -> 39 / 38 | 2.2x / 2.2x | 2.64x / 2.75x |
+
+The ordering, the mechanism and the step-size gain (1.8x to 2.0x under both
+priors) carry over; the lasso speedups are slightly smaller, which is what the
+clock's 8 to 15 per cent of effective step size buys the exactness with.
+
+It is also worth checking the sampler against the lasso in its usual form, a
+minimisation.  With `C = 1 / lambda` scikit-learn minimises exactly this `U`, and
+its solution is the MAP of the posterior that was sampled -- the script asserts
+that nudging any coordinate of it either way does not lower `U`:
+
+| | Titanic | MAGIC |
+|---|---|---|
+| `U` at the minimiser / at the posterior mean | 288.34 / 288.52 | 6102.30 / 6102.39 |
+| exact zeros, minimiser / posterior mean | 1 of 9 / 0 of 9 | 1 of 10 / 0 of 10 |
+| test accuracy, minimiser / posterior | 0.7724 / 0.7724 | 0.7948 / 0.7950 |
+| test log-loss, minimiser / posterior | 0.4631 / 0.4608 | 0.4586 / 0.4586 |
+
+Which is the textbook difference between the two: the minimiser sets a
+coefficient exactly to zero, the posterior mean sets none of them to zero and
+only pulls them in, and the posterior predictive is the better-calibrated of the
+two where they differ at all.
+
 ### Is it non-reversible, or only irreversible-looking?
 
 Worth checking rather than asserting, since a skew term can be present in the
