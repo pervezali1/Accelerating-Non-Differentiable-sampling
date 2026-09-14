@@ -1,0 +1,50 @@
+[
+  {
+    "dataset": "titanic",
+    "pretty": "Titanic (survival)",
+    "d": 10,
+    "sqrt_d": 3.1622776601683795,
+    "r0_start_to_bulk": 13.904041324428265,
+    "gate_radius": 10.4280309933212,
+    "gate_width": 1.3904041324428267,
+    "bulk_radius_median": 3.070677285813762,
+    "gate_mean_in_bulk": 0.9941717021642044,
+    "gate_median_in_bulk": 0.9949911212754348
+  },
+  {
+    "dataset": "magic",
+    "pretty": "MAGIC Gamma Telescope",
+    "d": 11,
+    "sqrt_d": 3.3166247903554,
+    "r0_start_to_bulk": 58.66576799847302,
+    "gate_radius": 43.999325998854765,
+    "gate_width": 5.866576799847302,
+    "bulk_radius_median": 3.1269260593564216,
+    "gate_mean_in_bulk": 0.9990443365081295,
+    "gate_median_in_bulk": 0.999058404812006
+  },
+  {
+    "dataset": "breast_cancer",
+    "pretty": "Breast Cancer Wisconsin",
+    "d": 31,
+    "sqrt_d": 5.5677643628300215,
+    "r0_start_to_bulk": 1.3804079115247867,
+    "gate_radius": 1.0353059336435901,
+    "gate_width": 0.13804079115247866,
+    "bulk_radius_median": 36.41721613210748,
+    "gate_mean_in_bulk": 3.152032970937313e-46,
+    "gate_median_in_bulk": 4.829499144957816e-112
+  },
+  {
+    "dataset": "spambase",
+    "pretty": "Spambase",
+    "d": 58,
+    "sqrt_d": 7.615773105863909,
+    "r0_start_to_bulk": 0.9383911419622951,
+    "gate_radius": 0.7037933564717214,
+    "gate_width": 0.09383911419622952,
+    "bulk_radius_median": 34.93337818062444,
+    "gate_mean_in_bulk": 7.669228441144218e-104,
+    "gate_median_in_bulk": 3.8284466487514975e-159
+  }
+]

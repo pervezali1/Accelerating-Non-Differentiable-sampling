@@ -375,17 +375,70 @@ J_s(w) = s(w) J_a,   s(w) = 1 / (1 + exp((r(w) - R) / W)),   r(w)^2 = (w - m)^T 
 
 with `R` three quarters of the whitened distance from `w = 0` to the warm-up
 mean and `W` a tenth of it.  Outside the gate the chain is the reversible one;
-inside it the full design applies.  That buys two things at once, and both show
-up in the table below: the calibration keeps amplitude 1.0 where the constant
-field cannot, and amplitude 1.0 is where the block rates *collide*, which halves
-the spectral radius of the drift and so **doubles the step size** the same
-step-size rule allows.  Its divergence is
+inside it the full design applies.  That lets the calibration keep amplitude 1.0
+where the constant field cannot, and amplitude 1.0 is where the block rates
+*collide*, which halves the spectral radius of the drift and so **doubles the
+step size** the same step-size rule allows -- both of which show up in the table
+below.  Where the gate is actually open, that is; it is not open everywhere, and
+[the next section](#the-gate-in-higher-dimension-and-where-it-shuts) measures
+where.  Its divergence is
 `Gamma(w) = -s(w)(1 - s(w)) J_a H (w - m) / (W r(w))`, in closed form as always.
 
 A Gaussian profile is not sharp enough for this: it decays over a scale
 comparable to the distance it is centred on, so with the `w = 0` start only a
 factor of two further out than the bulk it still leaves a quarter of the
 rotation switched on during the descent.
+
+### The gate in higher dimension, and where it shuts
+
+Nothing in the construction scales with `d`, which is the point of writing the
+state dependence as a scalar times a constant matrix rather than as a general
+`J(w)`.  A general skew field has `d(d-1)/2` free functions -- 1653 of them at
+`d = 58` -- and its divergence needs a derivative of every one.  Here the only
+state-dependent object is the scalar `s(w)`, so there is one gradient to take,
+`grad s = -s(1-s) H (w - m) / (W r)`, and the divergence is a single
+matrix-vector product: `O(d^2)` per step, the same order as applying `J` at all.
+The gate needs one extra quadratic form `r(w)^2` per step, no extra potential
+evaluations, and `J_a` is built once from the warm-up Hessian estimate as
+`floor(d/2)` 2x2 blocks (an odd `d` leaves the middle direction uncoupled).
+
+What does *not* scale is the rule that places the gate.  `R` and `W` are keyed
+to `r0`, the whitened distance from the `w = 0` start to the warm-up mean, which
+assumes the start lies outside the bulk.  In the same whitened units a
+`d`-dimensional bulk sits at radius `sqrt(d)`, so the assumption needs
+`r0 >> sqrt(d)`, and [`experiments/gate_diagnostics.py`](experiments/gate_diagnostics.py)
+checks it by evaluating the gate on draws from the reference posterior
+([`results/gate_in_the_bulk.md`](results/gate_in_the_bulk.md)):
+
+| dataset | `d` | `r0` (start to bulk) | `sqrt(d)` | bulk radius (median) | mean `s` in the bulk |
+|---|---|---|---|---|---|
+| Titanic | 10 | 13.90 | 3.16 | 3.07 | **0.994** |
+| MAGIC | 11 | 58.67 | 3.32 | 3.13 | **0.999** |
+| Breast Cancer | 31 | 1.38 | 5.57 | 36.42 | **3e-46** |
+| Spambase | 58 | 0.94 | 7.62 | 34.93 | **8e-104** |
+
+Radii are in the gate's own metric, centred at the warm-up mean `m` and measured
+in the warm-up inverse covariance `H`.  On the two low-dimensional posteriors the
+picture is the intended one: the start is four to eighteen times further out than
+the bulk, and the gate is open where the chain ends up.  On the two
+high-dimensional, near-separable posteriors it inverts.  Their warm-up never
+reaches the bulk -- a bulk radius of 36 where a matched geometry would give 5.6
+says the warm-up mean is not the posterior mean and the warm-up covariance is far
+too small -- so `r0` measures the distance to where the pilot stalled, not to the
+bulk, and comes out *below* `sqrt(d)`.  The gate keyed to it is then shut
+everywhere the chain actually lives.
+
+So on Breast Cancer and Spambase the row labelled gated `J_s` is, in the bulk, a
+reversible chain running at the design's step size.  Its amplitude of 1.0 in the
+table below is nominal: the calibration is free to keep it precisely because
+`s(w) J_a` is switched off where the calibration's score is computed, and the
+gain that shows up is the 2x step size, not the rotation.  That is also why
+`state` and `state_nocorr` agree to four digits there, and it is the honest
+reading of Spambase's near-tie.  The fix is one line -- key `R` to the bulk's own
+whitened radius (the median `r` over the warm-up ensemble, or `sqrt(d)`) instead
+of to `r0`, and give the warm-up enough iterations to find the bulk on a
+near-separable posterior -- but the numbers below are from the run as described,
+not from that fix.
 
 ### What the design buys
 
@@ -454,7 +507,9 @@ from iteration 40 on Breast Cancer, and from iteration 180 on Spambase.
   -- unlike the Metropolis-corrected experiment, which is exact.
 * The divergence correction is numerically negligible here too: the gate gives
   `Gamma / |D ghat|` under 0.01 in the bulk, so `state` and `state_nocorr` agree
-  to four digits.  The setting where that term is visible is
+  to four digits -- on Breast Cancer and Spambase because the gate is shut there
+  and `s(1 - s)` vanishes, as
+  [the gate measurement](#the-gate-in-higher-dimension-and-where-it-shuts) shows.  The setting where that term is visible is
   [the correction experiment](#the-correction-term-only-matters-without-the-metropolis-step).
 
 ## A non-differentiable regularizer, and anchored Langevin
@@ -693,6 +748,7 @@ python3 experiments/plot_three_lines.py                # the three-field figures
 python3 experiments/plot_accuracy.py --tag designed --suffix _designed \
     --variants zero constant state \
     --title 'Accuracy from the $w = 0$ start, unadjusted dynamics with a designed rotation'
+python3 experiments/gate_diagnostics.py                # is the gate open in the bulk?
 ```
 
 The non-differentiable target of
