@@ -485,21 +485,27 @@ def fig_curl_potentials(mode):
 # ------------------------------------------------------------------ fig 12
 
 
+# which curves fig 12 shows, in order.  The cross-product row is still measured
+# and still in the data file; it is simply not plotted here.
+FIG12_KEYS = ("zero", "const")
+
+
 def fig_three_fields(mode):
-    """d = 3, three fields: J = 0, a constant J_a, and the cross-product J_s."""
+    """d = 3: the reversible anchored sampler against a constant skew field."""
     path = os.path.join(DATA, "exp12_three_fields.json")
     if not os.path.exists(path):
         print("  skip: exp12_three_fields.json not found")
         return
     b = runner.load_json(path)
     floor = b["floor"]
-    pretty = {"zero": "$J = 0$",
-              "const": "$J_a$,  $a = 4$   (constant)",
+    pretty = {"zero": "$J = 0$   (reversible anchored)",
+              "const": "$J$ constant,  $a = 4$",
               "cross": "$J_s$,  $s = 4$   (state dependent)"}
     p = plotting.use_style(mode)
     fig, ax = plt.subplots(figsize=(6.8, 4.7))
-    base = next(r["iters"] for r in b["rows"] if r["key"] == "zero")
-    for i, r in enumerate(b["rows"]):
+    rows = [r for k in FIG12_KEYS for r in b["rows"] if r["key"] == k]
+    base = next(r["iters"] for r in rows if r["key"] == "zero")
+    for i, r in enumerate(rows):
         colour = p["categorical"][i % len(p["categorical"])]
         it = np.asarray(r["rec"], dtype=float)
         it[0] = max(it[1] * 0.5, 0.5)
@@ -509,7 +515,7 @@ def fig_three_fields(mode):
             lab += f"    $\\bf{{{r['iters']:d}}}$ it,  {base / r['iters']:.2f}$\\times$"
         else:
             lab += f"    not reached in {b['steps']:d}"
-        ax.plot(it, w, color=colour, lw=1.9, label=lab, zorder=3 - 0.1 * i)
+        ax.plot(it, w, color=colour, lw=2.0, label=lab, zorder=3 - 0.1 * i)
         if r["iters"] > 0:
             j = int(np.argmin(np.abs(it - r["iters"])))
             ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
@@ -528,12 +534,13 @@ def fig_three_fields(mode):
     ax.set_ylabel("sliced 2-Wasserstein distance")
     ax.set_title("Anchored Langevin on a heavy-tailed $d=3$ Student-t "
                  "($\\nu=6$, $\\kappa=100$)", loc="left")
-    etas = {r["key"]: r["eta"] for r in b["rows"]}
+    etas = {r["key"]: r["eta"] for r in rows}
+    sp = base / next(r["iters"] for r in rows if r["key"] == "const")
     ax.text(0.008, 0.02,
-            "equal stationary accuracy, so each field runs at its own stepsize:\n"
-            f"$\\eta$ = {etas['zero']:.2e},  {etas['const']:.2e},  {etas['cross']:.2e}"
-            f"     ($J_s$ at $s=4$ is stable but "
-            f"{etas['zero'] / etas['cross']:.0f}$\\times$ stepsize-limited)",
+            "equal stationary accuracy, so each runs at its own stepsize:  "
+            f"$\\eta$ = {etas['zero']:.2e} and {etas['const']:.2e}.\n"
+            f"Five replications, none diverged, neither curve rises out of a "
+            f"trough.   Speed-up {sp:.2f}$\\times$.",
             transform=ax.transAxes, fontsize=8.3, va="bottom", ha="left",
             color=p["text_secondary"])
     ax.legend(loc="upper right", fontsize=9, framealpha=0.93)
