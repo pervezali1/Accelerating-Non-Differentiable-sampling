@@ -296,6 +296,39 @@ def test_curl_family_divergence_is_the_curl_of_its_generator():
         raise AssertionError("a non-gradient generator was accepted")
 
 
+def test_curl_family_is_complete_in_three_dimensions():
+    """Every skew 3x3 is [a]_x, so div J = 0 forces a = grad f: no other
+    correction-free field exists.  In d = 2 the same argument forces the field
+    to be constant."""
+    rng = np.random.default_rng(0)
+
+    def hat(a):
+        return np.array([[0.0, -a[2], a[1]], [a[2], 0.0, -a[0]], [-a[1], a[0], 0.0]])
+
+    # d = 3: skew <-> vector is onto and one-to-one
+    for _ in range(500):
+        A = rng.standard_normal((3, 3))
+        A = A - A.T
+        a = np.array([A[2, 1], A[0, 2], A[1, 0]])
+        assert np.abs(hat(a) - A).max() == 0.0
+
+    # d = 2: J = phi J0, and div J = 0 forces grad phi = 0
+    J0 = np.array([[0.0, -1.0], [1.0, 0.0]])
+    h = 1e-6
+
+    def div2(phi, x):
+        out = np.zeros(2)
+        for i in range(2):
+            e = np.zeros(2)
+            e[i] = h
+            out += ((phi(x + e) - phi(x - e)) / (2 * h)) * J0[i, :]
+        return out
+
+    x = rng.standard_normal(2)
+    assert np.abs(div2(lambda z: 1.0 + z @ z, x)).max() > 1e-3    # non-constant: fails
+    assert np.abs(div2(lambda z: 3.0, x)).max() == 0.0            # constant: holds
+
+
 def test_improved_js_preserves_the_target():
     """The improved J_s at its measured best, started at stationarity."""
     t = anisotropic_student_t(3, 6.0, 100.0)

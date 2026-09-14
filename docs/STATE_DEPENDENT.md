@@ -84,9 +84,31 @@ tilt is admissible as a bare $J(x)$ field; both become legal through (COR).
 **In $d \ge 3$.** $J = \operatorname{div}A$ for a totally antisymmetric
 3-tensor $A$ has $\operatorname{div}J \equiv 0$, so it satisfies (INV) with no
 correction and preserves *any* target with *any* anchor. For $d = 3$ this is
-$J(x)v = v\times\nabla f(x)$ for an arbitrary scalar $f$. No such family exists
-in $d = 2$, which is precisely why two dimensions are confined to radial
-modulation under (INV).
+$J(x)v = \nabla f(x)\times v$ for an arbitrary scalar $f$.
+
+In $d = 3$ that family is not merely *sufficient* — it is everything:
+
+> **The curl family is complete in $d=3$.** Skew $3\times3$ matrices and
+> vectors in $\mathbb R^3$ are the same three-dimensional space, so every skew
+> field is $J(x)v = a(x)\times v$ for a unique vector field $a$. By § 3b3,
+> $\operatorname{div}J = \operatorname{curl}a$. Hence
+> $\operatorname{div}J \equiv 0 \iff \operatorname{curl}a \equiv 0 \iff
+> a = \nabla f$ for some scalar $f$ ($\mathbb R^3$ is simply connected). So the
+> correction-free skew fields in $d = 3$ are *exactly* the curl fields, one per
+> scalar $f$.
+
+Choosing a correction-free field in three dimensions is therefore choosing one
+scalar function, and nothing outside that family exists to be found. It also
+says where the remaining freedom is: the correction term (COR) of § 2 buys
+access to the fields with $\operatorname{curl}a \ne 0$, and nothing else.
+
+The contrast with the plane is sharp rather than incidental. Skew $2\times2$
+matrices are one-dimensional, $J(x) = \varphi(x)J_0$, so
+$(\operatorname{div}J)_k = (J_0^{\!\top}\nabla\varphi)_k$ and, $J_0$ being
+invertible, $\operatorname{div}J = 0$ forces $\nabla\varphi = 0$: **in $d = 2$
+the only correction-free skew field is a constant one.** Every state-dependent
+planar field in this work is legal only through (COR). That is why two
+dimensions are confined to radial modulation under (INV) alone.
 
 ## 3b. The curl family in three dimensions, and what it can and cannot do
 
