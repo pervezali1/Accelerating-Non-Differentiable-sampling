@@ -29,26 +29,44 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS = os.path.join(ROOT, "results")
 
 
-def select(rows: list, field: str, base: dict, max_fail_rate: float) -> tuple:
+def select(rows: list, field: str, base: dict, max_fail_rate: float,
+           objective: str = "band") -> tuple:
+    """The best amplitude for ``field``, under the rule in the module docstring.
+
+    ``objective="band"`` minimises the iterations to the accuracy band, which is
+    the right question when the budget is open-ended.  ``objective="gap"``
+    minimises the accuracy gap left at the end of the run, which is the right
+    question when the budget is fixed and short -- there, when a chain first
+    touched a band matters less than where it actually is when the iterations
+    run out.
+    """
     cands = [r for r in rows if r["field"] == field]
     if not cands:
         return None, False
     steps = base["n_iter"] * 1.0
-    ok = [
-        r for r in cands
-        if r["error"] <= base["error"] + base["error_se"]
-        and r["failed"] <= max_fail_rate * steps
-        and r["reached_all"]
-    ]
+    if objective == "gap":
+        key = lambda r: r["gap_tail"]  # noqa: E731
+        guard = lambda r: r["error"] <= base["error"] + base["error_se"]  # noqa: E731
+    else:
+        key = lambda r: r["band"]  # noqa: E731
+        guard = lambda r: (
+            r["error"] <= base["error"] + base["error_se"] and r["reached_all"]
+        )  # noqa: E731
+    ok = [r for r in cands if guard(r) and r["failed"] <= max_fail_rate * steps]
     if ok:
-        return min(ok, key=lambda r: r["band"]), True
-    return min(cands, key=lambda r: r["band"]), False
+        return min(ok, key=key), True
+    return min(cands, key=key), False
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--max-fail-rate", type=float, default=0.001)
     parser.add_argument("--out", default="anchored_selected_amplitudes.md")
+    parser.add_argument("--objective", default="band", choices=["band", "gap"],
+                        help="what to minimise: iterations to the accuracy band, or the "
+                             "accuracy gap left at the end of a fixed budget")
+    parser.add_argument("--n-iter", type=int, default=None,
+                        help="restrict to sweeps with this iteration budget")
     args = parser.parse_args()
 
     lines = [
@@ -65,8 +83,9 @@ def main() -> None:
         "",
     ]
     table = [
-        "| problem | set | eta | seeds | field | kappa | c | band | speed-up | error | error at n/4 |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| problem | set | eta | seeds | field | kappa | c | band | speed-up | "
+        "gap at the end | gap ratio | error | error ratio |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     notes = []
     # pool rows across sweep files, but only where the seed set matches, so the
@@ -75,6 +94,10 @@ def main() -> None:
     for path in sorted(glob.glob(os.path.join(RESULTS, "sweep_anchored_*.json"))):
         meta = json.load(open(path))
         for r in meta["rows"]:
+            if args.n_iter is not None and r["n_iter"] != args.n_iter:
+                continue
+            if args.objective == "gap" and "gap_tail" not in r:
+                continue
             key = (meta["problem"], meta["domain"], r["eta"], tuple(meta["seeds"]))
             groups.setdefault(key, []).append(r)
 
@@ -86,11 +109,12 @@ def main() -> None:
         table.append(
             f"| {problem} | {domain} | {eta:.2e} | {len(seeds)} | `J = 0` | -- | -- | "
             f"{base['band']:.0f} +/- {base['band_se']:.0f} | 1.00x | "
-            f"{base['error']:.3f} +/- {base['error_se']:.3f} | "
-            f"{base['error_quarter']:.3f} |"
+            f"{base.get('gap_tail', float('nan')):.4f} +/- "
+            f"{base.get('gap_tail_se', float('nan')):.4f} | 1.00x | "
+            f"{base['error']:.3f} +/- {base['error_se']:.3f} | 1.00x |"
         )
         for field, name in (("constant", "`J_a`"), ("state", "`J_s` / `J_g`")):
-            pick, clean = select(here, field, base, args.max_fail_rate)
+            pick, clean = select(here, field, base, args.max_fail_rate, args.objective)
             if pick is None:
                 continue
             flag = "" if clean else " **(bias traded)**"
@@ -99,8 +123,11 @@ def main() -> None:
                 f"{pick['kappa']:g} | {pick.get('tilt', 0.0):g} | "
                 f"{pick['band']:.0f} +/- {pick['band_se']:.0f} | "
                 f"**{base['band'] / max(pick['band'], 1e-9):.2f}x** | "
+                f"{pick.get('gap_tail', float('nan')):.4f} +/- "
+                f"{pick.get('gap_tail_se', float('nan')):.4f} | "
+                f"**{base.get('gap_tail', float('nan')) / max(pick.get('gap_tail', 1e-9), 1e-9):.2f}x** | "
                 f"{pick['error']:.3f} +/- {pick['error_se']:.3f} | "
-                f"{pick['error_quarter']:.3f} |"
+                f"**{base['error'] / max(pick['error'], 1e-9):.2f}x** |"
             )
             if not clean:
                 notes.append(

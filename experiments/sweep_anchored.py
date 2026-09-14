@@ -102,7 +102,12 @@ def main() -> None:
     parser.add_argument("--domain", default="ball", choices=["ball", "lp"])
     parser.add_argument("--kappas", nargs="+", type=float,
                         default=[0.01, 0.03, 0.1, 0.3, 0.6, 1.0, 2.0])
-    parser.add_argument("--step-divisors", nargs="+", type=float, default=[1.0])
+    parser.add_argument("--step-divisors", nargs="+", type=float, default=[1.0],
+                        help="each divisor scales eta down and the iteration count up, "
+                             "holding the simulated time fixed")
+    parser.add_argument("--eta", type=float, default=None,
+                        help="override the step size without touching the iteration "
+                             "count, for a fixed-budget comparison")
     parser.add_argument("--tilts", nargs="+", type=float, default=[0.0],
                         help="non-radial h in the paper's recipe: h = 1 + tilt (u . x). "
                              "0 is the paper's own choice, h = 1")
@@ -142,7 +147,7 @@ def main() -> None:
     d = target.d
     n_iter_base = args.n_iter or dcfg.get("n_iter", cfg["n_iter"])
     n_walkers = args.n_walkers or cfg["n_walkers"]
-    eta_base = cfg["step_size"]
+    eta_base = args.eta or cfg["step_size"]
 
     lam_tag = f"{target.lam:.4g}"
     ref = dict(np.load(os.path.join(
@@ -196,11 +201,18 @@ def main() -> None:
                 )
                 b = band(out["accuracy_test"], out["scored_at"], ref_acc)
                 q = int(np.searchsorted(out["scored_at"], quarter))
+                # the tail of the budget: with a fixed, short horizon what matters
+                # is where the chain has got to by the last iteration, not when it
+                # first touched a band
+                tail = out["accuracy_test"][int(0.8 * len(out["accuracy_test"])):]
                 per_seed.append({
                     "band": b if b is not None else n_iter,
                     "reached": b is not None,
                     "error": out["mean_error"],
+                    "error_running": float(out["running_error"][-1]),
                     "error_quarter": float(out["running_error"][min(q, len(out["running_error"]) - 1)]),
+                    "gap_tail": float(abs(tail.mean() - ref_acc)),
+                    "accuracy_tail": float(tail.mean()),
                     "accuracy_test": float(out["accuracy_test"][-1].mean()),
                     "boundary_rate": out["boundary_rate"],
                     "failed": out["failed_retractions"],
@@ -214,7 +226,8 @@ def main() -> None:
                 "n_iter": n_iter,
                 "reached_all": all(r["reached"] for r in per_seed),
             }
-            for stat in ("band", "error", "error_quarter", "accuracy_test",
+            for stat in ("band", "error", "error_running", "error_quarter",
+                         "gap_tail", "accuracy_tail", "accuracy_test",
                          "boundary_rate", "failed", "clock"):
                 vals = np.array([r[stat] for r in per_seed], float)
                 agg[stat] = float(vals.mean())
@@ -224,8 +237,9 @@ def main() -> None:
                 f"eta={eta:.2e} {key:9s} kappa={kappa:<5g} tilt={tilt:<4g} band {agg['band']:7.1f}"
                 f" +/- {agg['band_se']:5.1f}{'' if agg['reached_all'] else ' (not all reached)'}"
                 f"  error {agg['error']:8.3f} +/- {agg['error_se']:.3f}"
-                f"  error@n/4 {agg['error_quarter']:8.3f}"
-                f"  acc {agg['accuracy_test']:.4f}  bnd {agg['boundary_rate']:.3f}"
+                f"  run {agg['error_running']:8.3f}"
+                f"  gap_tail {agg['gap_tail']:.4f} +/- {agg['gap_tail_se']:.4f}"
+                f"  acc {agg['accuracy_tail']:.4f}  bnd {agg['boundary_rate']:.3f}"
                 f"  failed {agg['failed']:.0f}  ({time.time() - started:.0f}s)",
                 flush=True,
             )
@@ -262,8 +276,9 @@ def main() -> None:
         f"`kappa` multiplies the paper's own amplitudes "
         f"(`a` = {dcfg['a']:g}, `s` = {np.atleast_1d(dcfg['s']).tolist()}).",
         "",
-        "| eta | iterations | field | kappa | tilt | band | error | error at n/4 | accuracy | boundary | failed |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| eta | iterations | field | kappa | tilt | band | gap at the tail | "
+        "error | running error | accuracy | boundary | failed |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rows:
         star = "" if r["reached_all"] else " (not all)"
@@ -271,8 +286,9 @@ def main() -> None:
             f"| {r['eta']:.2e} | {r['n_iter']} | `{r['field']}` | {r['kappa']:g} | "
             f"{r['tilt']:g} | "
             f"{r['band']:.0f} +/- {r['band_se']:.0f}{star} | "
-            f"{r['error']:.3f} +/- {r['error_se']:.3f} | {r['error_quarter']:.3f} | "
-            f"{r['accuracy_test']:.4f} | {r['boundary_rate']:.3f} | {r['failed']:.0f} |"
+            f"{r['gap_tail']:.4f} +/- {r['gap_tail_se']:.4f} | "
+            f"{r['error']:.3f} +/- {r['error_se']:.3f} | {r['error_running']:.3f} | "
+            f"{r['accuracy_tail']:.4f} | {r['boundary_rate']:.3f} | {r['failed']:.0f} |"
         )
     open(os.path.join(RESULTS, f"sweep_anchored_{tag}.md"), "w").write("\n".join(lines) + "\n")
     print("wrote", os.path.join(RESULTS, f"sweep_anchored_{tag}.md"))

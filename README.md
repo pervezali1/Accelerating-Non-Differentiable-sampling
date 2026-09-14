@@ -48,9 +48,10 @@ and Titanic in `d = 9`, a centred ball and a smoothed `l_p` sublevel set -- reru
 with `lam |x|_1` added to the potential and the dynamics replaced by anchored
 Langevin composed with the paper's own skew fields, so the kinked target stays
 the invariant law and the chain never touches a subgradient.  At the right
-amplitude **both** fields reach the exact posterior's accuracy in fewer
-iterations than `J = 0` on four of the six problem-and-constraint pairs -- 1.2x
-to 4.5x, with no loss of stationary accuracy.  The state-dependent field needs
+amplitude **both** fields beat `J = 0`: given a fixed 250-iteration budget they
+are closer to the exact posterior's accuracy on all six
+problem-and-constraint pairs, by 1.02x to 21x, and given an open-ended budget
+they reach it in fewer iterations on four of the six, by 1.2x to 4.5x.  The state-dependent field needs
 one change to manage it on a *ball*, and the reason is a two-line calculation:
 the paper's choice of a radial `h` makes `J(x) x = 0` everywhere, not just on
 the boundary, which freezes the radial drift exactly -- and on these posteriors
@@ -1282,7 +1283,9 @@ standard error of the baseline's) and do not fall back on a missed boundary push
 On both Titanic constraint sets and both synthetic ones, **both** fields now
 reach the exact posterior's accuracy in fewer iterations than `J = 0` without
 giving up any stationary accuracy -- 1.17x to 4.52x, and the two that improve
-most improve the posterior-mean error as well.  The state-dependent field needs
+most improve the posterior-mean error as well.  (Under a fixed short budget the
+selection changes and all six pairs come out ahead; that is
+[the next subsection](#a-fixed-250-iteration-budget).)  The state-dependent field needs
 `c > 0` on the ball, for the reason above; on the sublevel set it wins with the
 paper's own `c = 0` too, just by less (521 against 737, 1.41x).
 
@@ -1298,9 +1301,77 @@ nothing left to win -- the same reduction that
 [the bias ladder](#how-much-of-the-remaining-gap-is-the-step-size) shows is
 needed for the chain to resolve the posterior at all.
 
+#### A fixed 250-iteration budget
+
+With a short, fixed horizon the question changes.  "How many iterations to the
+accuracy band" is the right measure when the budget is open-ended; when it is
+250 iterations, what matters is where the chain has actually got to when the
+iterations run out.  So the objective becomes the **gap left at the end** -- the
+distance from the mean test accuracy over the last fifth of the run to the exact
+constrained lasso posterior's -- with the whitened error of the running mean at
+250 as the second reading, and the amplitudes are re-selected against it
+(`experiments/select_anchored.py --objective gap --n-iter 250`).
+
+The step size has to be chosen so that `J = 0` is still moving at 250, or there
+is nothing to measure: Titanic keeps the paper's `eta = 1e-4`, and MAGIC and the
+synthetic problem run at `eta / 16 = 6.25e-6`, since at the paper's step they
+reach the accuracy ceiling within 13 and 30 iterations and at `eta / 4` they are
+converged well inside the budget.  Three to five walker seeds, shared across
+fields; full table in
+[`results/anchored_selected_250.md`](results/anchored_selected_250.md).
+
+| problem | set | field | `kappa` | `c` | gap at 250 | gap ratio | error at 250 | error ratio |
+|---|---|---|---|---|---|---|---|---|
+| Titanic | ball | `J = 0` | -- | -- | 0.0167 +/- 0.0022 | 1.00x | 10.93 +/- 0.21 | 1.00x |
+| Titanic | ball | `J_a` | 0.3 | -- | **0.0032 +/- 0.0008** | **5.26x** | **5.95 +/- 0.07** | **1.84x** |
+| Titanic | ball | `J_psi` | 0.3 | 3 | **0.0038 +/- 0.0013** | **4.43x** | **6.66 +/- 0.11** | **1.64x** |
+| Titanic | sublevel | `J = 0` | -- | -- | 0.0218 +/- 0.0019 | 1.00x | 6.50 +/- 0.06 | 1.00x |
+| Titanic | sublevel | `J_a` | 0.3 | -- | **0.0032 +/- 0.0012** | **6.77x** | **5.73 +/- 0.13** | **1.14x** |
+| Titanic | sublevel | `J_psi` | 0.3 | 3 | **0.0154 +/- 0.0019** | **1.41x** | **3.96 +/- 0.10** | **1.64x** |
+| MAGIC | ball | `J = 0` | -- | -- | 0.0047 +/- 0.0010 | 1.00x | 59.3 +/- 2.4 | 1.00x |
+| MAGIC | ball | `J_a` | 0.3 | -- | **0.0031 +/- 0.0007** | **1.51x** | **19.2 +/- 1.6** | **3.09x** |
+| MAGIC | ball | `J_psi` | 0.3 | 1 | **0.0041 +/- 0.0014** | **1.14x** | **24.8 +/- 1.4** | **2.39x** |
+| MAGIC | sublevel | `J = 0` | -- | -- | 0.0042 +/- 0.0004 | 1.00x | 17.05 +/- 0.13 | 1.00x |
+| MAGIC | sublevel | `J_a` | 0.3 | -- | **0.0033 +/- 0.0010** | **1.30x** | **15.30 +/- 0.84** | **1.11x** |
+| MAGIC | sublevel | `J_psi` | 0.03 | 3 | **0.0033 +/- 0.0003** | **1.27x** | **16.71 +/- 0.44** | **1.02x** |
+| Synthetic | ball | `J = 0` | -- | -- | 0.0653 +/- 0.0033 | 1.00x | 24.44 +/- 0.35 | 1.00x |
+| Synthetic | ball | `J_a` | 3 | -- | **0.0035 +/- 0.0009** | **18.8x** | **11.14 +/- 0.44** | **2.19x** |
+| Synthetic | ball | `J_psi` | 0.1 | 3 | **0.0551 +/- 0.0014** | **1.19x** | **21.32 +/- 0.36** | **1.15x** |
+| Synthetic | sublevel | `J = 0` | -- | -- | 0.0623 +/- 0.0031 | 1.00x | 14.47 +/- 0.18 | 1.00x |
+| Synthetic | sublevel | `J_a` | 3 | -- | **0.0030 +/- 0.0008** | **20.9x** | **9.61 +/- 0.24** | **1.51x** |
+| Synthetic | sublevel | `J_g` | 0.3 | 0 | **0.0608 +/- 0.0033** | **1.03x** | **14.19 +/- 0.22** | **1.02x** |
+
+Within 250 iterations **both fields beat `J = 0` in all six problem-and-constraint
+pairs, on both readings** -- from 1.02x to 21x.  The constant field wins by the
+most, the state-dependent field by between 1.02x and 4.4x, and the two places
+where its margin is barely outside the seed noise are the `d = 3` synthetic
+problem, where the block-diagonal construction is a *single* `3 x 3` hat map of
+rank two and so has one plane to rotate in and nothing else.
+
+![250 iterations, ball](figures/anchored_srnsgld_ball_250.png)
+
+![250 iterations, distance to the exact posterior, ball](figures/anchored_srnsgld_lp_250_gap.png)
+
+Two things are worth reading off the figures rather than the table.  On MAGIC the
+accuracy curves lie on top of each other, because even at `eta / 16` MAGIC's
+accuracy is converged by iteration 50; its separation is in the posterior mean,
+where the running error at 250 is 19 and 25 standard deviations against the
+baseline's 59.  And on the ball the state-dependent field is the *tilted* one
+throughout (`c > 0`): the paper's own `c = 0` cannot move the radius at all, as
+[above](#why-no-amplitude-can-help-on-a-ball), which over 250 iterations is the
+whole of the journey.
+
+The amplitudes the 250-iteration budget wants are not the ones the open-ended
+budget wanted -- on the synthetic problem `kappa` = 3 for the constant field
+against 1, and on Titanic's sublevel set 0.3 against 1 -- which is the expected
+direction: with a short horizon the stationary bias a strong rotation leaves
+behind never gets collected, so more rotation is affordable.
+
 #### MAGIC is the exception
 
-On MAGIC no amplitude of either field clears the bar.  The band improves -- 294
+On MAGIC no amplitude of either field clears the bar *at an open-ended budget*
+-- the [250-iteration budget above](#a-fixed-250-iteration-budget) is a different
+question, and there both fields do clear it.  The band improves -- 294
 to 214 iterations at `kappa` = 0.3 for both fields on the ball, a 1.37x speed-up
 -- but the stationary error grows with it, from 1.42 to 2.0-2.5 standard
 deviations, and at amplitudes small enough to leave the error alone
@@ -1435,6 +1506,23 @@ python3 experiments/run_anchored_srnsgld.py --problems titanic --domains ball \
     --amp-scale-constant 0.3 --amp-scale-state 0.3 --tilt 3.0 --tag-suffix _tuned
 python3 experiments/plot_anchored_srnsgld.py --suffixes _tuned --gap \
     --summary summary_anchored_srnsgld_tuned.md
+```
+
+The same question under a fixed 250-iteration budget
+([A fixed 250-iteration budget](#a-fixed-250-iteration-budget)):
+
+```bash
+python3 experiments/sweep_anchored.py --problem titanic --domain ball \
+    --n-iter 250 --score-every 1 --kappas 0.3 1.0 2.0 3.0 --tilts 0.0 1.0 3.0 6.0 \
+    --seeds 0 1 2 3 4 --tag _250          # and once per problem and set, with
+                                          # --eta 6.25e-6 for MAGIC and synthetic
+python3 experiments/select_anchored.py --objective gap --n-iter 250 \
+    --out anchored_selected_250.md
+python3 experiments/run_anchored_srnsgld.py --problems titanic --domains ball \
+    --n-iter 250 --amp-scale-constant 0.3 --amp-scale-state 0.3 --tilt 3.0 \
+    --tag-suffix _250
+python3 experiments/plot_anchored_srnsgld.py --suffixes _250 --gap --no-zoom \
+    --smooth 5 --summary summary_anchored_srnsgld_250.md
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they

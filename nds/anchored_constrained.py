@@ -234,8 +234,12 @@ def outward_tilt_direction(
     rng = np.random.default_rng(seed)
     W = domain.uniform(target.d, n_walkers, rng, radius=start_radius)
     G = target.anchor_grad(W, np.arange(target.n))
+    # the coordinate to be pushed outward is the one the constraint is written
+    # in: |x|^2 on a ball, g(x) on a sublevel set.  For a ball grad g = 2 x, so
+    # the two agree up to a positive factor and the direction is the same.
+    Q = domain.grad_g(W) if hasattr(domain, "grad_g") else W
     blocks = [
-        np.cross(G[3 * b : 3 * b + 3].T, W[3 * b : 3 * b + 3].T).mean(axis=0)
+        np.cross(G[3 * b : 3 * b + 3].T, Q[3 * b : 3 * b + 3].T).mean(axis=0)
         for b in range(target.d // 3)
     ]
     c = np.concatenate(blocks)

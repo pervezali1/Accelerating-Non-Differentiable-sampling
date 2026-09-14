@@ -234,6 +234,7 @@ def write_summary(all_runs: dict, out: str) -> None:
         which = {
             "_paper": "the paper's own amplitudes",
             "_tuned": "amplitudes tuned by the sweep",
+            "_250": "a 250-iteration budget, amplitudes tuned for it",
             "_noclock": "no clock",
         }.get(suffix, "calibrated amplitudes")
         lines += [f"## {DOMAIN_TITLE[domain]}, {which}", ""]
@@ -309,6 +310,7 @@ def main() -> None:
             which = {
                 "_paper": "the paper's amplitudes",
                 "_tuned": "amplitudes tuned by the sweep",
+                "_250": "a 250-iteration budget, amplitudes tuned for it",
                 "_noclock": "no clock",
             }.get(suffix, "calibrated amplitudes")
             figure(
