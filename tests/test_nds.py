@@ -12,6 +12,15 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from nds.anchored_constrained import (  # noqa: E402
+    Ball as PaperBall,
+    LassoLogistic as ConstrainedLasso,
+    SmoothedLpBall,
+    ball_axial_field,
+    reference_constrained_rwm as constrained_lasso_reference,
+    run_anchored_srnsgld,
+    sublevel_axial_field,
+)
 from nds.constrained import (  # noqa: E402
     Ball,
     BlockHatField,
@@ -401,6 +410,142 @@ def test_projection_bias_shrinks_with_the_step_size():
     # O(sqrt(h)) would predict a factor of two; anything clearly below one is
     # enough to rule out a biased invariant law
     assert errs[1] < 0.75 * errs[0], errs
+
+
+# --------------------------------------------------------------------------
+# The paper's own fields and constraint sets, with a lasso target sampled by
+# anchored Langevin: nds/anchored_constrained.py.
+# --------------------------------------------------------------------------
+def test_paper_fields_satisfy_the_three_assumptions():
+    """Skew, divergence free, and ``J n = 0`` on the respective boundary."""
+    rng = np.random.default_rng(0)
+    d = 9
+    ball, lp = PaperBall(2.0, squared=True), SmoothedLpBall(2.4, 0.2, 4.0)
+    fields = {
+        "state": (ball_axial_field(d, [5.0, 5.0, 5.0]), ball),
+        "sublevel": (sublevel_axial_field(d, [2.0, 7.0, 2.0], 2.4, 0.2), lp),
+    }
+    for key, (field, domain) in fields.items():
+        x = rng.normal(size=d)
+        J = field.matrix(x)
+        assert np.abs(J + J.T).max() < 1e-12, key
+        assert np.abs(_numeric_divergence(field, x)).max() < 1e-7, key
+        assert np.abs(field.divergence(x[:, None])).max() == 0.0, key
+        g = rng.normal(size=(d, 1))
+        assert np.abs(field.apply(x[:, None], g) - J @ g).max() < 1e-12, key
+        # J n = 0 on the boundary, which is what turns the oblique boundary
+        # condition into the plain Neumann one
+        X = rng.normal(size=(d, 32))
+        X = domain._shrink(X * 3.0) if hasattr(domain, "_shrink") else X * (
+            domain.radius / np.sqrt((X * X).sum(axis=0))
+        )
+        assert np.abs(field.apply(X, domain.normal(X))).max() < 1e-10, key
+
+    # the constant field is the counterexample: J_a n is not zero
+    J_a = ConstantField(d, 2.0)
+    X = rng.normal(size=(d, 32))
+    assert np.abs(J_a.apply(X, ball.normal(X))).max() > 0.1
+
+    # the paper writes J_s(x) w = s (x cross w); check the sign convention
+    f3 = ball_axial_field(3, 5.0)
+    x3, w3 = rng.normal(size=3), rng.normal(size=3)
+    assert np.allclose(f3.matrix(x3) @ w3, 5.0 * np.cross(x3, w3))
+
+
+def test_skew_projection_returns_to_the_constraint_set():
+    """Both domains, all three fields, at overshoots a Langevin step can make."""
+    rng = np.random.default_rng(1)
+    d = 9
+    ball, lp = PaperBall(2.0, squared=True), SmoothedLpBall(2.4, 0.2, 4.0)
+    cases = [
+        (ball, ball_axial_field(d, [5.0, 5.0, 5.0])),
+        (ball, ConstantField(d, 2.0)),
+        (ball, ZeroField(d)),
+        (lp, sublevel_axial_field(d, [2.0, 7.0, 2.0], 2.4, 0.2)),
+        (lp, ConstantField(d, 2.0)),
+        (lp, ZeroField(d)),
+    ]
+    for domain, field in cases:
+        Z = rng.normal(size=(d, 128))
+        inside = (
+            domain._shrink(Z * 3.0) if hasattr(domain, "_shrink")
+            else Z * (domain.radius / np.sqrt((Z * Z).sum(axis=0)))
+        )
+        for over in (1.002, 1.01):
+            Y = inside * over
+            out, mask, failed = domain.retract(Y, field)
+            assert mask.all(), (domain.key, field.key, over)
+            assert failed == 0, (domain.key, field.key, over, failed)
+            assert domain.contains(out).all(), (domain.key, field.key, over)
+            if field.key in ("state", "sublevel", "zero"):
+                # J n = 0, so the skew projection is the plain one
+                plain, _, _ = domain.retract(Y, ZeroField(d))
+                assert np.abs(out - plain).max() < 1e-10, (domain.key, field.key)
+
+    # gamma always points inward: n . (I + J) n = 1 for any skew J
+    N = rng.normal(size=(d, 64))
+    N /= np.sqrt((N * N).sum(axis=0))
+    for field in (ConstantField(d, 2.0), ball_axial_field(d, [5.0, 5.0, 5.0])):
+        gamma = N + field.apply(ball.radius * N, N)
+        assert np.abs((N * gamma).sum(axis=0) - 1.0).max() < 1e-12, field.key
+
+
+def test_lasso_anchor_majorises_and_its_clock_is_bounded():
+    X, y = _toy(n=150, d=3, seed=8)
+    target = ConstrainedLasso(X, y, lam=10.0, delta=0.1)
+    rng = np.random.default_rng(2)
+    W = rng.normal(size=(3, 64))
+    U, U0 = target.potential(W), target.anchor_potential(W)
+    assert (U0 >= U - 1e-10).all()
+    clock = target.clock(W)
+    assert np.allclose(clock, np.exp(U - U0))
+    assert (clock <= 1.0 + 1e-12).all()
+    assert (clock >= target.clock_floor - 1e-12).all()
+    assert abs(target.clock_floor - np.exp(-10.0 * 3 * 0.1)) < 1e-12
+
+    # the drift follows the anchor, so its gradient is the one that must be right
+    idx = np.arange(target.n)
+    G = target.anchor_grad(W[:, :4], idx)
+    eps = 1e-6
+    for j in range(3):
+        plus, minus = W[:, :4].copy(), W[:, :4].copy()
+        plus[j] += eps
+        minus[j] -= eps
+        fd = (target.anchor_potential(plus) - target.anchor_potential(minus)) / (2 * eps)
+        assert np.abs(G[j] - fd).max() < 1e-3 * max(1.0, np.abs(fd).max())
+
+
+def test_anchored_constrained_chains_hit_the_exact_lasso_reference():
+    """The invariant law has to be the kinked, constrained posterior for every ``J``.
+
+    The reference rejects proposals outside ``K`` and uses the exact ``|x|_1``,
+    so it carries no discretisation, projection, clock or mini-batch bias.  The
+    residual error is the projected scheme's, and it has to be the same for all
+    three fields -- a field that changed the invariant law would stand out.
+    """
+    X, y = _toy(n=200, d=3, seed=4)
+    data = {"X_train": X, "y_train": y, "X_test": X, "y_test": y}
+    lam = 10.0
+    target = ConstrainedLasso(X, y, lam=lam, delta=0.5 / lam)
+    domain = PaperBall(0.5, squared=True)
+    ref = constrained_lasso_reference(
+        target, domain, data, n_iter=40000, n_warmup=10000, seed=0
+    )
+    assert 0.1 < ref["acceptance"] < 0.5
+    metric = np.linalg.pinv(ref["posterior_cov"])
+    errors = {}
+    for field in (ZeroField(3), ConstantField(3, 1.0), ball_axial_field(3, 1.0)):
+        out = run_anchored_srnsgld(
+            target, field, domain, data, n_iter=20000, n_walkers=16, step_size=2e-4,
+            batch_size=len(y), seed=2, start_radius=0.3,
+            reference_mean=ref["posterior_mean"], reference_metric=metric,
+        )
+        assert out["failed_retractions"] == 0, field.key
+        assert out["boundary_rate"] > 0.05, field.key  # the constraint is active
+        assert 0.0 < out["clock"].mean() <= 1.0, field.key
+        errors[field.key] = out["mean_error"]
+        assert out["mean_error"] < 0.9, (field.key, out["mean_error"])
+    assert max(errors.values()) - min(errors.values()) < 0.3, errors
 
 
 if __name__ == "__main__":

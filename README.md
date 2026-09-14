@@ -40,6 +40,23 @@ a few per cent by how many pairs of directions each one couples.
 
 ![accuracy and log-loss, constrained d = 9](figures/srnsgld_accuracy_loss.png)
 
+**With a lasso in the potential and anchored Langevin to keep it exact: the
+rotation still pays, where the chain is slow enough for it to matter.**  The
+experiments of Section 3.3 of
+[arXiv:2506.07816](https://arxiv.org/abs/2506.07816) -- synthetic `d = 3`, MAGIC
+and Titanic in `d = 9`, a centred ball and a smoothed `l_p` sublevel set -- rerun
+with `lam |x|_1` added to the potential and the dynamics replaced by anchored
+Langevin composed with the paper's own skew fields, so the kinked target stays
+the invariant law and the chain never touches a subgradient.  On Titanic the
+constant `J_a` reaches the exact posterior's accuracy 4.5x to 4.7x sooner and
+the state-dependent `J_g` 1.8x sooner; on MAGIC the paper's step size is the
+binding constraint, not the field.  At the paper's own amplitudes, applied to
+the posterior it writes down, the state-dependent fields orbit the boundary and
+land at chance accuracy -- one scalar recalibration fixes it.
+[The paper's Section 3.3](#the-papers-section-33-with-a-lasso-and-anchored-langevin)
+
+![lasso, anchored, ball constraint](figures/anchored_srnsgld_ball.png)
+
 The four fields compared in the first two experiments:
 
 | variant | field | divergence correction |
@@ -940,6 +957,251 @@ gradient formula anywhere, and reproduces the Titanic numbers to four digits
 (0.1402 against 0.1400 for `J = 0`, 0.1349 against 0.1347 for the constant field
 at `rho = 1`).
 
+## The paper's Section 3.3, with a lasso and anchored Langevin
+
+[*Accelerating Constrained Sampling: A Large Deviations Approach*](https://arxiv.org/abs/2506.07816)
+(Wang, Tu, Wang and Zhu, arXiv:2506.07816v3) proves a large-deviations
+acceleration result for skew-reflected non-reversible Langevin dynamics and
+tests it in Section 3.3 on constrained Bayesian logistic regression -- synthetic
+data in `d = 3`, then MAGIC and Titanic in `d = 9` -- comparing projected SGLD
+(`J = 0`) against SRNSGLD with a constant `J_a` and with the state-dependent
+`J_s(x)` on a centred ball or `J_g(x)` on a smoothed `l_p` sublevel set.  All of
+those experiments are reproduced here with two changes, and nothing else:
+
+1. the potential gains a **lasso** term, so the target is not differentiable
+   where the posterior puts its mass;
+2. the dynamics become **anchored Langevin**, which is what makes the kinked
+   target the invariant law anyway, and keeping `J` makes them *non-reversible*
+   anchored Langevin.
+
+```
+U(x) = sum_j softplus(x . X_j) - y_j (x . X_j) + lam |x|_1,   x in K
+U_0(x) = the same likelihood + lam sum_j sqrt(x_j^2 + delta^2),   a(x) = exp(U(x) - U_0(x))
+```
+
+`U_0 >= U`, the difference is `lam sum_j (sqrt(x_j^2 + delta^2) - |x_j|)` in
+`[0, lam d delta]`, and one step of the composed scheme is
+
+```
+x_{k+1} = P^J_K( x_k - eta a(x_k) (I + J(x_k)) ghat_0(x_k) + sqrt(2 eta a(x_k)) xi_k ),
+```
+
+with `ghat_0` the mini-batch gradient of the *anchor* and `P^J_K` the paper's
+skew projection.  Why that is still exact: the base diffusion
+`-(I + J) grad U_0 + div J` with skew reflection along `gamma = (I + J)n` leaves
+`e^{-U_0} 1_K` invariant (the paper's own result, needing `div J = 0`);
+time-changing a diffusion at rate `a` leaves `p / a` invariant, and
+`e^{-U_0} / a = e^{-U}`; and a time change rescales drift and diffusion by the
+same positive scalar, so it does not touch the reflection direction.  So the
+invariant law is the lasso posterior restricted to `K`, for any `delta`, with no
+subgradient ever evaluated -- and the likelihood cancels in `U - U_0`, so the
+clock costs `O(d)`.
+
+### The fields, and which assumptions they satisfy
+
+The paper's three requirements on `J` are skew-symmetry, `div J = 0`, and
+`J(x) n(x) = 0` on the boundary -- the last is what turns the oblique boundary
+condition into a Neumann one.  Its two state-dependent constructions are
+block-diagonal, the `l`-th `3 x 3` block acting as `w -> k_l(x) x w`:
+
+| field | axial vector | `div J = 0` | `J n = 0` | reflection |
+|---|---|---|---|---|
+| `J_a` (3.1), `+a` superdiagonal, `-a` subdiagonal | -- | yes, constant | **no** | genuinely oblique |
+| `J_s(x)` (3.2), centred ball | `k_l = s_l x_{3l-2:3l}` | yes | yes | reduces to projection |
+| `J_g(x)` (3.14), sublevel set | `k_l = -s_l grad_l g` | yes | yes | reduces to projection |
+
+Both hold exactly in the implementation and are checked in
+[`tests/test_nds.py`](tests/test_nds.py) by finite-differencing the matrix field:
+`J_s(x) x = 0` for every `x`, and `J_g(x)` is parallel to `grad g(x)` blockwise,
+so `J_g(x) n(x) = 0` not only on `{g = lambda}` but everywhere.  `J_a n` is not
+zero -- for `d = 9`, `a = 2` its norm reaches 2.5 -- so `J_a` is the one field
+whose boundary push has to be solved obliquely, and the one that pays for it
+below.  For any skew `J`, `n . (I + J) n = 1`, so the push always points inward.
+
+### What had to be calibrated, and why
+
+Two things in the paper's setup do not survive contact with a lasso, and both
+are calibrated by a stated rule rather than tuned.
+
+**The lasso strength.**  `lam = 0.01 n_train` for all three problems: the
+largest value on the ladder `{0.01, 0.03, 0.1, 0.3} n_train` that keeps the
+constrained lasso MAP *on* the boundary of the ball -- a stronger lasso shrinks
+the posterior strictly inside the constraint set, and then the skew reflection
+the paper is about never happens -- while resolving the kink at the paper's step
+size (`eta lam <= 0.02`) and leaving the clock above 0.2.  The ladder is in
+[`results/anchored_lasso_calibration.md`](results/anchored_lasso_calibration.md).
+`delta = 0.5 / lam`, so the clock's worst case is `exp(-0.5 d)`, independent of
+`lam`.  That gives `lam` = 16, 152.2 and 7.13 and `delta` = 0.031, 0.0033 and
+0.070 on the synthetic set, MAGIC and Titanic.  The same `lam` is then used for
+the sublevel set, which is the larger of the two bodies, so there the MAP sits
+strictly inside and the boundary is reached only by the posterior's spread --
+17% of steps on MAGIC, 8% on the synthetic set, none at all on Titanic.
+
+**The rotation strength.**  The paper's `a` and `s` are dimensionless -- in
+`-(I + J) grad f` they say how large the rotational part of the drift is
+relative to the gradient part -- but its Section 3.2 defines `grad f` as the
+*mean* over data points while its Section 3.3 potential (3.11) is the *sum*.
+With the sum, which is the actual posterior and the only version a lasso term
+can be added to coherently, `E|grad U_0|` is about 6050 on MAGIC (and 304 on Titanic), so one
+step of the state-dependent field at `s = 5` moves
+`eta |J_s| E|grad U_0| = 2.5` -- more than the diameter of `K_{r=2}`, which is
+2.83.  The rule used here scales the paper's `a` and
+`s` together by one factor `kappa`, the largest with
+
+```
+eta kappa max(|J_a|, |J_s|) E|grad U_0| <= 0.1 r,
+```
+
+a tenth of the radius per step, measured on the initial ensemble.  That gives
+`kappa` = 0.13, 0.057 and 0.81 on the synthetic set, MAGIC and Titanic.  The
+paper's own amplitudes (`kappa = 1`) are reported alongside, and they do not
+work: the table below is why.
+
+### Results
+
+Exact references throughout are random-walk Metropolis chains that reject every
+proposal outside `K` and use `|x|_1` itself, so they carry no discretisation,
+projection, clock or mini-batch bias; their two halves agree to four digits.
+Accuracy is the paper's metric -- each walker's own parameter classifies the
+set, then mean and standard deviation across the 100 walkers.
+
+![ball constraint, calibrated amplitudes](figures/anchored_srnsgld_ball.png)
+
+![sublevel-set constraint, calibrated amplitudes](figures/anchored_srnsgld_lp.png)
+
+Full tables in
+[`results/summary_anchored_srnsgld.md`](results/summary_anchored_srnsgld.md).
+`band` is the first iteration whose mean test accuracy is within 0.005 of the
+exact posterior's; `error` is the whitened distance from the time-averaged mean
+to the exact posterior's mean, in units of its own standard deviations.
+
+| problem | set | exact test acc. | `J = 0` band / error | `J_a` band / error | `J_s` or `J_g` band / error |
+|---|---|---|---|---|---|
+| Synthetic `d` = 3 | ball | 0.7752 | 30 / 0.253 | 29 / 0.261 | 29 / 0.291 |
+| Synthetic `d` = 3 | sublevel | 0.7755 | 30 / 0.615 | 29 / 0.614 | 31 / 1.551 |
+| MAGIC | ball | 0.7910 | 13 / 21.5 | 13 / 21.5 | 13 / **21.3** |
+| MAGIC | sublevel | 0.7912 | 16 / 5.93 | 16 / 5.77 | 16 / **5.35** |
+| Titanic | ball | 0.7530 | 486 / **0.409** | **109** / 0.612 | 485 / 0.489 |
+| Titanic | sublevel | 0.7566 | 839 / 0.545 | **179** / **0.353** | 462 / 0.366 |
+
+Titanic is the only one of the three where the dynamics are slow enough for the
+question to have an answer: `n` is 713 rather than 15216, so the paper's
+`eta = 1e-4` is 20 times smaller relative to the gradient, and the chain takes
+hundreds of iterations to arrive.  There the constant field reaches the band
+**4.5x** faster on the ball and **4.7x** faster on the sublevel set, and the
+state-dependent `J_g` **1.8x** faster on the sublevel set.  On the sublevel set
+both fields also end up closer to the exact posterior mean (0.353 and 0.366
+against 0.545).  On the ball the constant field is the odd one out: it reaches
+the accuracy band 4.5 times sooner but its time-averaged mean is *worse* than
+the baseline's (0.612 against 0.409), and the reason is visible in the same run
+-- it is the only field whose boundary push is oblique, 77 of its 150000 pushes
+miss the sphere and fall back to a projection, and it sits on the boundary twice
+as often as the baseline.  On MAGIC and the synthetic set every field reaches
+the band within 30 iterations and the three are indistinguishable; the
+state-dependent field is slightly ahead of both others in posterior-mean error
+on MAGIC, which is the only trace of the paper's ordering that survives here.
+
+### The paper's own amplitudes
+
+![ball constraint, the paper's amplitudes](figures/anchored_srnsgld_ball_paper.png)
+
+At `kappa = 1` the rotational displacement per step is a multiple of the whole
+constraint set on the two larger problems, and the result is not a slower chain
+but a broken one:
+
+| problem | set | field | test accuracy | error | on boundary | pushes that missed |
+|---|---|---|---|---|---|---|
+| Synthetic | ball | `J_s`, `s` = 10 | 0.6365 | 26.0 | 98% | 0 |
+| Synthetic | sublevel | `J_g`, `s` = 10 | 0.4968 | 23.4 | 99% | 9239 |
+| MAGIC | ball | `J_a`, `a` = 2 | 0.7426 | 136.6 | 78% | 72303 |
+| MAGIC | ball | `J_s`, `s` = [5,5,5] | 0.5266 | 247.1 | 98% | 0 |
+| MAGIC | sublevel | `J_a`, `a` = 2 | 0.6782 | 33.2 | 68% | 58415 |
+| MAGIC | sublevel | `J_g`, `s` = [5,5,5] | 0.5391 | 47.2 | 100% | 32099 |
+| Titanic | ball | `J_a`, `a` = 3 | 0.7607 | 0.869 | 7% | 297 |
+| Titanic | sublevel | `J_g`, `s` = [2,7,2] | 0.7570 | 0.664 | 0.3% | 0 |
+
+The two failure modes are different and both are informative.  The constant
+field overshoots the boundary so far that the oblique ray misses it -- on 72303
+of MAGIC's 100000 walker steps, 93% of the pushes it had to make -- and degrades
+to a projection, which is exactly the
+`J n != 0` cost the paper's construction is designed to avoid.  The
+state-dependent fields never miss, because for them the skew projection *is* the
+plain projection, but being tangential they orbit: at `s = 5` they spend 98% of
+their steps outside `K_r` and circle the boundary instead of descending, and
+their accuracy sits at chance.  Titanic, whose gradient is twenty times smaller,
+is the one dataset where the paper's amplitudes are almost harmless -- and it is
+also the one where they help.
+
+### What the clock is worth
+
+Dropping the clock leaves a chain whose invariant law is the *smoothed* lasso,
+`e^{-U_0} 1_K`, not the lasso; keeping it costs mixing, since the effective step
+becomes `eta a(x)` with `a <= 1` (mean 0.31 to 0.90 in these runs).  So it earns
+its keep only where the two laws differ by more than the mixing costs, which is
+on the coordinates the lasso actually drives to zero
+([`results/anchored_clock_effect_lp.md`](results/anchored_clock_effect_lp.md)):
+
+| problem | field | error, anchored | error, anchor only | worst near-zero coordinate, anchored | anchor only |
+|---|---|---|---|---|---|
+| MAGIC (4 of 9 coords near zero) | `J = 0` | **5.93** | 6.42 | **0.0665** | 0.0708 |
+| MAGIC | `J_a` | **5.77** | 6.28 | **0.0637** | 0.0681 |
+| MAGIC | `J_g` | **5.35** | 5.50 | **0.0563** | 0.0566 |
+| Synthetic (0 near zero) | `J = 0` | **0.615** | 0.711 | -- | -- |
+| Titanic (0 near zero) | `J_a` | **0.353** | 0.558 | -- | -- |
+
+The clock helps in eight of the nine field-by-problem comparisons, by 8-15% on
+MAGIC where four coordinates sit at the kink, and the exception (`J = 0` on
+Titanic, 0.545 against 0.377) is a problem with no near-zero coordinate at all,
+where there is nothing for it to correct and only mixing to lose.  Pushing
+`delta` up makes the correction larger and the chain worse: at `lam delta = 4`
+on a `d = 3` toy the clock's floor is `exp(-12)` and walkers that wander to the
+origin stop moving for the rest of the run.  That is the trade-off the
+`delta = 0.5 / lam` rule is set by, and it is the same one the
+[unconstrained lasso section](#the-target-the-anchor-u_0-and-the-clock) hits.
+
+### How much of the remaining gap is the step size
+
+All of these chains are unadjusted, so they are biased at the paper's `eta`.
+Holding the total simulated time `eta k` fixed and shrinking `eta`
+([`results/anchored_step_bias_ball.md`](results/anchored_step_bias_ball.md)):
+
+| problem | `eta` | iterations | whitened error |
+|---|---|---|---|
+| Titanic | 1e-4 | 1500 | 0.409 |
+| Titanic | 2.5e-5 | 6000 | 0.412 |
+| Titanic | 6.25e-6 | 24000 | 0.319 |
+| MAGIC | 1e-4 | 1000 | 21.5 |
+| MAGIC | 2.5e-5 | 4000 | 6.32 |
+| MAGIC | 6.25e-6 | 16000 | 1.39 |
+
+Titanic is essentially converged at the paper's step size; MAGIC is not, and its
+error falls roughly like `eta`.  This is why MAGIC's accuracy curves plateau
+0.017 below the exact posterior's while its posterior mean is 21 standard
+deviations out: with `n = 15216` the posterior's own standard deviation is about
+0.03 and `eta E|grad U_0|` is 0.6, so one step crosses the whole posterior
+twenty times over.  Titanic's plateau gap is 0.002 and its `eta E|grad U_0|` is
+0.03.  Accuracy cannot see that, which is worth knowing before
+reading any accuracy figure in this setting -- including the paper's.
+
+### Caveats specific to this section
+
+* The paper does not state the coefficient vector its synthetic data is
+  generated from; `beta = [1, -0.7, 0]` is used, the first two coordinates from
+  its Section 3.2 and the third set to zero so that one feature is genuinely
+  irrelevant and the lasso has something to find.
+* The Titanic features here are the nine standardised, intercept-free ones of
+  [`nds.data.load_nine`](nds/data.py); with those, the paper's sublevel set
+  (`p` = 2.4, `eps` = 0.18, `lambda` = 4) does not bind at all -- the exact
+  posterior mean has `|x|` = 1.47 and `g` well under 4 -- so that row is a
+  comparison of non-reversibility in the interior, with the reflection idle.
+* One split, one seed and one `kappa` per problem; the accuracy bands are across
+  walkers, which covers walker noise but not the split or the seed.
+* `lam` is chosen to keep the constraint active, which caps how much the lasso
+  can bite: on the ball only MAGIC reaches a near-zero coordinate, and only on
+  the sublevel set does it reach four.  A stronger lasso makes the anchored
+  machinery matter more and the constrained machinery matter less, and
+  `--lam-scale` moves along that trade-off.
+
 ## Datasets
 
 | dataset | n (train/test) | d | source |
@@ -1009,6 +1271,20 @@ python3 experiments/srnsgld_spectrum.py             # predicted rate gain vs mea
 python3 experiments/srnsgld_seeds.py                # the same comparison over six seeds
 python3 experiments/run_srnsgld.py --frame eigen    # the pairing that did not help
 python3 experiments/run_srnsgld.py --grad fd --tag-suffix _fd   # derivative free
+```
+
+The lasso-regularised, anchored version of the paper's Section 3.3
+([The paper's Section 3.3](#the-papers-section-33-with-a-lasso-and-anchored-langevin)):
+
+```bash
+python3 experiments/calibrate_anchored_lasso.py       # the lasso-strength ladder
+python3 experiments/run_anchored_srnsgld.py           # calibrated amplitudes, ~25 min,
+                                                     # most of it the six references
+python3 experiments/run_anchored_srnsgld.py --amp-scale 1.0 --tag-suffix _paper
+python3 experiments/run_anchored_srnsgld.py --domains lp --no-clock --tag-suffix _noclock
+python3 experiments/plot_anchored_srnsgld.py         # the four figures and the tables
+python3 experiments/anchored_clock_effect.py         # what the clock is worth
+python3 experiments/anchored_step_bias.py            # how much of the gap is the step size
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they
@@ -1099,6 +1375,7 @@ nds/skew.py        J = 0, constant, radial and directional fields, and their div
 nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
 nds/anchored.py    the l1 target, its smooth anchor, anchored Langevin, an exact reference
 nds/constrained.py constrained target, ball with skew reflection, J_a and block-diagonal J_s
+nds/anchored_constrained.py  the paper's fields and constraint sets, lasso target, anchored SRNSGLD
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference

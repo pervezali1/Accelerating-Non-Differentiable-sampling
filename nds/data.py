@@ -131,7 +131,7 @@ def _split(
     )
 
 
-def load_titanic(seed: int = 0, intercept: bool = True) -> Dataset:
+def load_titanic(seed: int = 0, intercept: bool = True, test_fraction: float = 0.3) -> Dataset:
     """Titanic survival: 891 passengers, 9 engineered features."""
     import pandas as pd
 
@@ -152,10 +152,12 @@ def load_titanic(seed: int = 0, intercept: bool = True) -> Dataset:
         "embarked_Q": (embarked == "Q").astype(float),
     }
     X = np.column_stack([v.to_numpy() for v in columns.values()])
-    return _split("titanic", X, y, list(columns), seed=seed, intercept=intercept)
+    return _split("titanic", X, y, list(columns), seed=seed, intercept=intercept,
+                  test_fraction=test_fraction)
 
 
-def load_magic(seed: int = 0, intercept: bool = True, drop: tuple = ()) -> Dataset:
+def load_magic(seed: int = 0, intercept: bool = True, drop: tuple = (),
+               test_fraction: float = 0.3) -> Dataset:
     """MAGIC Gamma Telescope: 19020 events, gamma (1) versus hadron (0)."""
     import pandas as pd
 
@@ -167,7 +169,8 @@ def load_magic(seed: int = 0, intercept: bool = True, drop: tuple = ()) -> Datas
     y = (df["class"] == "g").to_numpy().astype(float)
     kept = [c for c in names[:-1] if c not in drop]
     X = df[kept].to_numpy(dtype=float)
-    return _split("magic", X, y, kept, seed=seed, intercept=intercept)
+    return _split("magic", X, y, kept, seed=seed, intercept=intercept,
+                  test_fraction=test_fraction)
 
 
 def load_breast_cancer(seed: int = 0) -> Dataset:
@@ -229,11 +232,11 @@ def load(name: str, seed: int = 0) -> Dataset:
 NINE_DROP = {"titanic": (), "magic": ("fConc1",)}
 
 
-def load_nine(name: str, seed: int = 0) -> Dataset:
+def load_nine(name: str, seed: int = 0, test_fraction: float = 0.3) -> Dataset:
     """Load ``name`` reduced to exactly nine standardised features, no intercept."""
     if name not in NINE_DROP:
         raise KeyError(f"no d = 9 preprocessing for {name!r}; have {sorted(NINE_DROP)}")
-    kwargs = {"intercept": False}
+    kwargs = {"intercept": False, "test_fraction": test_fraction}
     if NINE_DROP[name]:
         kwargs["drop"] = NINE_DROP[name]
     ds = LOADERS[name](seed=seed, **kwargs)

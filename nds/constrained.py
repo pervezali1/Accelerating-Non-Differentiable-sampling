@@ -122,19 +122,27 @@ class BlockHatField:
     label = "state-dependent $J_s$ (SRNSGLD)"
     key = "state"
 
-    def __init__(self, d: int, amplitude: float = 1.0) -> None:
+    def __init__(self, d: int, amplitude=1.0) -> None:
         if d % 3:
             raise ValueError(f"block hat field needs d divisible by 3, got {d}")
         self.d = d
         self.n_blocks = d // 3
-        self.amplitude = float(amplitude)
+        # a scalar applies to every block; a sequence gives each block its own
+        # s_1, ..., s_m, which is how the d = 9 experiments state it
+        arr = np.atleast_1d(np.asarray(amplitude, dtype=float)).ravel()
+        if arr.size == 1:
+            arr = np.repeat(arr, self.n_blocks)
+        if arr.size != self.n_blocks:
+            raise ValueError(f"expected 1 or {self.n_blocks} amplitudes, got {arr.size}")
+        self.amplitudes = arr
+        self.amplitude = float(arr[0]) if np.allclose(arr, arr[0]) else float(arr.mean())
 
     def apply(self, W: np.ndarray, G: np.ndarray) -> np.ndarray:
         out = np.empty_like(G)
         for b in range(self.n_blocks):
             s = slice(3 * b, 3 * b + 3)
             # J(z) g = a (g x z), cross products taken down the coordinate axis
-            out[s] = self.amplitude * np.cross(G[s].T, W[s].T).T
+            out[s] = self.amplitudes[b] * np.cross(G[s].T, W[s].T).T
         return out
 
     def divergence(self, W: np.ndarray) -> np.ndarray:
@@ -146,7 +154,7 @@ class BlockHatField:
         J = np.zeros((self.d, self.d))
         for b in range(self.n_blocks):
             u, v, w = x[3 * b : 3 * b + 3]
-            J[3 * b : 3 * b + 3, 3 * b : 3 * b + 3] = self.amplitude * np.array(
+            J[3 * b : 3 * b + 3, 3 * b : 3 * b + 3] = self.amplitudes[b] * np.array(
                 [[0.0, w, -v], [-w, 0.0, u], [v, -u, 0.0]]
             )
         return J
