@@ -73,6 +73,8 @@ from __future__ import annotations
 import numpy as np
 
 __all__ = [
+    "curl",
+    "assert_gradient_field",
     "SkewField",
     "ConstantSkew",
     "RadialModulated",
@@ -171,6 +173,62 @@ class RadialModulated(SkewField):
         return dpsi[:, None] * (gq @ self.J0.T)
 
 
+def curl(vector_field, x, h=1e-5):
+    r"""``(curl a)_k = eps_kij d_i a_j`` at each row of ``x``, by central differences.
+
+    This is the whole content of the divergence-free claim for the curl family:
+    for ``J(x)v = a(x) x v`` the matrix is ``J_ik = eps_ijk a_j``, so
+
+        (div J)_k = sum_i d_i J_ik = eps_ijk d_i a_j = (curl a)_k
+
+    and ``div J`` vanishes exactly when ``a`` is curl free -- in particular
+    whenever ``a = grad f``, since the Hessian is symmetric and ``eps`` is not.
+    """
+    x = np.atleast_2d(np.asarray(x, dtype=np.float64))
+    out = np.zeros_like(x)
+    d = np.zeros((x.shape[0], 3, 3))                 # d[:, i, j] = d_i a_j
+    for i in range(3):
+        step = np.zeros(3)
+        step[i] = h
+        d[:, i, :] = (np.atleast_2d(vector_field(x + step))
+                      - np.atleast_2d(vector_field(x - step))) / (2 * h)
+    out[:, 0] = d[:, 1, 2] - d[:, 2, 1]
+    out[:, 1] = d[:, 2, 0] - d[:, 0, 2]
+    out[:, 2] = d[:, 0, 1] - d[:, 1, 0]
+    return out, d
+
+
+def assert_gradient_field(vector_field, d=3, scale=1.0, n=24, tol=1e-4, seed=0):
+    """Raise unless ``vector_field`` is curl free, i.e. really is some ``grad f``.
+
+    A curl-family skew field is divergence free *because* its generating vector
+    field is a gradient.  Nothing in the type system enforces that, and a
+    non-gradient passed by mistake gives a sampler that silently fails to
+    preserve the target -- the kind of error that shows up as a wrong answer
+    rather than an exception.  So check it, cheaply, once, at construction.
+
+    The tolerance is relative to the size of the field's own Jacobian, so it is
+    free of the units of ``f``, and loose enough for the central difference's
+    truncation error.
+    """
+    if d != 3:
+        return
+    rng = np.random.default_rng(seed)
+    pts = scale * rng.standard_normal((n, 3))
+    c, jac = curl(vector_field, pts)
+    ref = np.abs(jac).max()
+    if ref == 0.0:
+        return                                        # the zero field
+    rel = np.abs(c).max() / ref
+    if rel > tol:
+        raise ValueError(
+            f"the generating field is not a gradient: |curl a| / |grad a| = "
+            f"{rel:.3g} > {tol:g}. A curl-family J(x)v = a(x) x v is divergence "
+            f"free only when a = grad f; with a non-gradient a the sampler does "
+            f"not preserve the target unless the correction term is used."
+        )
+
+
 class CurlSkew(SkewField):
     r"""``J(x) v = v x grad f(x)`` in ``d = 3``.
 
@@ -178,9 +236,11 @@ class CurlSkew(SkewField):
     must map ``(n, 3) -> (n, 3)``.
     """
 
-    def __init__(self, grad_f, d=3):
+    def __init__(self, grad_f, d=3, verify=True, verify_scale=1.0):
         if d != 3:
             raise ValueError("CurlSkew as written is the d = 3 cross-product form")
+        if verify:
+            assert_gradient_field(grad_f, d=3, scale=verify_scale)
         self.grad_f = grad_f
         self.d = 3
 
@@ -189,6 +249,11 @@ class CurlSkew(SkewField):
         return np.cross(np.atleast_2d(v), self.grad_f(x))
 
     def divergence(self, x, h=None):
+        """Identically zero -- but only because ``grad_f`` is a gradient.
+
+        That is a *precondition*, not something computed here, which is why the
+        constructor checks it.  See :func:`assert_gradient_field`.
+        """
         return np.zeros_like(np.atleast_2d(x))
 
 

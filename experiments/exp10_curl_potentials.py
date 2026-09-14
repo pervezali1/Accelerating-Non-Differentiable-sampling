@@ -77,11 +77,21 @@ PCTS = np.array([0.5, 0.7, 0.9])
 
 
 class GradCurl(sf.SkewField):
-    """``J(x) v = grad f(x) x v`` -- divergence free for every ``f``."""
+    r"""``J(x) v = grad f(x) x v`` -- divergence free for every ``f``.
+
+    For ``J(x)v = a(x) x v`` the matrix is ``J_ik = eps_ijk a_j``, so
+    ``(div J)_k = eps_ijk d_i a_j = (curl a)_k``: the field is divergence free
+    exactly when ``a`` is curl free, and ``a = grad f`` always is.  That is a
+    precondition on the callable, not something ``divergence`` computes, so the
+    constructor checks it -- a non-gradient ``grad_f`` would otherwise give a
+    sampler that quietly fails to preserve the target.
+    """
 
     is_constant = False
 
-    def __init__(self, grad_f):
+    def __init__(self, grad_f, verify=True, verify_scale=1.0):
+        if verify:
+            sf.assert_gradient_field(grad_f, d=3, scale=verify_scale)
         self.grad_f = grad_f
         self.d = 3
 

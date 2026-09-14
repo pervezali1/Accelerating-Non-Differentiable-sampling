@@ -262,6 +262,50 @@ Euler — and that, not the extra conserved quantity, is now the main reason the
 best of them trails. Splitting the exponential reversible part from an explicit
 skew part would give them the same benefit; that is not implemented here.
 
+## 3b3. Why the curl family is divergence free, and what has to be checked
+
+For a field of the form $J(x)v = a(x)\times v$ the matrix is
+$J_{ik} = \varepsilon_{ijk}a_j$, so
+
+$$(\operatorname{div}J)_k = \sum_i \partial_i J_{ik}
+  = \varepsilon_{ijk}\,\partial_i a_j = (\operatorname{curl}a)_k .$$
+
+**div $J$ is the curl of the generating vector field.** It vanishes exactly
+when $a$ is curl free, and $a = \nabla f$ always is: writing it out,
+$(\operatorname{curl}\nabla f)_k = \varepsilon_{kij}H_{ij} = 0$ because
+$\varepsilon$ is antisymmetric in $(i,j)$ while the Hessian $H$ is symmetric.
+
+That is why every member of this family needs no correction term, with no
+condition on $f$, on $M$, on the strength, or on the target:
+
+| field | generator $a$ | potential $f$ |
+|---|---|---|
+| constant $J_a$ | $v$ | $\langle v, x\rangle$ |
+| $J_s$ (cross product) | $s\,x$ | $s\|x\|^2/2$ |
+| $J_M$ | $Mx$, $M$ symmetric | $x^\top Mx/2$ |
+| improved $J_s$ | $sMx/\sqrt{r^2+x^\top Mx}$ | $s\sqrt{r^2 + x^\top Mx}$ |
+
+For the improved field the Hessian is
+$H = s\big[M/\sqrt{u} - (Mx)(Mx)^\top/u^{3/2}\big]$ with $u = r^2 + x^\top Mx$,
+manifestly symmetric, so $\operatorname{div}J = 0$ identically. Measured: the
+analytic Hessian's asymmetry is $0$ to the last bit, and $|\operatorname{div}J|$
+by complex-step differentiation — which has no truncation error at all — is
+$7\times10^{-15}$ against a field of size $30$, i.e. machine precision. A
+central difference reports $\sim10^{-9}$ on the same field, and that number is
+the difference scheme's error, not the field's.
+
+$M$ must be symmetric, since only the symmetric part of a general $M$ is a
+gradient; and the saturating form additionally needs $M \succeq 0$ and $r > 0$,
+or the radicand goes negative and $\nabla f$ is NaN.
+
+**The check that has to exist.** `divergence()` returns zero for these classes,
+but that is a *precondition* on the generator, not a computation — a
+non-gradient $a$ passed by mistake gives a sampler that quietly fails to
+preserve the target, which surfaces as a wrong answer rather than an exception.
+`skewfield.assert_gradient_field` now runs at construction and rejects one;
+`skewfield.curl` exposes the underlying quantity. On a skew generator $a = Ax$
+the check returns $|\operatorname{curl}a|/|\nabla a| = 2$ and raises.
+
 ## 3c. Two ways to fool yourself, both of which we did
 
 The first version of the table above reported the hyperbolic potential at

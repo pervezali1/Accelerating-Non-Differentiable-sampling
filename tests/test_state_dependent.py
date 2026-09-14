@@ -250,6 +250,76 @@ def test_strong_field_preserves_the_target_under_expm():
     assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
 
 
+def test_curl_family_divergence_is_the_curl_of_its_generator():
+    """div J = curl a for J(x)v = a(x) x v, so a gradient generator gives zero.
+
+    Checked on the improved J_s -- a = grad of s sqrt(r^2 + x'Mx) -- against a
+    directly differentiated div J, and on a deliberately non-gradient generator
+    which must NOT come out zero.
+    """
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    V, ev = t.Sigma_evecs, t.Sigma_evals
+    o = np.argsort(ev)
+    B = V[:, o]
+    aa = 1.0 / ev[o]
+    M = B @ np.diag([aa[0], 0.0, aa[2]]) @ B.T
+    M /= np.linalg.norm(M, 2)
+
+    def grad_f(x, s=30.0, r=0.03):
+        u = np.sqrt(r * r + np.einsum('ni,ij,nj->n', x, M, x))
+        return s * (x @ M.T) / u[:, None]
+
+    x = t.sample(200, np.random.default_rng(0))
+
+    # div J straight from the matrix, independently of the curl identity
+    fld = sf.CurlSkew(grad_f)
+    h = 1e-5
+    div = np.zeros_like(x)
+    for i in range(3):
+        step = np.zeros(3)
+        step[i] = h
+        div += (fld.matrix_at(x + step)[:, i, :] - fld.matrix_at(x - step)[:, i, :]) / (2 * h)
+    scale = np.abs(fld.matrix_at(x)).max()
+    assert np.abs(div).max() / scale < 1e-6, np.abs(div).max() / scale
+
+    # and via the identity
+    c, jac = sf.curl(grad_f, x)
+    assert np.abs(c).max() / np.abs(jac).max() < 1e-6
+
+    # a generator that is not a gradient must be rejected, not silently accepted
+    A = np.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    try:
+        sf.CurlSkew(lambda z: z @ A.T)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a non-gradient generator was accepted")
+
+
+def test_improved_js_preserves_the_target():
+    """The improved J_s at its measured best, started at stationarity."""
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    V, ev = t.Sigma_evecs, t.Sigma_evals
+    o = np.argsort(ev)
+    B = V[:, o]
+    aa = 1.0 / ev[o]
+    M = B @ np.diag([aa[0], 0.0, aa[2]]) @ B.T
+    M /= np.linalg.norm(M, 2)
+
+    def grad_f(x, s=30.0, r=0.03):
+        u = np.sqrt(r * r + np.einsum('ni,ij,nj->n', x, M, x))
+        return s * (x @ M.T) / u[:, None]
+
+    fld = sf.CurlSkew(grad_f)
+    x0 = t.sample(200_000, np.random.default_rng(5))
+    truth = np.diag(t.cov())
+    step = samplers.field_anchored_step(t, 6.28e-4, fld, "euler")
+    res = samplers.simulate(step, x0, 600, np.random.default_rng(6))
+    assert res.diverged_at is None
+    got = res.final_state.var(axis=0)
+    assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
+
+
 def test_stream_quadrupole_rewrite_matches_the_stream_form():
     """c = delta e^{U-U0} J0 [F grad U0 - grad F]  is  e^U J0 grad Phi."""
     t = anisotropic_student_t(2, 5.0, 100.0)
