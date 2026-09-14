@@ -65,6 +65,7 @@ GENERIC = {
     "constant": r"constant $J_a$  (anchored SRNSGLD)",
     "state": r"state-dependent $J_s(x)$  (anchored SRNSGLD)",
     "sublevel": r"state-dependent $J_g(x)$  (anchored SRNSGLD)",
+    "tilted": r"tilted $J_\psi(x)$  (anchored SRNSGLD)",
 }
 
 
@@ -88,16 +89,25 @@ def band_iteration(A: np.ndarray, ref: float, tol: float = 0.005):
     return int(hit[0]) + 1 if len(hit) else None
 
 
+def legend_label(meta: dict, key: str) -> str:
+    if key == "state" and meta.get("tilt", 0.0):
+        return GENERIC["tilted"]
+    return GENERIC[key]
+
+
 def panel(ax, run: dict, split: str, window: int, zoom: bool) -> None:
     meta, traces = run["meta"], run["traces"]
     frame(ax)
     ref = meta["reference"][f"accuracy_{split}"]
+    at = traces.get("scored_at", None)
     curves, bands = {}, []
     for row in meta["runs"]:
         key = row["key"]
         A = smooth(traces[f"{key}_accuracy_{split}"], window)
         curves[key] = A
         b = band_iteration(A.mean(axis=1), ref)
+        if b is not None and at is not None:
+            b = int(at[min(b - 1, len(at) - 1)])
         bands.append(b if b is not None else meta["n_iter"])
 
     xmax = meta["n_iter"]
@@ -106,10 +116,12 @@ def panel(ax, run: dict, split: str, window: int, zoom: bool) -> None:
     lo_hi = []
     for row in meta["runs"]:
         key = row["key"]
-        A = curves[key][:xmax]
+        at = traces.get("scored_at", np.arange(1, len(curves[key]) + 1))
+        keep = at <= xmax
+        A = curves[key][keep]
         mean, sd = A.mean(axis=1), A.std(axis=1)
-        x = np.arange(1, len(mean) + 1)
-        ax.plot(x, mean, label=GENERIC[key], zorder=4, **STYLE[key])
+        x = at[keep]
+        ax.plot(x, mean, label=legend_label(meta, key), zorder=4, **STYLE[key])
         ax.fill_between(x, mean - sd, mean + sd, color=STYLE[key]["color"], alpha=0.16, lw=0)
         lo_hi += [mean - sd, mean + sd]
     ax.axhline(ref, color=INK, ls=(0, (5, 3)), lw=1.2, zorder=6)
@@ -126,9 +138,11 @@ def panel(ax, run: dict, split: str, window: int, zoom: bool) -> None:
     )
     amp = meta["amplitudes"]
     s_txt = ", ".join(f"{v:g}" for v in np.round(amp["s"], 3))
+    tilt = meta.get("tilt", 0.0)
+    tilt_txt = f",  $c$ = {tilt:g}" if tilt else ""
     ax.annotate(
         f"dashed: exact constrained lasso posterior, {ref:.4f}\n"
-        f"$a$ = {amp['a']:.3g},  $s$ = [{s_txt}]",
+        f"$a$ = {amp['a']:.3g},  $s$ = [{s_txt}]{tilt_txt}",
         xy=(0.98, 0.04), xycoords="axes fraction", ha="right", va="bottom",
         fontsize=8, color=MUTED, zorder=8,
     )
@@ -155,6 +169,52 @@ def figure(runs: list, domain: str, out: str, title: str, window: int = 1,
     print("wrote", out)
 
 
+def gap_figure(runs: list, out: str, title: str, window: int) -> None:
+    """The same runs on log axes: distance to the exact posterior, two ways.
+
+    Top row: ``|mean test accuracy - exact|``, which is what the paper plots,
+    read as a gap so that a factor of two is visible.  Bottom row: the whitened
+    distance from the running mean to the exact posterior's mean, which keeps
+    resolving after the accuracy has saturated.
+    """
+    fig, axes = plt.subplots(
+        2, len(runs), figsize=(5.2 * len(runs), 7.0), squeeze=False, layout="constrained"
+    )
+    for col, run in enumerate(runs):
+        meta, traces = run["meta"], run["traces"]
+        at = traces.get("scored_at", None)
+        ref = meta["reference"]["accuracy_test"]
+        for row in range(2):
+            ax = axes[row][col]
+            frame(ax)
+            for r in meta["runs"]:
+                key = r["key"]
+                if row == 0:
+                    y = np.abs(smooth(traces[f"{key}_accuracy_test"], window).mean(axis=1) - ref)
+                    x = at if at is not None else np.arange(1, len(y) + 1)
+                else:
+                    y = traces[f"{key}_running_error"]
+                    x = at if at is not None else np.arange(1, len(y) + 1)
+                ax.plot(x, np.maximum(y, 1e-6), label=legend_label(meta, key),
+                        zorder=4, **STYLE[key])
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlabel("iterations $k$", color=INK, fontsize=10)
+            ax.set_ylabel(
+                "gap to exact test accuracy" if row == 0
+                else "whitened error of the running mean",
+                color=INK, fontsize=10,
+            )
+            if row == 0:
+                ax.set_title(f"{meta['pretty']}", color=INK, fontsize=11, pad=6)
+    handles, labels = axes[0][0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="outside lower center", ncols=3, frameon=False, fontsize=9)
+    fig.suptitle(title, fontsize=13, color=INK)
+    fig.savefig(out, dpi=200)
+    plt.close(fig)
+    print("wrote", out)
+
+
 def write_summary(all_runs: dict, out: str) -> None:
     lines = [
         "# Lasso-regularised constrained sampling, anchored Langevin",
@@ -171,7 +231,11 @@ def write_summary(all_runs: dict, out: str) -> None:
     for (domain, suffix), runs in all_runs.items():
         if not runs:
             continue
-        which = "the paper's own amplitudes" if suffix == "_paper" else "calibrated amplitudes"
+        which = {
+            "_paper": "the paper's own amplitudes",
+            "_tuned": "amplitudes tuned by the sweep",
+            "_noclock": "no clock",
+        }.get(suffix, "calibrated amplitudes")
         lines += [f"## {DOMAIN_TITLE[domain]}, {which}", ""]
         for run in runs:
             meta, traces = run["meta"], run["traces"]
@@ -184,7 +248,13 @@ def write_summary(all_runs: dict, out: str) -> None:
                 f"(= {meta['lam_scale']:.3g} `n`), `delta` = {meta['delta']:.4g}, "
                 f"`eta` = {meta['step_size']:.0e}, batch = {meta['batch_size']}, "
                 f"{meta['n_iter']} iterations, {meta['n_walkers']} walkers, "
-                f"amplitude scale {meta['amp_scale']:.4g}.",
+                + (
+                    f"amplitude scales {meta['amp_scale']['constant']:.4g} "
+                    f"(constant) and {meta['amp_scale']['state']:.4g} (state), "
+                    f"tilt {meta.get('tilt', 0.0):g}."
+                    if isinstance(meta["amp_scale"], dict)
+                    else f"amplitude scale {meta['amp_scale']:.4g}."
+                ),
                 "",
                 f"Exact reference: train {meta['reference']['accuracy_train']:.4f}, "
                 f"test {ref:.4f} (halves "
@@ -218,6 +288,9 @@ def main() -> None:
     parser.add_argument("--problems", nargs="+", default=["synthetic", "magic", "titanic"])
     parser.add_argument("--domains", nargs="+", default=["ball", "lp"])
     parser.add_argument("--suffixes", nargs="+", default=["", "_paper"])
+    parser.add_argument("--summary", default="summary_anchored_srnsgld.md")
+    parser.add_argument("--gap", action="store_true",
+                        help="also draw the log-log distance-to-the-posterior figure")
     parser.add_argument("--smooth", type=int, default=15,
                         help="moving average over iterations, for readability")
     parser.add_argument("--no-zoom", action="store_true",
@@ -233,9 +306,11 @@ def main() -> None:
             all_runs[(domain, suffix)] = runs
             if not runs:
                 continue
-            which = (
-                "the paper's amplitudes" if suffix == "_paper" else "calibrated amplitudes"
-            )
+            which = {
+                "_paper": "the paper's amplitudes",
+                "_tuned": "amplitudes tuned by the sweep",
+                "_noclock": "no clock",
+            }.get(suffix, "calibrated amplitudes")
             figure(
                 runs, domain,
                 os.path.join(FIGURES, f"anchored_srnsgld_{domain}{suffix}.png"),
@@ -243,7 +318,13 @@ def main() -> None:
                 f"{DOMAIN_TITLE[domain]}, {which}",
                 args.smooth, not args.no_zoom,
             )
-    write_summary(all_runs, os.path.join(RESULTS, "summary_anchored_srnsgld.md"))
+            if args.gap:
+                gap_figure(
+                    runs, os.path.join(FIGURES, f"anchored_srnsgld_{domain}{suffix}_gap.png"),
+                    f"Distance to the exact constrained lasso posterior\n"
+                    f"{DOMAIN_TITLE[domain]}, {which}", args.smooth,
+                )
+    write_summary(all_runs, os.path.join(RESULTS, args.summary))
 
 
 if __name__ == "__main__":

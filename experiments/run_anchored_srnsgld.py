@@ -43,9 +43,11 @@ from nds.anchored_constrained import (  # noqa: E402
     SmoothedLpBall,
     ZeroField,
     ball_axial_field,
+    outward_tilt_direction,
     reference_constrained_rwm,
     run_anchored_srnsgld,
     sublevel_axial_field,
+    tilted_axial_field,
 )
 from nds.data import load_nine  # noqa: E402
 
@@ -187,18 +189,36 @@ def build(problem: str, domain_key: str, args) -> tuple:
             target, domain, dcfg, args.step_size or cfg["step_size"],
             cfg["n_walkers"], args.start_radius, args.rotation_budget, args.seed,
         )
-    a = dcfg["a"] * kappa
-    s_amp = (np.atleast_1d(np.asarray(dcfg["s"], float)) * kappa).tolist()
+    # per-field overrides, so a tuned pair can be run without touching the rest
+    kappa_a = args.amp_scale_constant if args.amp_scale_constant is not None else kappa
+    kappa_s = args.amp_scale_state if args.amp_scale_state is not None else kappa
+    a = dcfg["a"] * kappa_a
+    s_amp = (np.atleast_1d(np.asarray(dcfg["s"], float)) * kappa_s).tolist()
     fields = [ZeroField(d), ConstantField(d, a)]
     fields[0].label = r"$J = 0$ (anchored PSGLD)"
-    fields[1].label = rf"constant $J_a$, $a$ = {a:g}"
-    if domain_key == "ball":
+    fields[1].label = rf"constant $J_a$, $a$ = {a:.3g}"
+    name = "J_s" if domain_key == "ball" else "J_g"
+    if args.tilt:
+        direction = outward_tilt_direction(
+            target, domain, start_radius=args.start_radius, seed=args.seed
+        )
+        state = tilted_axial_field(
+            d, s_amp, domain, direction, args.tilt,
+            p=2.0 if domain_key == "ball" else dcfg["p"],
+            eps=0.0 if domain_key == "ball" else dcfg["eps"],
+        )
+        state.label = (
+            rf"tilted ${name}(x)$, $s$ = {[round(v, 3) for v in s_amp]}, "
+            rf"$c$ = {args.tilt:g}"
+        )
+    elif domain_key == "ball":
         state = ball_axial_field(d, s_amp)
-        state.label = rf"state-dependent $J_s(x)$, $s$ = {[round(v, 4) for v in s_amp]}"
+        state.label = rf"state-dependent $J_s(x)$, $s$ = {[round(v, 3) for v in s_amp]}"
     else:
         state = sublevel_axial_field(d, s_amp, dcfg["p"], dcfg["eps"])
-        state.label = rf"state-dependent $J_g(x)$, $s$ = {[round(v, 4) for v in s_amp]}"
+        state.label = rf"state-dependent $J_g(x)$, $s$ = {[round(v, 3) for v in s_amp]}"
     fields.append(state)
+    kappa = {"constant": kappa_a, "state": kappa_s}
     return cfg, dcfg, data, domain, target, fields, kappa
 
 
@@ -233,7 +253,8 @@ def run(problem: str, domain_key: str, args) -> dict:
         f"n_test={len(data['y_test'])} {domain.key} lam={target.lam:.3g} "
         f"delta={target.delta:.4g} clock floor {target.clock_floor:.3g} "
         f"eta={eta:.1e} batch={cfg['batch']} iters={n_iter} walkers={cfg['n_walkers']} "
-        f"eta*lam={eta * target.lam:.4f} kappa={kappa:.4g}",
+        f"eta*lam={eta * target.lam:.4f} "
+        f"kappa={kappa['constant']:.4g}/{kappa['state']:.4g} tilt={args.tilt:g}",
         flush=True,
     )
     ref = reference(problem, domain_key, target, domain, data, args)
@@ -247,6 +268,7 @@ def run(problem: str, domain_key: str, args) -> dict:
             n_walkers=cfg["n_walkers"], step_size=eta, batch_size=cfg["batch"],
             seed=args.seed, start_radius=args.start_radius, anchored=not args.no_clock,
             reference_mean=ref_mean, reference_metric=ref_metric,
+            score_every=args.score_every,
         )
         runs.append(out)
         print(
@@ -263,7 +285,8 @@ def run(problem: str, domain_key: str, args) -> dict:
     np.savez_compressed(
         os.path.join(RESULTS, f"traces_anchored_{tag}.npz"),
         **{f"{r['key']}_{k}": r[k] for r in runs
-           for k in ("accuracy_train", "accuracy_test", "clock")},
+           for k in ("accuracy_train", "accuracy_test", "clock", "running_error")},
+        scored_at=runs[0]["scored_at"],
         **{f"{r['key']}_posterior_mean": r["posterior_mean"] for r in runs},
     )
     meta = {
@@ -282,12 +305,16 @@ def run(problem: str, domain_key: str, args) -> dict:
         "eta_lam": eta * target.lam,
         "batch_size": cfg["batch"],
         "n_iter": int(n_iter),
+        "score_every": args.score_every,
         "n_walkers": cfg["n_walkers"],
         "start_radius": args.start_radius,
         "anchored": not args.no_clock,
-        "amp_scale": float(kappa),
-        "amplitudes": {"a": dcfg["a"] * kappa,
-                       "s": (np.atleast_1d(np.asarray(dcfg["s"], float)) * kappa).tolist()},
+        "amp_scale": kappa,
+        "tilt": args.tilt,
+        "amplitudes": {
+            "a": dcfg["a"] * kappa["constant"],
+            "s": (np.atleast_1d(np.asarray(dcfg["s"], float)) * kappa["state"]).tolist(),
+        },
         "operator_norms": field_operator_norms(dcfg, target.d, getattr(domain, "radius", 1.0)),
         "reference": {
             "accuracy_train": float(ref["accuracy_train"]),
@@ -343,7 +370,17 @@ def main() -> None:
                              "step's rotational displacement is at most --rotation-budget "
                              "times the radius")
     parser.add_argument("--rotation-budget", type=float, default=0.1)
+    parser.add_argument("--amp-scale-constant", type=float, default=None,
+                        help="override --amp-scale for the constant field only")
+    parser.add_argument("--amp-scale-state", type=float, default=None,
+                        help="override --amp-scale for the state-dependent field only")
+    parser.add_argument("--tilt", type=float, default=0.0,
+                        help="non-radial h in the paper's recipe, h = 1 + c (u . x), with "
+                             "u the closed-form outward direction; 0 is the paper's h = 1")
     parser.add_argument("--n-iter", type=int, default=None)
+    parser.add_argument("--score-every", type=int, default=1,
+                        help="score accuracy every k iterations; the figures read this, "
+                             "so keep it small unless the runs are long")
     parser.add_argument("--step-size", type=float, default=None)
     parser.add_argument("--start-radius", type=float, default=1.0,
                         help="walkers start uniform on the centred ball of this radius")

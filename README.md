@@ -47,12 +47,15 @@ experiments of Section 3.3 of
 and Titanic in `d = 9`, a centred ball and a smoothed `l_p` sublevel set -- rerun
 with `lam |x|_1` added to the potential and the dynamics replaced by anchored
 Langevin composed with the paper's own skew fields, so the kinked target stays
-the invariant law and the chain never touches a subgradient.  On Titanic the
-constant `J_a` reaches the exact posterior's accuracy 4.5x to 4.7x sooner and
-the state-dependent `J_g` 1.8x sooner; on MAGIC the paper's step size is the
-binding constraint, not the field.  At the paper's own amplitudes, applied to
-the posterior it writes down, the state-dependent fields orbit the boundary and
-land at chance accuracy -- one scalar recalibration fixes it.
+the invariant law and the chain never touches a subgradient.  At the right
+amplitude **both** fields reach the exact posterior's accuracy in fewer
+iterations than `J = 0` on four of the six problem-and-constraint pairs -- 1.2x
+to 4.5x, with no loss of stationary accuracy.  The state-dependent field needs
+one change to manage it on a *ball*, and the reason is a two-line calculation:
+the paper's choice of a radial `h` makes `J(x) x = 0` everywhere, not just on
+the boundary, which freezes the radial drift exactly -- and on these posteriors
+the radial direction is the stiff one.  The paper's own recipe allows a
+non-radial `h`, which keeps all three of its assumptions and frees the radius.
 [The paper's Section 3.3](#the-papers-section-33-with-a-lasso-and-anchored-langevin)
 
 ![lasso, anchored, ball constraint](figures/anchored_srnsgld_ball.png)
@@ -1183,6 +1186,133 @@ twenty times over.  Titanic's plateau gap is 0.002 and its `eta E|grad U_0|` is
 0.03.  Accuracy cannot see that, which is worth knowing before
 reading any accuracy figure in this setting -- including the paper's.
 
+### Making both fields beat `J = 0`
+
+The amplitudes above come from one conservative a-priori rule, which says nothing
+about whether they are any *good*.  Sweeping them
+([`experiments/sweep_anchored.py`](experiments/sweep_anchored.py), several walker
+seeds shared across fields) answers two different questions, and the answers are
+not the same: the constant field beats `J = 0` at the right amplitude on every
+problem where the accuracy metric has room to move, and the paper's
+state-dependent field **cannot** beat it on a centred ball at any amplitude, for
+a reason that is a two-line calculation rather than a tuning failure.
+
+#### Why no amplitude can help, on a ball
+
+Assumption 2 of the paper is `J(x) n(x) = 0` on the boundary.  On a centred ball
+its construction meets that with the axial vector `k = s x`, and then
+`J_s(x) x = 0` holds not only on the boundary but *everywhere*, so
+
+```
+d|x|^2 / dt  =  -2 x . (I + J_s(x)) grad U  =  -2 x . grad U,
+```
+
+identically, at every point and for every amplitude.  The field cannot change
+the radial motion at all.  Measured over a run, the mean radius of the
+state-dependent chain tracks the baseline's to three digits (0.799, 0.816, 0.910
+at iterations 50, 100, 200, against the baseline's 0.799, 0.816, 0.912) while the
+constant field is already at 1.312 by iteration 200.
+
+That is fatal on these problems because the radial direction is *the* stiff one:
+the constrained lasso posterior's smallest-standard-deviation eigenvector has
+`|cos|` = 0.963 with `x*/|x*|` -- the ball's boundary is what pins it -- and
+decomposing the error along the reference posterior's eigendirections shows the
+transient is entirely that component: 20.5 standard deviations at iteration 50
+and still 3.5 at 1500, against 0.3 and 0.4 for the two *slowest* directions,
+which are converged from the start.  So the whole convergence story on a ball is
+radial, and Assumption 2 with a radial `h` hands that direction to the kernel of
+`J`.  The same degeneracy hits `J_g` exactly at `p = 2`, where `grad g` is
+parallel to `x`, and not for other `p` -- which is why the paper's `J_g` at
+`p = 2.4` does beat the baseline on the sublevel set without any modification.
+Both statements are checked in
+[`tests/test_nds.py`](tests/test_nds.py).
+
+#### The fix is in the paper's own recipe
+
+Its general construction (2.3) is `psi = (level - g) h` with `k = grad psi` and
+`h` *any* function that does not vanish on the boundary; the two fields it uses
+take `h = 1`, and it suggests `h = 1 + |x|^2`.  Both are radial, which is
+exactly the degenerate choice.  Take instead
+
+```
+h(x) = 1 + c (u . x),      k(x) = -h(x) grad g(x) + (level - g(x)) c u.
+```
+
+On the boundary the second term vanishes, so `k` is still parallel to the
+normal and Assumption 2 holds; `k` is still a gradient, so `div J = 0` holds;
+and inside, `k` is no longer parallel to `x`, so the radial motion is free
+again.  At large `c` it becomes a rotation about `u` that switches itself off at
+the boundary -- the opposite of the paper's fields, and the right way round for
+a cold start that has to travel outward.
+
+`u` is not a free parameter either.  The tilt's contribution to the radial drift
+is `-2 (level - g) c s  u . E[grad U x x]`, which is *linear* in `u`, so the unit
+vector that maximises the mean outward push is
+`u* = -normalise(E[grad U x x])` blockwise -- one pilot evaluation on the
+initial ensemble, no search.  On Titanic it scores +3.51 against +3.02 for the
+best of 2000 random directions, +0.34 for the MAP direction and **-1.11** for
+the slowest Hessian eigenvector, which would have pushed the walkers the wrong
+way.
+
+#### What the sweep picks, and what it buys
+
+[`experiments/select_anchored.py`](experiments/select_anchored.py) chooses, for
+each field, the amplitude with the fewest iterations to the accuracy band among
+those that do not lose stationary accuracy (final whitened error within one
+standard error of the baseline's) and do not fall back on a missed boundary push
+(under 0.1%).  Full table in
+[`results/anchored_selected_amplitudes.md`](results/anchored_selected_amplitudes.md);
+`kappa` multiplies the paper's own `a` and `s`, `c` is the tilt.
+
+| problem | set | `eta` | field | `kappa` | `c` | iterations to band | speed-up | error |
+|---|---|---|---|---|---|---|---|---|
+| Titanic | ball | 1e-4 | `J = 0` | -- | -- | 388 +/- 68 | 1.00x | 0.518 +/- 0.062 |
+| Titanic | ball | 1e-4 | `J_a` | 0.6 | -- | **136 +/- 2** | **2.85x** | 0.538 +/- 0.047 |
+| Titanic | ball | 1e-4 | `J_psi` | 0.3 | 3 | **185 +/- 20** | **2.10x** | **0.495 +/- 0.025** |
+| Titanic | sublevel | 1e-4 | `J = 0` | -- | -- | 737 +/- 58 | 1.00x | 0.582 +/- 0.051 |
+| Titanic | sublevel | 1e-4 | `J_a` | 1 | -- | **163 +/- 9** | **4.52x** | **0.418 +/- 0.037** |
+| Titanic | sublevel | 1e-4 | `J_psi` | 0.3 | 3 | **367 +/- 12** | **2.01x** | **0.441 +/- 0.045** |
+| Synthetic | ball | 6.25e-6 | `J = 0` | -- | -- | 513 +/- 20 | 1.00x | 0.094 +/- 0.018 |
+| Synthetic | ball | 6.25e-6 | `J_a` | 1 | -- | **401 +/- 0** | **1.28x** | **0.057 +/- 0.015** |
+| Synthetic | ball | 6.25e-6 | `J_psi` | 0.1 | 1 | **401 +/- 0** | **1.28x** | **0.077 +/- 0.015** |
+| Synthetic | sublevel | 6.25e-6 | `J = 0` | -- | -- | 561 +/- 36 | 1.00x | 0.078 +/- 0.025 |
+| Synthetic | sublevel | 6.25e-6 | `J_a` | 1 | -- | **401 +/- 0** | **1.47x** | 0.077 +/- 0.042 |
+| Synthetic | sublevel | 6.25e-6 | `J_psi` | 0.1 | 2 | **481 +/- 0** | **1.17x** | 0.084 +/- 0.020 |
+
+On both Titanic constraint sets and both synthetic ones, **both** fields now
+reach the exact posterior's accuracy in fewer iterations than `J = 0` without
+giving up any stationary accuracy -- 1.17x to 4.52x, and the two that improve
+most improve the posterior-mean error as well.  The state-dependent field needs
+`c > 0` on the ball, for the reason above; on the sublevel set it wins with the
+paper's own `c = 0` too, just by less (521 against 737, 1.41x).
+
+![tuned amplitudes, ball](figures/anchored_srnsgld_ball_tuned.png)
+
+![tuned amplitudes, distance to the exact posterior, sublevel set](figures/anchored_srnsgld_lp_tuned_gap.png)
+
+Two settings had to change to get here, and both are worth naming.  The sweep is
+over the amplitude, which the paper leaves free; and on the synthetic problem the
+step size has to come down from `1e-4` to `6.25e-6`, because at the paper's step
+every field reaches the accuracy ceiling within 30 iterations and there is
+nothing left to win -- the same reduction that
+[the bias ladder](#how-much-of-the-remaining-gap-is-the-step-size) shows is
+needed for the chain to resolve the posterior at all.
+
+#### MAGIC is the exception
+
+On MAGIC no amplitude of either field clears the bar.  The band improves -- 294
+to 214 iterations at `kappa` = 0.3 for both fields on the ball, a 1.37x speed-up
+-- but the stationary error grows with it, from 1.42 to 2.0-2.5 standard
+deviations, and at amplitudes small enough to leave the error alone
+(`kappa` = 0.03) the band does not move.  The transient error does improve for
+both fields (9.31 to 8.36 for `J_a`, to 6.87 for the tilted field, a quarter of
+the way into the run), so the rotation is doing something; it just cannot be
+collected without paying discretisation bias.  MAGIC is the problem where the
+posterior is smallest relative to the constraint set -- standard deviation 0.03
+in a ball of radius 1.41 -- so the run is a long drift-dominated descent with
+little diffusive mixing for a rotation to improve, and the unadjusted step is
+what limits the answer.
+
 ### Caveats specific to this section
 
 * The paper does not state the coefficient vector its synthetic data is
@@ -1194,8 +1324,15 @@ reading any accuracy figure in this setting -- including the paper's.
   (`p` = 2.4, `eps` = 0.18, `lambda` = 4) does not bind at all -- the exact
   posterior mean has `|x|` = 1.47 and `g` well under 4 -- so that row is a
   comparison of non-reversibility in the interior, with the reflection idle.
-* One split, one seed and one `kappa` per problem; the accuracy bands are across
-  walkers, which covers walker noise but not the split or the seed.
+* One split and one `kappa` per problem; the accuracy bands are across walkers,
+  which covers walker noise but not the split.  The sweeps use three to five
+  walker seeds, shared across fields, and quote standard errors over them.
+* The tuned amplitudes are selected on the same runs they are reported on, with
+  a stated rule and a guard against trading stationary accuracy, but they are
+  still selected: the honest reading of the speed-up table is "the best this
+  family can do here", not an out-of-sample number.  The amplitude ladder is
+  coarse (factors of two to three), and the band is resolved only to the
+  scoring interval, which is `n_iter / 200`.
 * `lam` is chosen to keep the constraint active, which caps how much the lasso
   can bite: on the ball only MAGIC reaches a near-zero coordinate, and only on
   the sublevel set does it reach four.  A stronger lasso makes the anchored
@@ -1285,6 +1422,19 @@ python3 experiments/run_anchored_srnsgld.py --domains lp --no-clock --tag-suffix
 python3 experiments/plot_anchored_srnsgld.py         # the four figures and the tables
 python3 experiments/anchored_clock_effect.py         # what the clock is worth
 python3 experiments/anchored_step_bias.py            # how much of the gap is the step size
+```
+
+Making both fields beat `J = 0`
+([Making both fields beat `J = 0`](#making-both-fields-beat-j--0)):
+
+```bash
+python3 experiments/sweep_anchored.py --problem titanic --domain ball \
+    --tilts 0.0 1.0 3.0 --seeds 0 1 2 3 4        # one sweep per problem and set
+python3 experiments/select_anchored.py           # the amplitude each field wants
+python3 experiments/run_anchored_srnsgld.py --problems titanic --domains ball \
+    --amp-scale-constant 0.3 --amp-scale-state 0.3 --tilt 3.0 --tag-suffix _tuned
+python3 experiments/plot_anchored_srnsgld.py --suffixes _tuned --gap \
+    --summary summary_anchored_srnsgld_tuned.md
 ```
 
 The unpreconditioned robustness check, whose outputs are suffixed so that they

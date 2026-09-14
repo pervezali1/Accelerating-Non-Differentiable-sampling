@@ -13,6 +13,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from nds.anchored_constrained import (  # noqa: E402
+    outward_tilt_direction,
+    tilted_axial_field,
     Ball as PaperBall,
     LassoLogistic as ConstrainedLasso,
     SmoothedLpBall,
@@ -546,6 +548,93 @@ def test_anchored_constrained_chains_hit_the_exact_lasso_reference():
         errors[field.key] = out["mean_error"]
         assert out["mean_error"] < 0.9, (field.key, out["mean_error"])
     assert max(errors.values()) - min(errors.values()) < 0.3, errors
+
+
+def test_assumption_two_with_a_radial_h_freezes_the_radial_drift():
+    r"""The degeneracy that makes the paper's ``J_s`` powerless on a ball.
+
+    Its axial vector is ``k = s x``, so ``J_s(x) x = 0`` *everywhere*, not only
+    on the boundary, and then ``x . (I + J) grad U = x . grad U`` identically:
+    the field cannot change ``d|x|^2/dt`` at any point, for any amplitude.  The
+    same degeneracy hits ``J_g`` exactly at ``p = 2``, where ``grad g`` is
+    parallel to ``x``, and not for other ``p``.
+    """
+    rng = np.random.default_rng(3)
+    d = 9
+    X, G = rng.normal(size=(d, 128)), rng.normal(size=(d, 128))
+
+    frozen = [
+        ball_axial_field(d, [5.0, 5.0, 5.0]),
+        sublevel_axial_field(d, [5.0, 5.0, 5.0], 2.0, 0.2),  # p = 2: same degeneracy
+    ]
+    for field in frozen:
+        assert np.abs((X * field.apply(X, G)).sum(axis=0)).max() < 1e-10, field.key
+        assert np.abs(field.apply(X, X)).max() < 1e-10, field.key
+
+    free = [
+        ConstantField(d, 2.0),
+        sublevel_axial_field(d, [5.0, 5.0, 5.0], 2.4, 0.2),  # p != 2: not parallel to x
+    ]
+    for field in free:
+        assert np.abs((X * field.apply(X, G)).sum(axis=0)).max() > 1.0, field.key
+
+    # and J_g still leaves g itself alone, which is the assumption it is built for
+    lp = SmoothedLpBall(2.4, 0.2, 4.0)
+    Jg = sublevel_axial_field(d, [5.0, 5.0, 5.0], 2.4, 0.2)
+    assert np.abs((lp.grad_g(X) * Jg.apply(X, G)).sum(axis=0)).max() < 1e-9
+
+
+def test_tilted_field_keeps_the_assumptions_and_unfreezes_the_radius():
+    """The paper's own recipe with a non-radial ``h``: same assumptions, free radius."""
+    rng = np.random.default_rng(4)
+    d = 9
+    ball, lp = PaperBall(2.0, squared=True), SmoothedLpBall(2.4, 0.2, 4.0)
+    u = rng.normal(size=d)
+    for domain, p, eps in ((ball, 2.0, 0.0), (lp, 2.4, 0.2)):
+        for tilt in (0.0, 2.0):
+            field = tilted_axial_field(d, [1.0, 1.0, 1.0], domain, u, tilt, p=p, eps=eps)
+            x = rng.normal(size=d)
+            J = field.matrix(x)
+            assert np.abs(J + J.T).max() < 1e-12, (domain.key, tilt)
+            assert np.abs(_numeric_divergence(field, x)).max() < 1e-6, (domain.key, tilt)
+            # Assumption 2 survives the tilt, because (level - g) vanishes there
+            B = rng.normal(size=(d, 64))
+            B = domain._shrink(B * 3.0) if hasattr(domain, "_shrink") else B * (
+                domain.radius / np.sqrt((B * B).sum(axis=0))
+            )
+            assert np.abs(field.apply(B, domain.normal(B))).max() < 1e-9, (domain.key, tilt)
+            # but inside, the tilt is exactly what frees the radial motion
+            Y = 0.5 * B
+            G = rng.normal(size=(d, 64))
+            radial = np.abs((Y * field.apply(Y, G)).sum(axis=0)).max()
+            if domain.key == "ball" and tilt == 0.0:
+                assert radial < 1e-10
+            elif tilt > 0.0:
+                assert radial > 0.1, (domain.key, tilt, radial)
+
+
+def test_outward_tilt_direction_beats_every_direction_tried():
+    """The closed form is the maximiser, not a heuristic."""
+    X, y = _toy(n=200, d=9, seed=11)
+    target = ConstrainedLasso(X, y, lam=10.0, delta=0.05)
+    domain = PaperBall(2.0, squared=True)
+    u_star = outward_tilt_direction(target, domain, n_walkers=500, seed=0)
+    assert abs(np.linalg.norm(u_star) - 1.0) < 1e-12
+
+    rng = np.random.default_rng(0)
+    W = domain.uniform(target.d, 500, rng, radius=1.0)
+    G = target.anchor_grad(W, np.arange(target.n))
+    c = np.concatenate([
+        np.cross(G[3 * b : 3 * b + 3].T, W[3 * b : 3 * b + 3].T).mean(axis=0)
+        for b in range(target.d // 3)
+    ])
+
+    def push(u):
+        return -2.0 * float(np.dot(u / np.linalg.norm(u), c))
+
+    best_random = max(push(rng.normal(size=target.d)) for _ in range(300))
+    assert push(u_star) > best_random
+    assert push(u_star) > 0.0 > push(-u_star)
 
 
 if __name__ == "__main__":

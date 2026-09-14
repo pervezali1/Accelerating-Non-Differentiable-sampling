@@ -95,6 +95,8 @@ class AxialBlockField:
         self.amplitudes = np.repeat(arr, self.n_blocks) if arr.size == 1 else arr
         if self.amplitudes.size != self.n_blocks:
             raise ValueError(f"expected 1 or {self.n_blocks} amplitudes")
+        # a scalar stand-in, for the wrappers and the summaries
+        self.amplitude = float(self.amplitudes.mean())
 
     def axial(self, W: np.ndarray) -> np.ndarray:
         return self._axial(W)
@@ -144,6 +146,102 @@ def sublevel_axial_field(d: int, s, p: float, eps: float) -> AxialBlockField:
 
     field._axial = axial
     return field
+
+
+def tilted_axial_field(
+    d: int, s, domain, direction, tilt: float, p: float = 2.0, eps: float = 0.0
+) -> AxialBlockField:
+    r"""The paper's recipe (2.3) with a **non-radial** ``h``.
+
+    The paper builds its state-dependent fields from a scalar potential
+    ``psi = (level - g) h`` with ``h`` any function that does not vanish on the
+    boundary, and takes the axial vector to be ``k = grad psi`` restricted to
+    each coordinate triple.  On the boundary ``grad psi = -h grad g`` is
+    parallel to the normal, which is Assumption 2, and ``k`` being a gradient
+    gives Assumption 3 for free.  The two fields the paper actually uses take
+    ``h = 1``; it also suggests ``h = 1 + |x|^2``.
+
+    Both of those are *radial*, and for the ball that is a degeneracy worth
+    naming: with ``g = |x|^2`` and a radial ``h``, ``k`` is parallel to ``x``
+    everywhere, so ``J(x) x = 0`` everywhere, not only on the boundary, and then
+
+        d|x|^2 / dt = -2 x . (I + J(x)) grad U = -2 x . grad U
+
+    exactly -- the field cannot change the radial motion at any point of the
+    space, for any amplitude.  A cold start inside the ball whose posterior
+    hugs the boundary has to travel outward, and no such field can help it.
+
+    Taking ``h(x) = 1 + tilt (u . x)`` keeps both assumptions -- on the boundary
+    the second term of
+
+        k = -h(x) grad g(x) + (level - g(x)) tilt u
+
+    vanishes, so ``k`` is still parallel to the normal there -- while making
+    ``k`` non-parallel to ``x`` inside, so the field does act on the radial
+    motion.  At large ``tilt`` it becomes a rotation about ``u`` that switches
+    itself off at the boundary, which is the opposite of the paper's fields.
+
+    ``p = 2, eps = 0`` gives the ball (``g = |x|^2``, ``level = r^2``); other
+    ``p`` and ``eps`` give the smoothed ``l_p`` sublevel set.
+    """
+    u = np.asarray(direction, float).reshape(d, 1)
+    u = u / max(np.linalg.norm(u), 1e-300)
+    tilt = float(tilt)
+    level = domain.radius**2 if p == 2.0 and eps == 0.0 else domain.level
+
+    def g_and_grad(W):
+        if p == 2.0 and eps == 0.0:
+            return (W * W).sum(axis=0, keepdims=True), 2.0 * W
+        base = W * W + eps * eps
+        return (
+            (base ** (0.5 * p)).sum(axis=0, keepdims=True),
+            p * W * base ** (0.5 * p - 1.0),
+        )
+
+    field = AxialBlockField(
+        d, None, label=r"tilted $J_\psi(x)$", key="state", amplitude=s
+    )
+    scale = np.repeat(field.amplitudes, 3)[:, None]
+
+    def axial(W):
+        g, grad_g = g_and_grad(W)
+        h = 1.0 + tilt * (u * W).sum(axis=0, keepdims=True)
+        return scale * (-h * grad_g + (level - g) * tilt * u)
+
+    field._axial = axial
+    field.tilt = tilt
+    field.direction = u.ravel()
+    return field
+
+
+def outward_tilt_direction(
+    target, domain, n_walkers: int = 2000, start_radius: float = 1.0, seed: int = 0
+) -> np.ndarray:
+    r"""The tilt direction that pushes hardest *outward*, in closed form.
+
+    For the tilted field the rotational part of the radial drift is
+
+        d|x|^2/dt |_J  =  -2 x . (k x grad U)  =  -2 k . (grad U x x),
+
+    and the tilt contributes ``k = (level - g) tilt s u``, so the mean radial
+    push over an ensemble is *linear* in ``u``: it is
+    ``-2 (level - g) tilt s  u . E[grad U x x]`` blockwise.  The unit ``u`` that
+    maximises it is therefore
+    ``u* = -normalise(E[grad U x x])``, one pilot evaluation, no search.  The
+    sign is the one that drives ``|x|`` outward, which is the direction a start
+    inside a boundary-hugging posterior has to travel.
+    """
+    rng = np.random.default_rng(seed)
+    W = domain.uniform(target.d, n_walkers, rng, radius=start_radius)
+    G = target.anchor_grad(W, np.arange(target.n))
+    blocks = [
+        np.cross(G[3 * b : 3 * b + 3].T, W[3 * b : 3 * b + 3].T).mean(axis=0)
+        for b in range(target.d // 3)
+    ]
+    c = np.concatenate(blocks)
+    if target.d % 3:
+        c = np.concatenate([c, np.zeros(target.d % 3)])
+    return -c / max(np.linalg.norm(c), 1e-300)
 
 
 # -------------------------------------------------------------------- domains
@@ -287,6 +385,59 @@ class SmoothedLpBall:
         return np.concatenate(cols, axis=1)[:, :m]
 
 
+def constrained_lasso_map(target, domain, n_iter: int = 4000) -> np.ndarray:
+    """The constrained MAP of the smooth anchor, by projected gradient descent."""
+    L = 0.25 * np.linalg.eigvalsh(target.X.T @ target.X).max() + target.lam / target.delta
+    idx = np.arange(target.n)
+    w = np.zeros((target.d, 1))
+    zero = ZeroField(target.d)
+    for _ in range(n_iter):
+        w = domain.retract(w - target.anchor_grad(w, idx) / L, zero)[0]
+    return w.ravel()
+
+
+def anchor_hessian(target, x: np.ndarray) -> np.ndarray:
+    r"""Hessian of the anchor at ``x``: likelihood plus the smoothed penalty.
+
+    The penalty's second derivative is
+    ``lam delta^2 (x_j^2 + delta^2)^{-3/2}``, which is ``lam / delta`` at a
+    coordinate sitting at the kink -- so on a coordinate the lasso has driven to
+    zero the anchor is very stiff, and that is where the slow and fast
+    directions of these posteriors come from.
+    """
+    x = np.asarray(x, float).reshape(target.d, 1)
+    p = _sigmoid(target.X @ x).ravel()
+    H = target.X.T @ (target.X * (p * (1.0 - p))[:, None])
+    smooth = target.lam * target.delta**2 / (x.ravel() ** 2 + target.delta**2) ** 1.5
+    return H + np.diag(smooth)
+
+
+def curvature_blocks(target, domain) -> np.ndarray:
+    r"""Permutation grouping each ``3``-block around one slow and one fast axis.
+
+    Which coordinates share a block is a modelling choice: the paper's ``J_s``
+    takes them in column order, but a permutation ``P`` is an orthogonal change
+    of frame, and ``P J(P^T x) P^T`` is still skew, still divergence free, still
+    annihilates ``x`` -- and a centred ball is ``P``-invariant, so the boundary
+    condition is untouched.  A skew term can only move relaxation rate between
+    the directions it couples, so a block holding three slow coordinates has
+    nothing to trade.  Coordinates are sorted by the anchor's curvature at the
+    constrained MAP and dealt out one slow, one fast, one middling per block.
+    """
+    x_star = constrained_lasso_map(target, domain)
+    h = np.diag(anchor_hessian(target, x_star))
+    order = np.argsort(h)  # ascending: slow first
+    d = len(order)
+    k = d // 3
+    slow, mid, fast = order[:k], order[k : 2 * k], order[2 * k :][::-1]
+    perm = np.concatenate([[slow[b], fast[b], mid[b]] for b in range(k)])
+    if d % 3:  # leftover coordinates keep their place at the end
+        perm = np.concatenate([perm, order[3 * k :]])
+    P = np.zeros((d, d))
+    P[perm, np.arange(d)] = 1.0  # columns of P are the new basis vectors
+    return P
+
+
 # -------------------------------------------------------------------- targets
 class LassoLogistic:
     r"""``U(x) = NLL(x) + lam |x|_1`` with the smooth anchor and its clock.
@@ -353,6 +504,16 @@ def per_walker_accuracy(W: np.ndarray, X: np.ndarray, y: np.ndarray) -> np.ndarr
     return ((P > 0.5) * yc + (P < 0.5) * (1.0 - yc) + (P == 0.5) * 0.5).mean(axis=0)
 
 
+def _whitened(mean: np.ndarray, ref: np.ndarray | None, metric: np.ndarray | None) -> float:
+    """Distance from ``ref``, in units of the reference posterior's own spread."""
+    if ref is None:
+        return float("nan")
+    diff = mean - np.asarray(ref, float)
+    if metric is None:
+        return float(np.linalg.norm(diff))
+    return float(np.sqrt(max(diff @ (metric @ diff), 0.0)))
+
+
 # -------------------------------------------------------------------- sampler
 def run_anchored_srnsgld(
     target: LassoLogistic,
@@ -369,6 +530,7 @@ def run_anchored_srnsgld(
     reference_mean: np.ndarray | None = None,
     reference_metric: np.ndarray | None = None,
     burn_in: float = 0.5,
+    score_every: int = 1,
 ) -> dict:
     r"""Anchored SRNSGLD / PSGLD on a constrained lasso posterior.
 
@@ -386,14 +548,23 @@ def run_anchored_srnsgld(
     d = target.d
     W = domain.uniform(d, n_walkers, rng, radius=start_radius)
 
-    acc_train = np.empty((n_iter, n_walkers))
-    acc_test = np.empty((n_iter, n_walkers))
-    potential = np.empty((n_iter, n_walkers))
-    clocks = np.empty(n_iter)
+    scored = np.arange(0, n_iter, max(score_every, 1))
+    if scored[-1] != n_iter - 1:
+        scored = np.append(scored, n_iter - 1)
+    is_scored = np.zeros(n_iter, dtype=bool)
+    is_scored[scored] = True
+    acc_train = np.empty((len(scored), n_walkers))
+    acc_test = np.empty((len(scored), n_walkers))
+    potential = np.empty((len(scored), n_walkers))
+    clocks = np.empty(len(scored))
+    running_error = np.empty(len(scored))
+    slot = 0
     hits = 0
     failed = 0
     w_sum = np.zeros(d)
     n_kept = 0
+    run_sum = np.zeros(d)
+    run_kept = 0
     first_kept = int(burn_in * n_iter)
 
     for t in range(n_iter):
@@ -413,21 +584,24 @@ def run_anchored_srnsgld(
         if t >= first_kept:  # a time average over the second half of the run
             w_sum += W.sum(axis=1)
             n_kept += n_walkers
-        acc_train[t] = per_walker_accuracy(W, data["X_train"], data["y_train"])
-        acc_test[t] = per_walker_accuracy(W, data["X_test"], data["y_test"])
-        potential[t] = target.potential(W)
-        clocks[t] = float(np.mean(target.clock(W)))
+        run_sum += W.sum(axis=1)  # and one from the first iteration, for the trace
+        run_kept += n_walkers
+        if not is_scored[t]:
+            continue
+        acc_train[slot] = per_walker_accuracy(W, data["X_train"], data["y_train"])
+        acc_test[slot] = per_walker_accuracy(W, data["X_test"], data["y_test"])
+        potential[slot] = target.potential(W)
+        clocks[slot] = float(np.mean(target.clock(W)))
+        running_error[slot] = _whitened(
+            run_sum / run_kept, reference_mean, reference_metric
+        )
+        slot += 1
 
     time_mean = w_sum / max(n_kept, 1)
-    mean_error = float("nan")
-    if reference_mean is not None:
-        diff = time_mean - np.asarray(reference_mean, float)
-        mean_error = float(
-            np.sqrt(diff @ (reference_metric @ diff))
-            if reference_metric is not None
-            else np.linalg.norm(diff)
-        )
+    mean_error = _whitened(time_mean, reference_mean, reference_metric)
     return {
+        "scored_at": scored + 1,
+        "running_error": running_error,
         "label": field.label,
         "key": field.key,
         "time_mean": time_mean,
