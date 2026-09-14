@@ -482,6 +482,65 @@ def fig_curl_potentials(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig11_curl_potentials_{mode}.png")))
 
 
+# ------------------------------------------------------------------ fig 12
+
+
+def fig_three_fields(mode):
+    """d = 3, three fields: J = 0, a constant J_a, and the cross-product J_s."""
+    path = os.path.join(DATA, "exp12_three_fields.json")
+    if not os.path.exists(path):
+        print("  skip: exp12_three_fields.json not found")
+        return
+    b = runner.load_json(path)
+    floor = b["floor"]
+    pretty = {"zero": "$J = 0$",
+              "const": "$J_a$,  $a = 4$   (constant)",
+              "cross": "$J_s$,  $s = 4$   (state dependent)"}
+    p = plotting.use_style(mode)
+    fig, ax = plt.subplots(figsize=(6.8, 4.7))
+    base = next(r["iters"] for r in b["rows"] if r["key"] == "zero")
+    for i, r in enumerate(b["rows"]):
+        colour = p["categorical"][i % len(p["categorical"])]
+        it = np.asarray(r["rec"], dtype=float)
+        it[0] = max(it[1] * 0.5, 0.5)
+        w = np.asarray(r["w2"], dtype=float)
+        lab = pretty[r["key"]]
+        if r["iters"] > 0:
+            lab += f"    $\\bf{{{r['iters']:d}}}$ it,  {base / r['iters']:.2f}$\\times$"
+        else:
+            lab += f"    not reached in {b['steps']:d}"
+        ax.plot(it, w, color=colour, lw=1.9, label=lab, zorder=3 - 0.1 * i)
+        if r["iters"] > 0:
+            j = int(np.argmin(np.abs(it - r["iters"])))
+            ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
+                    markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
+    ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
+    ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+    ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
+                textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                va="bottom")
+    ax.annotate("measurement floor", xy=(ax.get_xlim()[0], floor * 0.76), xytext=(6, 0),
+                textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                ha="left", va="center")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("sliced 2-Wasserstein distance")
+    ax.set_title("Anchored Langevin on a heavy-tailed $d=3$ Student-t "
+                 "($\\nu=6$, $\\kappa=100$)", loc="left")
+    etas = {r["key"]: r["eta"] for r in b["rows"]}
+    ax.text(0.008, 0.02,
+            "equal stationary accuracy, so each field runs at its own stepsize:\n"
+            f"$\\eta$ = {etas['zero']:.2e},  {etas['const']:.2e},  {etas['cross']:.2e}"
+            f"     ($J_s$ at $s=4$ is stable but "
+            f"{etas['zero'] / etas['cross']:.0f}$\\times$ stepsize-limited)",
+            transform=ax.transAxes, fontsize=8.3, va="bottom", ha="left",
+            color=p["text_secondary"])
+    ax.legend(loc="upper right", fontsize=9, framealpha=0.93)
+    ax.set_ylim(top=ax.get_ylim()[1] * 3.2, bottom=ax.get_ylim()[0] * 0.5)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig12_three_fields_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -500,6 +559,7 @@ def main():
         fig_state_dependent(mode)
         fig_three_way(mode)
         fig_curl_potentials(mode)
+        fig_three_fields(mode)
 
 
 if __name__ == "__main__":
