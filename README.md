@@ -230,6 +230,7 @@ python experiments/exp7_state_dependent.py      # state-dependent J and the inte
 python experiments/exp10_curl_potentials.py    # d=3: the divergence-free family, by potential
 python experiments/exp11_seed_robustness.py    # is a speed-up an artefact of one seed set?
 python experiments/exp12_three_fields.py       # J=0 vs constant J_a vs cross-product J_s
+python experiments/exp13_improving_js.py       # two fixes to J_s, and what each is worth
 python experiments/make_figures.py
 python experiments/summarize.py                 # read everything back
 ```

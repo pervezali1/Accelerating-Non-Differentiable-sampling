@@ -541,6 +541,62 @@ def fig_three_fields(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig12_three_fields_{mode}.png")))
 
 
+# ------------------------------------------------------------------ fig 13
+
+
+def fig_improving_js(mode):
+    """Two fixes to the cross-product field, and what they are worth."""
+    path = os.path.join(DATA, "exp13_improving_js.json")
+    if not os.path.exists(path):
+        print("  skip: exp13_improving_js.json not found")
+        return
+    b = runner.load_json(path)
+    floor = b["floor"]
+    p = plotting.use_style(mode)
+    fig, ax = plt.subplots(figsize=(6.9, 4.8))
+    base = b["rows"][0]["iters"]
+    # improved J_s is the point of the figure, so give it the emphasis
+    widths = {3: 2.6}
+    for i, r in enumerate(b["rows"]):
+        colour = p["categorical"][i % len(p["categorical"])]
+        it = np.asarray(r["rec"], dtype=float)
+        it[0] = max(it[1] * 0.5, 0.5)
+        w = np.asarray(r["w2"], dtype=float)
+        lab = r["pretty"]
+        if r["iters"] > 0:
+            lab += f"    $\\bf{{{r['iters']:d}}}$ it,  {base / r['iters']:.2f}$\\times$"
+        else:
+            lab += "    never reaches it"
+        ax.plot(it, w, color=colour, lw=widths.get(i, 1.8), label=lab,
+                zorder=3 + (0.5 if i == 3 else -0.1 * i))
+        if r["iters"] > 0:
+            j = int(np.argmin(np.abs(it - r["iters"])))
+            ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
+                    markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=5)
+    ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
+    ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+    ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
+                textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                va="bottom")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("sliced 2-Wasserstein distance")
+    ax.set_title("Improving $J_s$: change what it conserves, and bound how it grows",
+                 loc="left")
+    ax.text(0.008, 0.02,
+            "$J_s(x)v = \\nabla f \\times v$ with $f = s\\|x\\|^2/2$.  Both defects are in $f$:\n"
+            "it conserves $\\|x\\|$, and $\\nabla f$ grows so $|c|/|b|$ is unbounded.\n"
+            "$f = s\\sqrt{r^2 + x^{\\!\\top}\\! Mx}$, $M = \\Sigma^{-1}$ with the middle eigenvalue "
+            "changed, fixes both\nand is still divergence free, so still no correction term.",
+            transform=ax.transAxes, fontsize=8.2, va="bottom", ha="left",
+            color=p["text_secondary"])
+    ax.legend(loc="upper right", fontsize=8.5, framealpha=0.93,
+              title="iterations to twice the floor", title_fontsize=8.5)
+    ax.set_ylim(top=ax.get_ylim()[1] * 4.5, bottom=ax.get_ylim()[0] * 0.42)
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig13_improving_js_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -560,6 +616,7 @@ def main():
         fig_three_way(mode)
         fig_curl_potentials(mode)
         fig_three_fields(mode)
+        fig_improving_js(mode)
 
 
 if __name__ == "__main__":
