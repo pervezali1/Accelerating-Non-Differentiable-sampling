@@ -94,11 +94,9 @@ def accuracy_figure(runs: list, out: str, skip: int = 2) -> None:
         pad = 0.12 * (hi - lo) + 0.003
         ax.set_ylim(lo - pad, hi + pad)
         ax.set_xlim(0, meta["n_iter"])
-        amp = meta["amplitude"]
         ax.set_title(
-            f"{meta['pretty_name']}  (d = {meta['dim']}, n = {meta['n_train']})\n"
-            f"amplitude {amp['constant']:g} constant, {amp['state']:g} gated",
-            color=INK, fontsize=10.5, pad=8,
+            f"{meta['pretty_name']}  (d = {meta['dim']}, n = {meta['n_train']})",
+            color=INK, fontsize=11.5, pad=8,
         )
         ax.set_xlabel("iterations", color=INK, fontsize=10)
         ax.set_ylabel("classification accuracy", color=INK, fontsize=10)

@@ -83,9 +83,8 @@ def bias_figure(datasets: list, deltas: list) -> None:
                 ax.set_ylim(lo - 0.002, hi + 0.002)
                 ax.set_ylabel("predictive log-loss (nats)", color=INK, fontsize=10)
             ax.set_xlabel("iteration (log scale)", color=INK, fontsize=10)
-            ax.set_title(f"{meta['pretty_name']}: {meta['n_iter']} iterations, "
-                         f"$\\lambda$ = {meta['penalty']:g}, $\\delta$ = {meta['delta']:g}",
-                         color=INK, fontsize=10.5, pad=8)
+            ax.set_title(f"{meta['pretty_name']}: {meta['n_iter']} iterations, anchor "
+                         f"smoothing {meta['delta']:g}", color=INK, fontsize=10.5, pad=8)
     handles, labels = axes[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="outside lower center", ncols=1, frameon=False, fontsize=9.5)
     fig.suptitle("The clock costs speed and buys exactness, and how much of each "
@@ -139,12 +138,9 @@ def main() -> None:
             ax.set_xlim(0, meta["n_iter"])
             ax.set_xlabel("iterations", color=INK, fontsize=10)
             ax.set_ylabel(label, color=INK, fontsize=10)
-            amp = meta["amplitude"]
             ax.set_title(
-                f"{meta['pretty_name']}  (d = {meta['dim']}, n = {meta['n_train']})\n"
-                f"$\\lambda$ = {meta['penalty']:g}, $\\delta$ = {meta['delta']:g}, "
-                f"amplitude {amp['constant']:g} constant, {amp['state']:g} gated",
-                color=INK, fontsize=10.5, pad=8,
+                f"{meta['pretty_name']}  (d = {meta['dim']}, n = {meta['n_train']})",
+                color=INK, fontsize=11.5, pad=8,
             )
             note = ("dashed: exact posterior, band $\\pm$0.005" if metric == "accuracy"
                     else "dashed: exact posterior, band $\\pm$1%")
