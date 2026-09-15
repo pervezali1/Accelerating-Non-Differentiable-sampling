@@ -48,7 +48,12 @@ from nds.anchored_constrained import (  # noqa: E402
     sublevel_axial_field,
     tilted_axial_field,
 )
-from nds.constrained import FramedField, eigen_frame  # noqa: E402
+from nds.constrained import (  # noqa: E402
+    FramedField,
+    eigen_frame,
+    slowest_rate,
+    spectral_frame,
+)
 
 
 def make_field(key: str, d: int, dcfg: dict, kappa: float, domain_key: str,
@@ -120,10 +125,14 @@ def main() -> None:
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--profile", default="paper", choices=["paper", "flat"])
     parser.add_argument("--block-order", default="columns",
-                        choices=["columns", "curvature", "eigen"],
+                        choices=["columns", "curvature", "eigen", "spectral"],
                         help="which coordinates share a 3-block of the state-dependent "
                              "field: the paper's column order, a permutation pairing slow "
-                             "with fast coordinates, or the anchor Hessian's eigenbasis")
+                             "with fast coordinates, the anchor Hessian's eigenbasis, or "
+                             "the signed permutation that maximises the slowest rate of "
+                             "(I + J) H -- the only one of the four that is searched "
+                             "rather than guessed, and the only one admissible on the "
+                             "sublevel set as well as the ball")
     parser.add_argument("--n-iter", type=int, default=None)
     parser.add_argument("--n-walkers", type=int, default=None)
     parser.add_argument("--score-every", type=int, default=None)
@@ -162,11 +171,10 @@ def main() -> None:
     frame = None
     x_star = constrained_lasso_map(target, domain)
     H = anchor_hessian(target, x_star)
-    if args.block_order != "columns":
-        frame = (
-            curvature_blocks(target, domain) if args.block_order == "curvature"
-            else eigen_frame(H)
-        )
+    if args.block_order == "curvature":
+        frame = curvature_blocks(target, domain)
+    elif args.block_order == "eigen":
+        frame = eigen_frame(H)
     if args.tilt_direction == "outward":
         direction = outward_tilt_direction(
             target, domain, start_radius=args.start_radius, seed=args.seeds[0]
@@ -179,6 +187,7 @@ def main() -> None:
         direction = np.eye(d)[0]
 
     rows = []
+    spectral_cache: dict = {}
     for div in args.step_divisors:
         eta = eta_base / div
         n_iter = int(round(n_iter_base * div))
@@ -190,9 +199,24 @@ def main() -> None:
         if "state" in args.fields:
             plans += [("state", k, t) for k in args.kappas for t in args.tilts]
         for key, kappa, tilt in plans:
+            here = frame if key == "state" else None
+            if args.block_order == "spectral" and key == "state":
+                # the best frame depends on the field, so on kappa and tilt too
+                cached = spectral_cache.get((kappa, tilt))
+                if cached is None:
+                    plain = make_field(key, d, dcfg, kappa, args.domain,
+                                       args.profile, None, tilt=tilt,
+                                       domain=domain, direction=direction)
+                    cached = spectral_frame(plain, H, x_star,
+                                            seed=args.seeds[0])
+                    spectral_cache[(kappa, tilt)] = cached
+                here = cached
             field = make_field(key, d, dcfg, kappa, args.domain, args.profile,
-                               frame if key == "state" else None, tilt=tilt,
+                               here, tilt=tilt,
                                domain=domain, direction=direction)
+            rate = slowest_rate(
+                np.zeros((d, d)) if key == "zero" else field.matrix(x_star), H
+            )
             started = time.time()
             per_seed = []
             for seed in args.seeds:
@@ -228,6 +252,7 @@ def main() -> None:
                 "eta": eta,
                 "n_iter": n_iter,
                 "reached_all": all(r["reached"] for r in per_seed),
+                "slowest_rate": rate,
             }
             for stat in ("band", "error", "error_running", "error_quarter",
                          "gap_tail", "accuracy_tail", "accuracy_test",
@@ -243,6 +268,7 @@ def main() -> None:
                 f"  run {agg['error_running']:8.3f}"
                 f"  gap_tail {agg['gap_tail']:.4f} +/- {agg['gap_tail_se']:.4f}"
                 f"  acc {agg['accuracy_tail']:.4f}  bnd {agg['boundary_rate']:.3f}"
+                f"  rate {rate:8.1f}"
                 f"  failed {agg['failed']:.0f}  ({time.time() - started:.0f}s)",
                 flush=True,
             )

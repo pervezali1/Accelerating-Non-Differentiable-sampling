@@ -210,6 +210,88 @@ def eigen_frame(H: np.ndarray) -> np.ndarray:
     return V[:, order]
 
 
+def slowest_rate(J: np.ndarray, H: np.ndarray) -> float:
+    r"""Smallest real part of ``spec((I + J) H)``: the transient's slowest rate.
+
+    When the constraint is idle the run is a descent in the anchor's bowl, and
+    linearising at the constrained MAP gives ``dx/dt = -(I + J) H (x - x*)``.
+    The tail of that descent is set by the slowest mode, so the smallest real
+    part of the spectrum is the quantity a field has to raise to be worth
+    anything on a fixed budget.  A skew term cannot add rate -- 
+    ``trace((I + J) H) = trace H`` -- it can only move it off the fast
+    directions, where it is wasted, onto the slow one.
+    """
+    return float(np.linalg.eigvals((np.eye(len(H)) + J) @ H).real.min())
+
+
+def signed_permutation(perm: np.ndarray, signs: np.ndarray) -> np.ndarray:
+    """The orthogonal matrix sending ``e_j`` to ``signs[j] e_perm[j]``."""
+    Q = np.zeros((len(perm), len(perm)))
+    Q[np.asarray(perm), np.arange(len(perm))] = np.asarray(signs, float)
+    return Q
+
+
+def spectral_frame(field, H: np.ndarray, x_star: np.ndarray, restarts: int = 24,
+                   seed: int = 0) -> np.ndarray:
+    r"""The signed permutation frame that maximises :func:`slowest_rate`.
+
+    Which coordinates share a ``3``-block, and with which orientation, is free:
+    conjugating by any orthogonal ``Q`` leaves the field skew and divergence
+    free (a divergence transforms covariantly) and leaves ``Q J(Q^T x) Q^T x``
+    zero, so the construction is the paper's read in another frame.  The frame
+    has to keep the *constraint set* invariant too, and that is what restricts
+    ``Q`` here: a centred ball admits every orthogonal ``Q``, but the smoothed
+    ``l_p`` sublevel set ``sum_i (x_i^2 + eps^2)^{p/2} <= level`` is only
+    invariant under **signed permutations** once ``p != 2``.  Searching that
+    group therefore gives one frame admissible on both sets.
+
+    Two guesses one would reach for first are both wrong, and cheaply shown so:
+    the paper's column order is arbitrary, and pairing each block's slowest
+    coordinate with its fastest (:func:`eigen_frame`,
+    ``anchored_constrained.curvature_blocks``) *lowers* the slowest rate here.
+    The reason is that the hat map is rank two -- it rotates in the plane normal
+    to its axial vector -- so what matters is not the spread of curvature in a
+    block but whether the block's rotation plane contains the slow direction.
+    That is not something a sorting rule reads off the diagonal, so it is
+    searched: hill-climbing on transpositions and sign flips from ``restarts``
+    random starts plus the identity, which at ``d = 9`` costs a few thousand
+    ``9 x 9`` eigenvalue solves.
+    """
+    d = len(H)
+    x_star = np.asarray(x_star, float).ravel()
+    rng = np.random.default_rng(seed)
+
+    def score(perm, signs):
+        Q = signed_permutation(perm, signs)
+        return slowest_rate(Q @ field.matrix(Q.T @ x_star) @ Q.T, H)
+
+    best_val, best = -np.inf, None
+    starts = [(np.arange(d), np.ones(d))]
+    starts += [(rng.permutation(d), rng.choice([-1.0, 1.0], size=d))
+               for _ in range(restarts)]
+    for perm, signs in starts:
+        perm, signs = np.array(perm), np.array(signs, float)
+        val = score(perm, signs)
+        improved = True
+        while improved:  # steepest ascent over transpositions and single flips
+            improved = False
+            for i in range(d):
+                flip = signs.copy()
+                flip[i] *= -1.0
+                v = score(perm, flip)
+                if v > val + 1e-9:
+                    signs, val, improved = flip, v, True
+                for j in range(i + 1, d):
+                    swap = perm.copy()
+                    swap[i], swap[j] = swap[j], swap[i]
+                    v = score(swap, signs)
+                    if v > val + 1e-9:
+                        perm, val, improved = swap, v, True
+        if val > best_val:
+            best_val, best = val, (perm.copy(), signs.copy())
+    return signed_permutation(*best)
+
+
 FIELDS = {"zero": ZeroField, "constant": ConstantField, "state": BlockHatField}
 
 

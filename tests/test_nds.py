@@ -39,6 +39,9 @@ from nds.constrained import (  # noqa: E402
     ZeroField,
     curvature_step_size,
     eigen_frame,
+    signed_permutation,
+    slowest_rate,
+    spectral_frame,
     field_from_rho,
     reference_constrained_rwm,
     run_constrained_sgld,
@@ -765,3 +768,90 @@ if __name__ == "__main__":
         if name.startswith("test_") and callable(fn):
             fn()
             print("ok", name)
+
+
+def test_signed_permutation_frames_keep_all_three_assumptions_on_both_sets():
+    """A signed permutation is the frame group both constraint sets share.
+
+    Conjugating by an orthogonal ``Q`` always keeps the field skew and
+    divergence free, but the *boundary* condition ``J n = 0`` needs the
+    constraint set to be ``Q``-invariant as well.  A centred ball is invariant
+    under every orthogonal ``Q``; the smoothed ``l_p`` set is a symmetric
+    function of the ``x_i^2``, so it is invariant under permutations and sign
+    flips and, once ``p != 2``, under nothing more.  This pins down what
+    ``spectral_frame`` is allowed to search: a general rotation would break the
+    sublevel set, and does, which is checked here too.
+    """
+    rng = np.random.default_rng(3)
+    d = 9
+    ball, lp = PaperBall(2.0, squared=True), SmoothedLpBall(2.4, 0.2, 4.0)
+    cases = (
+        (ball_axial_field(d, [5.0, 5.0, 5.0]), ball),
+        (sublevel_axial_field(d, [2.0, 7.0, 2.0], 2.4, 0.2), lp),
+    )
+    for field, domain in cases:
+        Q = signed_permutation(rng.permutation(d), rng.choice([-1.0, 1.0], size=d))
+        assert np.abs(Q @ Q.T - np.eye(d)).max() < 1e-12
+        framed = FramedField(field, Q)
+        x = rng.normal(size=d)
+        J = framed.matrix(x)
+        assert np.abs(J + J.T).max() < 1e-12
+        assert np.abs(_numeric_divergence(framed, x)).max() < 1e-7
+        X = rng.normal(size=(d, 32))
+        X = domain._shrink(X * 3.0) if hasattr(domain, "_shrink") else X * (
+            domain.radius / np.sqrt((X * X).sum(axis=0))
+        )
+        assert np.abs(framed.apply(X, domain.normal(X))).max() < 1e-9
+
+    # and the reason the search is restricted to that group: a general rotation
+    # keeps the ball's boundary condition but breaks the sublevel set's
+    G = rng.normal(size=(d, d))
+    V = np.linalg.qr(G)[0]
+    on_ball = ball._shrink(rng.normal(size=(d, 32)) * 3.0) if hasattr(
+        ball, "_shrink") else None
+    X = rng.normal(size=(d, 32))
+    X = X * (ball.radius / np.sqrt((X * X).sum(axis=0)))
+    rotated_ball = FramedField(ball_axial_field(d, [5.0, 5.0, 5.0]), V)
+    assert np.abs(rotated_ball.apply(X, ball.normal(X))).max() < 1e-9
+    Y = lp._shrink(rng.normal(size=(d, 32)) * 3.0)
+    rotated_lp = FramedField(sublevel_axial_field(d, [2.0, 7.0, 2.0], 2.4, 0.2), V)
+    assert np.abs(rotated_lp.apply(Y, lp.normal(Y))).max() > 1e-3
+
+
+def test_spectral_frame_raises_the_slowest_rate_above_every_guess():
+    """The searched frame beats the column order and the curvature pairing.
+
+    ``slowest_rate`` is the smallest real part of ``spec((I + J) H)``, which is
+    the rate that governs the tail of an interior descent.  A skew term cannot
+    add rate -- ``trace((I + J) H) = trace H`` -- so the whole question is
+    whether it moves rate onto the slow direction, and the two orderings one
+    would guess (the paper's column order, and pairing each block's slowest
+    coordinate with its fastest) are both beaten by searching.  The anisotropic
+    ``H`` here is the shape the constrained anchor actually has: one very stiff
+    direction, from a coordinate the penalty pins at its kink.
+    """
+    d = 9
+    rng = np.random.default_rng(1)
+    h = np.array([1.0, 1.3, 2.4, 2.7, 1.6, 1.5, 14.0, 2.2, 2.8]) * 100.0
+    G = rng.normal(size=(d, d)) * 0.03
+    H = np.diag(h) + (G + G.T) * h.mean()
+    H = H + np.eye(d) * (max(0.0, -np.linalg.eigvalsh(H).min()) + 1.0)
+    x_star = rng.normal(size=d)
+    field = ball_axial_field(d, [1.0, 1.0, 1.0])
+
+    base = slowest_rate(np.zeros((d, d)), H)
+    columns = slowest_rate(field.matrix(x_star), H)
+    Q = spectral_frame(field, H, x_star, restarts=12, seed=0)
+    searched = slowest_rate(Q @ field.matrix(Q.T @ x_star) @ Q.T, H)
+    V = eigen_frame(H)
+    paired = slowest_rate(V @ field.matrix(V.T @ x_star) @ V.T, H)
+
+    assert searched > columns > base
+    assert searched > paired
+    # a skew term moves rate, it does not create any
+    for J in (field.matrix(x_star), Q @ field.matrix(Q.T @ x_star) @ Q.T):
+        assert abs(np.trace((np.eye(d) + J) @ H) - np.trace(H)) < 1e-8 * np.trace(H)
+    # and the frame it returns is an admissible signed permutation
+    assert np.abs(Q @ Q.T - np.eye(d)).max() < 1e-12
+    assert np.abs(np.abs(Q).sum(axis=0) - 1.0).max() < 1e-12
+    assert set(np.abs(Q[np.abs(Q) > 0.5]).round(9)) == {1.0}

@@ -46,12 +46,15 @@ from nds.anchored_constrained import (  # noqa: E402
     SmoothedLpBall,
     ZeroField,
     ball_axial_field,
+    anchor_hessian,
+    constrained_lasso_map,
     outward_tilt_direction,
     reference_constrained_rwm,
     run_anchored_srnsgld,
     sublevel_axial_field,
     tilted_axial_field,
 )
+from nds.constrained import FramedField, spectral_frame  # noqa: E402
 from nds.data import load_nine  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -227,6 +230,16 @@ def build(problem: str, domain_key: str, args) -> tuple:
         state = sublevel_axial_field(d, s_amp, dcfg["p"], dcfg["eps"])
         state.label = rf"state-dependent $J_g(x)$, $s$ = {[round(v, 3) for v in s_amp]}"
     fields.append(state)
+    if getattr(args, "block_order", "columns") == "spectral":
+        # which coordinates share a block, and with which orientation, is free;
+        # pick the signed permutation that raises the slowest rate of (I + J) H
+        x_star = constrained_lasso_map(target, domain)
+        Q = spectral_frame(state, anchor_hessian(target, x_star), x_star,
+                           seed=args.seed)
+        label = state.label + ", spectral frame"
+        state = FramedField(state, Q, label=label)
+        state.key = "state"
+        fields[-1] = state
     kappa = {"constant": kappa_a, "state": kappa_s}
     return cfg, dcfg, data, domain, target, fields, kappa
 
@@ -324,6 +337,7 @@ def run(problem: str, domain_key: str, args) -> dict:
         "anchored": not args.no_clock,
         "amp_scale": kappa,
         "tilt": args.tilt,
+        "block_order": args.block_order,
         "amplitudes": {
             "a": dcfg["a"] * kappa["constant"],
             "s": (np.atleast_1d(np.asarray(dcfg["s"], float)) * kappa["state"]).tolist(),
@@ -390,6 +404,11 @@ def main() -> None:
                         help="override --amp-scale for the constant field only")
     parser.add_argument("--amp-scale-state", type=float, default=None,
                         help="override --amp-scale for the state-dependent field only")
+    parser.add_argument("--block-order", default="columns",
+                        choices=["columns", "spectral"],
+                        help="which coordinates share a 3-block of the state-dependent "
+                             "field: the paper's column order, or the signed permutation "
+                             "that maximises the slowest rate of (I + J) H")
     parser.add_argument("--tilt", type=float, default=0.0,
                         help="non-radial h in the paper's recipe, h = 1 + c (u . x), with "
                              "u the closed-form outward direction; 0 is the paper's h = 1")
