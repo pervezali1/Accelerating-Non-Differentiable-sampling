@@ -1478,6 +1478,135 @@ blocks are the same three triples there, so the rotation acts in exactly the
 subspaces the penalty makes stiff.  With 3 seeds the margin is inside the error
 bars, so this is a lead worth following rather than a result.
 
+### Beating `J = 0` in every cell: the step size, the frame, and the guard
+
+The tables above leave both fields behind `J = 0` on MAGIC, and the state field
+barely ahead of it on the synthetic problem.  Three things were wrong, and none
+of them was the rotation's strength -- the thing the earlier sweeps varied.
+
+**The budget was not binding.**  At `eta / 16` MAGIC's accuracy is converged
+inside 50 iterations, so the gap a 250-iteration baseline has left is 0.0014 to
+0.0047 with a standard error about half that: the ratios measured there were
+noise, which is why they carried the only large error bars in the figure and why
+they pointed both ways.  At `eta / 64` the baseline's gap is 0.0135 to 0.0195,
+the boundary rate is zero, and the run is a pure interior descent -- a budget
+rather than a formality.  That alone turns most MAGIC cells around, with error
+bars an order of magnitude tighter.
+
+**The frame was arbitrary.**  Which coordinates share a `3`-block of `J_s` is
+not something the construction fixes.  Conjugating by an orthogonal `Q` keeps
+the field skew, keeps it divergence free (a divergence transforms covariantly,
+so `div (Q J(Q^T x) Q^T) = Q (div J)(Q^T x) = 0`) and keeps `J(x) x = 0`, so
+`Q J(Q^T x) Q^T` is the paper's construction read in another frame, not a
+different one.  What restricts `Q` is the *constraint set*, which has to be
+`Q`-invariant too: a centred ball admits every orthogonal `Q`, but the smoothed
+`l_p` set `sum_i (x_i^2 + eps^2)^{p/2} <= level` is a symmetric function of the
+`x_i^2`, so once `p != 2` it admits only **signed permutations**.  Searching
+that group gives one frame admissible on both sets, and a general rotation
+provably breaks the sublevel set -- which is a test, not a remark
+(`tests/test_nds.py`).
+
+Inside that group the frame is *searched*, against a criterion that costs no
+simulation.  With the boundary idle the run is a descent in the anchor's bowl,
+and linearising at the constrained MAP gives `dx/dt = -(I + J) H (x - x*)`, so
+the tail is set by the smallest real part of `spec((I + J) H)`.  A skew term
+cannot add rate -- `trace((I + J) H) = trace H` -- it can only move rate off the
+fast directions, where it is wasted, onto the slow one.
+`nds.constrained.spectral_frame` hill-climbs on transpositions and sign flips to
+maximise that, which at `d = 9` is a few thousand `9 x 9` eigenvalue solves.
+
+Two orderings one would reach for first are both wrong, and cheaply shown so.
+The paper's column order is arbitrary, and pairing each block's slowest
+coordinate with its fastest -- the rule `eigen_frame` and
+`curvature_blocks` implement, and the obvious one, since a block of three slow
+directions has nothing to trade -- actually *lowers* the rate on MAGIC, to
+1.10-1.42x against the column order's 1.70-2.15x.  The reason is that a hat map
+is rank two: it rotates in the plane normal to its axial vector, so what matters
+is not the spread of curvature inside a block but whether the block's rotation
+plane contains the slow direction, and that is not something a sorting rule
+reads off the diagonal.
+
+**The guard was answering the other question.**  The selection rule protects
+against buying speed with stationary bias by requiring the field's whitened
+error, *time-averaged over the whole run*, to be no worse than the baseline's.
+That is the right guard for an open-ended budget.  At 250 iterations nothing is
+stationary, and the time-average is dominated by the transient the field exists
+to shorten, so guarding a fixed-budget objective with it asks the field not to
+change the thing it is for.  The consistent reading is the running mean at the
+last iteration -- the estimate the budget actually hands you -- and
+`select_anchored.py --guard error_running` uses it.  The difference is small and
+not self-serving: of 82 selected rows **3** change, all on MAGIC's sublevel set,
+and one of the three moves the wrong way (the state field under the lasso, 1.27x
+down to 1.15x).  The stricter guard stays the default and both selections are
+written out
+([`results/anchored_frames_error.md`](results/anchored_frames_error.md),
+[`_error_running.md`](results/anchored_frames_error_running.md)).
+
+#### What that adds up to
+
+![both fields against J = 0, and whether the criterion calls the frame](figures/anchored_frames.png)
+
+Titanic at the paper's `eta`, MAGIC at `eta / 64`, the synthetic problem at
+`eta / 16`; three to five walker seeds shared across fields; the accuracy gap
+left at iteration 250 as a ratio over `J = 0`, so above 1 the field wins.  Full
+table in
+[`results/anchored_best_frame.md`](results/anchored_best_frame.md), both frames
+side by side with the prediction in
+[`results/anchored_frames_error_running.md`](results/anchored_frames_error_running.md).
+
+| problem | set | `J_a` | `J_s` / `J_g` | frame it wants |
+|---|---|---|---|---|
+| Titanic | ball | 5.1x - 5.5x | **3.3x - 4.5x** | column |
+| Titanic | sublevel | 6.0x - 7.1x | **2.3x - 4.9x** | searched |
+| MAGIC | ball | 1.8x - 3.7x | **1.15x - 1.5x** | searched |
+| MAGIC | sublevel | 1.4x - 2.2x | **1.00x - 1.2x** | searched |
+| Synthetic | ball | 1.5x - 18.8x | **1.02x - 1.2x** | column |
+| Synthetic | sublevel | 1.3x - 20.9x | **1.12x - 1.2x** | searched |
+
+Ranges are over the three penalties.  **Both fields reach or beat `J = 0` in all
+eighteen problem-set-penalty cells, on both readings**, which was not true of
+any earlier table here.  The searched frame is what does it on MAGIC: it beats
+the column order in all four cells there, turning 0.91x and 0.89x on the
+sublevel set into 1.00x and 1.17x, and 1.11x and 1.31x on the ball into 1.27x
+and 1.52x, with every error ratio at or above 1.00x so none of it is bought.
+
+#### Where the criterion is valid, and where it is not
+
+The right panel of the figure is the honest part.  Both axes are the searched
+frame over the column frame, so every point is right of 1 by construction -- the
+search maximises the rate -- and the only question is whether it is *above* 1.
+On the sublevel sets it is, **9 times out of 9**.  On the balls it is **2 out of
+7**, both of them MAGIC's.
+
+That is a limitation of the criterion and not noise, and the mechanism is the
+one already named [above](#why-no-amplitude-can-help-on-a-ball): on a ball
+`J(x) x = 0` holds *everywhere*, not just on the boundary, and conjugation
+preserves it, so no frame can change radial motion -- while the journey on a
+ball, from the start shell out to a posterior that hugs the boundary, is almost
+entirely radial.  The criterion scores the full spectrum and credits a frame for
+modes the geometry has pinned.  The search then pays for that credit with the
+lever that does work: in **every** ball cell it gets wrong, the tilt it selects
+is lower than the column frame's (`c` = 3 to 1 on Titanic under the lasso, 1 to
+0 under total variation, 1 to 0 on the synthetic problem).  So the rule is: the
+frame is the lever on a sublevel set, the tilt is the lever on a ball, and the
+rate criterion knows about the first only.
+
+Two cells stay honest rather than becoming wins.  `J_s` on MAGIC's sublevel set
+under the group penalty **ties**, at 1.00x +/- 0.07 -- the one cell in the table
+that is not a win.  And `J_a` on MAGIC's sublevel set under the *lasso* can only
+trade: `kappa` = 1 wins the accuracy gap 1.47x but costs 27% on the running
+error, `kappa` = 2 wins the error 1.21x but loses the gap and misses 240
+boundary pushes, and no amplitude wins both -- so that row is flagged
+`(bias traded)` and hatched in the figure.
+
+The synthetic problem's state field stays near 1 for a reason that is structural
+rather than a tuning failure.  At `d = 3` the block-diagonal construction is a
+*single* `3 x 3` hat map, of rank two, with its axis pinned to `x`; the rate
+criterion returns exactly 1.00x there for every amplitude, every tilt and every
+one of the 48 signed permutations, and the measured 1.02x to 1.19x is what the
+tilt alone buys.  Nine dimensions is where the construction has something to
+choose.
+
 ### Caveats specific to this section
 
 * The paper does not state the coefficient vector its synthetic data is
@@ -1513,6 +1642,20 @@ bars, so this is a lead worth following rather than a result.
   was run under the group penalty only.
 * The max-norm penalty is implemented and unit-tested but not swept, so the
   cross-penalty claim rests on three penalties, not four.
+* The frame the state-dependent field is read in is selected on the runs it is
+  reported on, exactly like the amplitude and the tilt, and with the same
+  honest reading: "the best this family does here", not an out-of-sample
+  number.  The search itself is deterministic given its seed.
+* The step size differs by problem -- Titanic at the paper's `eta`, MAGIC at
+  `eta / 64`, the synthetic problem at `eta / 16` -- chosen so that `J = 0` is
+  still moving at iteration 250 on each.  That is necessary for the comparison
+  to measure anything, but it does mean the three problems are not compared
+  with each other, only each against its own baseline.
+* The rate criterion linearises at the constrained MAP and ignores the
+  mini-batch noise, the anchoring clock and the reflection, so it is a
+  predictor of the *ordering* of frames and not of the size of the effect; it
+  gets the ordering right on the sublevel sets and wrong on the balls, as
+  above.
 
 ## Datasets
 
@@ -1650,6 +1793,31 @@ through the calibration, the sweep, the runner and `select_anchored.py`; the
 smoothing `delta` is set per penalty by `nds.anchored_constrained.delta_for` so
 that every penalty carries the same worst-case anchoring clock.
 
+Searching the frame instead of guessing it
+([Beating `J = 0` in every cell](#beating-j--0-in-every-cell-the-step-size-the-frame-and-the-guard)):
+
+```bash
+# the same sweep in the two frames, with identical seeds and ladders so that
+# the frame is the only difference in a cell
+for order in columns spectral; do
+  python3 experiments/sweep_anchored.py --problem magic --domain lp \
+      --regularizer group --block-order $order --n-iter 250 --score-every 2 \
+      --eta 1.5625e-6 --kappas 0.3 1.0 2.0 --tilts 0.0 1.0 3.0 \
+      --seeds 0 1 2 --tag _e64
+done
+python3 experiments/compare_frames.py --frames columns spectral \
+    --guard error_running                      # both frames, with the prediction
+python3 experiments/compare_frames.py --frames columns spectral \
+    --guard error_running --best-frame --etas 1e-4 1.5625e-6 6.25e-6 \
+    --out anchored_best_frame.md               # one row per field per cell
+python3 experiments/plot_frames.py             # figures/anchored_frames.png
+```
+
+`--block-order spectral` also works on `run_anchored_srnsgld.py`.  The step
+sizes are per problem, chosen so `J = 0` is still moving at 250: `1e-4` for
+Titanic, `eta / 64 = 1.5625e-6` for MAGIC, `eta / 16 = 6.25e-6` for the
+synthetic problem.
+
 The unpreconditioned robustness check, whose outputs are suffixed so that they
 do not overwrite the defaults:
 
@@ -1737,7 +1905,8 @@ nds/target.py      logistic posterior, central-difference surrogate, prediction
 nds/skew.py        J = 0, constant, radial and directional fields, and their divergence
 nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
 nds/anchored.py    the l1 target, its smooth anchor, anchored Langevin, an exact reference
-nds/constrained.py constrained target, ball with skew reflection, J_a and block-diagonal J_s
+nds/constrained.py constrained target, ball with skew reflection, J_a and block-diagonal J_s,
+                   orthogonal reframing and the searched signed permutation
 nds/anchored_constrained.py  the paper's fields and constraint sets, four kinked
                    penalties with smooth anchors, anchored SRNSGLD, an exact reference
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
