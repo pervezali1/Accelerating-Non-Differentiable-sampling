@@ -65,6 +65,9 @@ def main() -> None:
     parser.add_argument("--objective", default="band", choices=["band", "gap"],
                         help="what to minimise: iterations to the accuracy band, or the "
                              "accuracy gap left at the end of a fixed budget")
+    parser.add_argument("--regularizer", default=None,
+                        choices=["l1", "group", "tv", "linf"],
+                        help="restrict to sweeps with this penalty")
     parser.add_argument("--n-iter", type=int, default=None,
                         help="restrict to sweeps with this iteration budget")
     args = parser.parse_args()
@@ -83,9 +86,9 @@ def main() -> None:
         "",
     ]
     table = [
-        "| problem | set | eta | seeds | field | kappa | c | band | speed-up | "
+        "| problem | set | penalty | eta | seeds | field | kappa | c | band | speed-up | "
         "gap at the end | gap ratio | error | error ratio |",
-        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     notes = []
     # pool rows across sweep files, but only where the seed set matches, so the
@@ -98,16 +101,19 @@ def main() -> None:
                 continue
             if args.objective == "gap" and "gap_tail" not in r:
                 continue
-            key = (meta["problem"], meta["domain"], r["eta"], tuple(meta["seeds"]))
+            reg = meta.get("regularizer", "l1")
+            if args.regularizer is not None and reg != args.regularizer:
+                continue
+            key = (meta["problem"], meta["domain"], reg, r["eta"], tuple(meta["seeds"]))
             groups.setdefault(key, []).append(r)
 
-    for (problem, domain, eta, seeds) in sorted(groups):
-        here = groups[(problem, domain, eta, seeds)]
+    for (problem, domain, reg, eta, seeds) in sorted(groups):
+        here = groups[(problem, domain, reg, eta, seeds)]
         base = next((r for r in here if r["field"] == "zero"), None)
         if base is None:
             continue
         table.append(
-            f"| {problem} | {domain} | {eta:.2e} | {len(seeds)} | `J = 0` | -- | -- | "
+            f"| {problem} | {domain} | {reg} | {eta:.2e} | {len(seeds)} | `J = 0` | -- | -- | "
             f"{base['band']:.0f} +/- {base['band_se']:.0f} | 1.00x | "
             f"{base.get('gap_tail', float('nan')):.4f} +/- "
             f"{base.get('gap_tail_se', float('nan')):.4f} | 1.00x | "
@@ -119,7 +125,7 @@ def main() -> None:
                 continue
             flag = "" if clean else " **(bias traded)**"
             table.append(
-                f"| {problem} | {domain} | {eta:.2e} | {len(seeds)} | {name}{flag} | "
+                f"| {problem} | {domain} | {reg} | {eta:.2e} | {len(seeds)} | {name}{flag} | "
                 f"{pick['kappa']:g} | {pick.get('tilt', 0.0):g} | "
                 f"{pick['band']:.0f} +/- {pick['band_se']:.0f} | "
                 f"**{base['band'] / max(pick['band'], 1e-9):.2f}x** | "
@@ -131,7 +137,7 @@ def main() -> None:
             )
             if not clean:
                 notes.append(
-                    f"* {problem}/{domain} at `eta` = {eta:.2e}: no amplitude of {name} "
+                    f"* {problem}/{domain}/{reg} at `eta` = {eta:.2e}: no amplitude of {name} "
                     f"improves the band without giving up stationary accuracy; the row "
                     f"shown is the best band."
                 )

@@ -1384,6 +1384,100 @@ in a ball of radius 1.41 -- so the run is a long drift-dominated descent with
 little diffusive mixing for a rotation to improve, and the unadjusted step is
 what limits the answer.
 
+### Other regularizers: group lasso and total variation
+
+Everything above is one non-differentiable penalty, and a fair question is
+whether the answer is about the rotation or about the lasso.  The anchored
+machinery does not care which penalty it is given -- it needs a kinked `R`, a
+smooth `R_0 >= R`, its gradient, and a bound on `R_0 - R`, and nothing else
+-- so two more are implemented in `nds.anchored_constrained` and the whole
+comparison is re-run on each:
+
+| penalty | `R(x)` | anchor `R_0(x)` | where it kinks |
+|---|---|---|---|
+| lasso | `lam sum_j \|x_j\|` | `lam sum_j sqrt(x_j^2 + delta^2)` | the `d` coordinate hyperplanes |
+| group lasso | `lam sum_g \|x_g\|_2` | `lam sum_g sqrt(\|x_g\|^2 + delta^2)` | the `d/3` block subspaces `{x_g = 0}` |
+| total variation | `lam sum_j \|x_{j+1} - x_j\|` | `lam sum_j sqrt((x_{j+1}-x_j)^2 + delta^2)` | the `d-1` hyperplanes `{x_j = x_{j+1}}` |
+
+The two new ones are chosen because their kinks line up with the *fields* rather
+than with the coordinates: the group lasso's groups are exactly the triples the
+state-dependent `J_s` rotates within, and total variation's differences are
+exactly the neighbour pairs the constant tridiagonal `J_a` couples.  A fourth,
+`lam |x|_infinity` with a log-sum-exp anchor, is implemented and tested but not
+run.
+
+Each penalty has a different number of smoothed absolute values -- 9, 3 and 8 at
+`d = 9` -- so the smoothing is set by
+`nds.anchored_constrained.delta_for`, which holds `lam n_terms delta` fixed at
+what the lasso's rule gave.  Every penalty then has the same worst-case clock,
+`exp(-4.5)`, and none is handicapped by having more kinks than another.  The
+penalty strength is the same rule as before and lands on the same value,
+`lam = 0.01 n_train`
+([`results/anchored_lasso_calibration_group.md`](results/anchored_lasso_calibration_group.md),
+[`_tv.md`](results/anchored_lasso_calibration_tv.md)).
+
+These are genuinely different targets, not relabelled ones.  On MAGIC's sublevel
+set the exact constrained posterior's test accuracy is 0.7912 under the lasso,
+0.7853 under the group lasso and 0.7773 under total variation, and the number of
+coordinates its mean puts within 0.02 of zero falls from four to one to one.
+
+#### Does the rotation still pay?
+
+250 iterations, the same step sizes, the same selection rule, three to five
+walker seeds; full table in
+[`results/anchored_regularizers_250.md`](results/anchored_regularizers_250.md).
+
+![three regularizers](figures/anchored_regularizers.png)
+
+| penalty | Titanic ball | Titanic sublevel | MAGIC ball | MAGIC sublevel | Synthetic ball | Synthetic sublevel |
+|---|---|---|---|---|---|---|
+| lasso, `J_a` | **5.3x** | **6.8x** | 1.5x | 1.3x | **18.8x** | **20.9x** |
+| lasso, `J_s`/`J_g` | **4.4x** | **1.4x** | 1.1x | **1.3x** | **1.2x** | 1.0x |
+| group, `J_a` | **5.5x** | **6.9x** | 1.7x | **2.2x** | **1.5x** | **1.3x** |
+| group, `J_s`/`J_g` | **3.3x** | **1.4x** | 2.4x | 0.5x | 1.0x | 1.0x |
+| tv, `J_a` | **5.1x** | **6.0x** | 0.8x | 0.4x | **1.6x** | **1.5x** |
+| tv, `J_s`/`J_g` | **3.5x** | **1.6x** | 1.0x | 0.8x | **1.1x** | 1.0x |
+
+Ratios of the accuracy gap left at iteration 250, `J = 0` over the field, so
+above 1 the field wins; **bold** is a win by more than one standard error.  The
+posterior-mean error ratios, in the lower half of the figure, are above 1 in 33
+of the 36 cells.
+
+The answer holds where there is something to win.  On Titanic -- the problem
+whose 250 iterations are genuinely short of convergence, with the baseline's gap
+at 0.016 to 0.024 -- both fields beat `J = 0` under **all three** penalties, and
+by almost identical margins: the constant field by 5.1x to 6.9x and the
+state-dependent one by 1.4x to 4.4x.  Swapping the lasso for a group lasso or
+for total variation moves those numbers by less than their standard errors.  The
+synthetic problem is the same story at a smaller scale.
+
+MAGIC is where the penalty matters, and for a reason that is about the *budget*
+rather than the field: at these step sizes 250 iterations is already enough for
+the baseline, whose gap is 0.0014 to 0.0047 with a standard error of half that,
+so the accuracy ratios there are noise (which is why MAGIC's bars carry the
+figure's only large error bars, and why the one clear loss, total variation's
+`J_a` at 0.4x, sits on a baseline gap of 0.0019 +/- 0.0010).  Lowering MAGIC's
+step to `eta / 64`, where the baseline's gap is 0.019 +/- 0.000 and the budget
+binds again, restores the pattern under the group lasso: the constant field wins
+1.99x on the ball and 1.44x on the sublevel set, the state-dependent field 1.12x
+on the ball, and only the state field on MAGIC's sublevel set still fails
+(0.91x).
+
+So the mechanism established under the lasso is not about the lasso.  It carries
+over unchanged to a penalty whose kinks are block subspaces and to one whose
+kinks are differences of neighbours, including the part that needed fixing: on
+every ball the state-dependent field still needs the non-radial `h`
+([why](#why-no-amplitude-can-help-on-a-ball)), and the amplitudes the three
+penalties want agree to within one step of the ladder.
+
+One thing did change, and it is the alignment the group lasso was chosen to
+test: on MAGIC's ball the state-dependent field is the *better* of the two
+fields under the group penalty (2.4x against the constant field's 1.7x), the
+only cell in the whole table where that happens.  Its groups and the field's
+blocks are the same three triples there, so the rotation acts in exactly the
+subspaces the penalty makes stiff.  With 3 seeds the margin is inside the error
+bars, so this is a lead worth following rather than a result.
+
 ### Caveats specific to this section
 
 * The paper does not state the coefficient vector its synthetic data is
@@ -1409,6 +1503,16 @@ what limits the answer.
   the sublevel set does it reach four.  A stronger lasso makes the anchored
   machinery matter more and the constrained machinery matter less, and
   `--lam-scale` moves along that trade-off.
+* The cross-penalty comparison uses three walker seeds on MAGIC and the
+  synthetic problem and five on Titanic, and `lam = 0.01 n_train` for all three
+  penalties -- the same rule, and it happens to land on the same value, but not
+  a per-penalty re-tune.
+* MAGIC's cross-penalty cells at `eta / 16` sit on a baseline gap of 0.0014 to
+  0.0047 with a standard error of about half that, so their accuracy ratios are
+  noise in both directions; the `eta / 64` check is the one to read there, and it
+  was run under the group penalty only.
+* The max-norm penalty is implemented and unit-tested but not swept, so the
+  cross-penalty claim rests on three penalties, not four.
 
 ## Datasets
 
@@ -1525,6 +1629,27 @@ python3 experiments/plot_anchored_srnsgld.py --suffixes _250 --gap --no-zoom \
     --smooth 5 --summary summary_anchored_srnsgld_250.md
 ```
 
+The same budget under a different non-differentiable penalty
+([Other regularizers](#other-regularizers-group-lasso-and-total-variation)).
+Each penalty needs its own exact reference, since it is a different target:
+
+```bash
+python3 experiments/calibrate_anchored_lasso.py --regularizer group
+python3 experiments/sweep_anchored.py --problem titanic --domain ball \
+    --regularizer group --n-iter 250 --score-every 1 \
+    --kappas 0.3 1.0 2.0 3.0 --tilts 0.0 1.0 3.0 6.0 --seeds 0 1 2 3 4 \
+    --tag _250                            # and once per problem, set and penalty
+python3 experiments/run_anchored_srnsgld.py --problems titanic --domains ball \
+    --regularizer group --n-iter 250 --amp-scale-constant 0.3 \
+    --amp-scale-state 0.3 --tilt 3.0 --tag-suffix _group250
+python3 experiments/plot_regularizers.py --n-iter 250 --penalties l1 group tv
+```
+
+`--regularizer` takes `l1` (the default), `group`, `tv` or `linf`, and threads
+through the calibration, the sweep, the runner and `select_anchored.py`; the
+smoothing `delta` is set per penalty by `nds.anchored_constrained.delta_for` so
+that every penalty carries the same worst-case anchoring clock.
+
 The unpreconditioned robustness check, whose outputs are suffixed so that they
 do not overwrite the defaults:
 
@@ -1613,7 +1738,8 @@ nds/skew.py        J = 0, constant, radial and directional fields, and their div
 nds/design.py      designing J from the geometry: pairing, step-size rule, calibration
 nds/anchored.py    the l1 target, its smooth anchor, anchored Langevin, an exact reference
 nds/constrained.py constrained target, ball with skew reflection, J_a and block-diagonal J_s
-nds/anchored_constrained.py  the paper's fields and constraint sets, lasso target, anchored SRNSGLD
+nds/anchored_constrained.py  the paper's fields and constraint sets, four kinked
+                   penalties with smooth anchors, anchored SRNSGLD, an exact reference
 nds/sampler.py     Metropolis-corrected irreversible steps, warm-up, calibration
 nds/reference.py   MAP, Laplace covariance, long gradient-based reference chain
 nds/metrics.py     autocorrelation, ESS, iterations-to-reference

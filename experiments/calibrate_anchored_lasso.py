@@ -32,9 +32,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from nds.anchored_constrained import (  # noqa: E402
     Ball,
-    LassoLogistic,
+    RegularisedLogistic,
     SmoothedLpBall,
     ZeroField,
+    delta_for,
+    make_regularizer,
 )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,7 +44,7 @@ RESULTS = os.path.join(ROOT, "results")
 sys.path.insert(0, os.path.join(ROOT, "experiments"))
 
 
-def constrained_lasso_map(target: LassoLogistic, domain, n_iter: int = 4000) -> np.ndarray:
+def constrained_lasso_map(target, domain, n_iter: int = 4000) -> np.ndarray:
     """Projected gradient descent on the smooth anchor, retracted into ``K``."""
     L = 0.25 * np.linalg.eigvalsh(target.X.T @ target.X).max() + target.lam / target.delta
     idx = np.arange(target.n)
@@ -61,11 +63,13 @@ def main() -> None:
     parser.add_argument("--problems", nargs="+", default=["synthetic", "magic", "titanic"])
     parser.add_argument("--ladder", nargs="+", type=float, default=[0.01, 0.03, 0.1, 0.3])
     parser.add_argument("--clock-budget", type=float, default=0.5)
+    parser.add_argument("--regularizer", default="l1",
+                        choices=["l1", "group", "tv", "linf"])
     parser.add_argument("--split-seed", type=int, default=0)
     args = parser.parse_args()
 
     lines = [
-        "# Choosing the lasso strength",
+        f"# Choosing the penalty strength ({args.regularizer})",
         "",
         "`lam = c n_train`, `delta = 0.5 / lam`.  `|x*|` is the norm of the constrained",
         "lasso MAP and `on boundary` says whether the constraint is still active there;",
@@ -93,7 +97,10 @@ def main() -> None:
         for dname, domain in domains:
             for c in args.ladder:
                 lam = c * n
-                target = LassoLogistic(X, y, lam=lam, delta=args.clock_budget / lam)
+                delta = delta_for(args.regularizer, lam, d, args.clock_budget)
+                target = RegularisedLogistic(
+                    X, y, make_regularizer(args.regularizer, lam, delta, d)
+                )
                 w = constrained_lasso_map(target, domain)
                 on_bd = not bool(domain.contains(w[:, None] * 1.0001)[0])
                 chosen = " **used**" if abs(c - LAM_SCALE[problem]) < 1e-12 else ""
@@ -105,7 +112,8 @@ def main() -> None:
                 )
     text = "\n".join(lines) + "\n"
     print(text)
-    with open(os.path.join(RESULTS, "anchored_lasso_calibration.md"), "w") as handle:
+    suffix = "" if args.regularizer == "l1" else f"_{args.regularizer}"
+    with open(os.path.join(RESULTS, f"anchored_lasso_calibration{suffix}.md"), "w") as handle:
         handle.write(text)
 
 

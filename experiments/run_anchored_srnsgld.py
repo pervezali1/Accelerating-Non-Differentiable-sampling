@@ -39,7 +39,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from nds.anchored_constrained import (  # noqa: E402
     Ball,
     ConstantField,
-    LassoLogistic,
+    RegularisedLogistic,
+    delta_for,
+    make_regularizer,
+    reference_path,
     SmoothedLpBall,
     ZeroField,
     ball_axial_field,
@@ -180,8 +183,14 @@ def build(problem: str, domain_key: str, args) -> tuple:
 
     scale = args.lam_scale if args.lam_scale is not None else LAM_SCALE[problem]
     lam = args.lam if args.lam is not None else scale * n_train
-    delta = args.delta if args.delta is not None else args.clock_budget / max(lam, 1e-12)
-    target = LassoLogistic(data["X_train"], data["y_train"], lam=lam, delta=delta)
+    delta = (
+        args.delta if args.delta is not None
+        else delta_for(args.regularizer, max(lam, 1e-12), d, args.clock_budget)
+    )
+    target = RegularisedLogistic(
+        data["X_train"], data["y_train"],
+        make_regularizer(args.regularizer, lam, delta, d),
+    )
 
     kappa = args.amp_scale
     if kappa is None:
@@ -223,8 +232,9 @@ def build(problem: str, domain_key: str, args) -> tuple:
 
 
 def reference(problem, domain_key, target, domain, data, args) -> dict:
-    tag = f"{problem}_{domain_key}_lam{target.lam:.4g}"
-    path = os.path.join(RESULTS, f"reference_anchored_{tag}.npz")
+    path = os.path.join(
+        RESULTS, reference_path(problem, domain_key, target.lam, args.regularizer)
+    )
     if os.path.exists(path) and not args.refresh_reference:
         return dict(np.load(path))
     started = time.time()
@@ -249,7 +259,7 @@ def run(problem: str, domain_key: str, args) -> dict:
     n_iter = args.n_iter or dcfg.get("n_iter", cfg["n_iter"])
     eta = args.step_size or cfg["step_size"]
     print(
-        f"[{problem}/{domain_key}] d={target.d} n_train={target.n} "
+        f"[{problem}/{domain_key}/{args.regularizer}] d={target.d} n_train={target.n} "
         f"n_test={len(data['y_test'])} {domain.key} lam={target.lam:.3g} "
         f"delta={target.delta:.4g} clock floor {target.clock_floor:.3g} "
         f"eta={eta:.1e} batch={cfg['batch']} iters={n_iter} walkers={cfg['n_walkers']} "
@@ -299,6 +309,9 @@ def run(problem: str, domain_key: str, args) -> dict:
         "n_test": int(len(data["y_test"])),
         "lam": target.lam,
         "lam_scale": target.lam / target.n,
+        "regularizer": args.regularizer,
+        "regularizer_label": target.regularizer.label,
+        "regularizer_terms": target.regularizer.n_terms,
         "delta": target.delta,
         "clock_floor": target.clock_floor,
         "step_size": eta,
@@ -355,6 +368,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--problems", nargs="+", default=["synthetic", "magic", "titanic"])
     parser.add_argument("--domains", nargs="+", default=["ball", "lp"])
+    parser.add_argument("--regularizer", default="l1",
+                        choices=["l1", "group", "tv", "linf"],
+                        help="the non-differentiable penalty in the target")
     parser.add_argument("--lam", type=float, default=None,
                         help="lasso strength; the default is --lam-scale times n_train, "
                              "since the potential is a sum over data points")

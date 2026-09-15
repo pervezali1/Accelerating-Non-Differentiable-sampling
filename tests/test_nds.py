@@ -13,6 +13,13 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from nds.anchored_constrained import (  # noqa: E402
+    GroupLasso,
+    L1,
+    MaxNorm,
+    RegularisedLogistic,
+    TotalVariation,
+    delta_for,
+    make_regularizer,
     outward_tilt_direction,
     tilted_axial_field,
     Ball as PaperBall,
@@ -635,6 +642,122 @@ def test_outward_tilt_direction_beats_every_direction_tried():
     best_random = max(push(rng.normal(size=target.d)) for _ in range(300))
     assert push(u_star) > best_random
     assert push(u_star) > 0.0 > push(-u_star)
+
+
+# --------------------------------------------------------------------------
+# Other non-differentiable regularizers: the anchored machinery only needs a
+# smooth majoriser with a bounded gap, and each penalty kinks somewhere else.
+# --------------------------------------------------------------------------
+def test_every_regularizer_majorises_with_a_bounded_gap():
+    rng = np.random.default_rng(12)
+    d, lam, budget = 9, 10.0, 0.5
+    W = rng.normal(size=(d, 200)) * 0.5
+    W[:, :20] = 0.0                # every coordinate at the kink
+    W[3:6, 20:40] = 0.0            # one whole group at the kink
+    W[:, 40:60] = W[:1, 40:60]     # all coordinates equal: the TV kink
+    gaps = {}
+    for key in ("l1", "group", "tv", "linf"):
+        delta = delta_for(key, lam, d, budget)
+        reg = make_regularizer(key, lam, delta, d)
+        target = RegularisedLogistic(*_toy(n=80, d=d, seed=2), reg)
+        gap = reg.log_gap(W)
+        assert (gap >= -1e-9).all(), key                      # majorises
+        assert (gap <= reg.max_gap + 1e-9).all(), key         # and by no more than the bound
+        clock = target.clock(W)
+        assert np.allclose(clock, np.exp(-gap))
+        assert (clock <= 1.0 + 1e-12).all() and (clock >= target.clock_floor - 1e-12).all()
+        gaps[key] = reg.max_gap
+
+        # the drift follows the anchor, so its gradient has to be right
+        G = reg.anchor_grad(W[:, :6])
+        eps = 1e-6
+        for j in range(d):
+            plus, minus = W[:, :6].copy(), W[:, :6].copy()
+            plus[j] += eps
+            minus[j] -= eps
+            fd = (reg.anchor(plus) - reg.anchor(minus)) / (2 * eps)
+            assert np.abs(G[j] - fd).max() < 1e-3 * max(1.0, np.abs(fd).max()), (key, j)
+
+    # delta_for equalises the worst case, so no penalty is handicapped by having
+    # more or fewer smoothed absolute values than another
+    assert max(gaps.values()) - min(gaps.values()) < 1e-9, gaps
+    assert abs(gaps["l1"] - budget * d) < 1e-9
+
+
+def test_each_regularizer_kinks_where_it_should():
+    """The exact penalties are non-differentiable on different sets."""
+    rng = np.random.default_rng(13)
+    d, lam = 9, 10.0
+    reg_l1 = L1(lam, 0.05, d)
+    reg_gr = GroupLasso(lam, 0.05, d)
+    reg_tv = TotalVariation(lam, 0.05, d)
+    reg_mx = MaxNorm(lam, 0.05, d)
+    v = rng.normal(size=(d, 1))
+    eps = 1e-7
+
+    def kinked(reg, x0, direction=None):
+        """Is the exact penalty non-differentiable at ``x0`` along a direction?"""
+        w = v if direction is None else direction
+        right = (reg.value(x0 + eps * w) - reg.value(x0)) / eps
+        left = (reg.value(x0) - reg.value(x0 - eps * w)) / eps
+        return bool(np.abs(right - left).max() > 1e-3 * lam)
+
+    zero = np.zeros((d, 1))
+    one_group = rng.normal(size=(d, 1))
+    one_group[3:6] = 0.0
+    flat = np.ones((d, 1)) * 0.3
+    interior = np.array([[0.5], [-0.4], [0.9], [0.2], [-0.7], [0.3], [1.1], [-0.2], [0.6]])
+
+    # the lasso kinks wherever a coordinate is zero; the group lasso only where a
+    # whole group is
+    assert kinked(reg_l1, one_group) and kinked(reg_gr, one_group)
+    assert not kinked(reg_l1, interior) and not kinked(reg_gr, interior)
+    single = interior.copy()
+    single[2] = 0.0
+    assert kinked(reg_l1, single)
+    assert not kinked(reg_gr, single)     # one zero coordinate is not a zero group
+
+    # total variation kinks where neighbours meet, not where coordinates vanish
+    assert kinked(reg_tv, flat)
+    assert not kinked(reg_tv, interior)
+    assert not kinked(reg_l1, flat)
+
+    # the max norm kinks where the maximising coordinate changes hands, so the
+    # direction has to move the tied pair apart
+    tie = interior.copy()
+    tie[0], tie[6] = 1.1, 1.1
+    swap = np.zeros((d, 1))
+    swap[0], swap[6] = 1.0, -1.0
+    assert kinked(reg_mx, tie, swap)
+    assert not kinked(reg_mx, interior)
+    assert kinked(reg_gr, zero) and kinked(reg_tv, zero) and kinked(reg_mx, zero)
+
+
+def test_anchored_chain_hits_the_reference_with_a_group_penalty():
+    """Changing the penalty must not change what the chain samples."""
+    X, y = _toy(n=200, d=6, seed=9)
+    data = {"X_train": X, "y_train": y, "X_test": X, "y_test": y}
+    lam = 8.0
+    reg = GroupLasso(lam, delta_for("group", lam, 6, 0.5), 6, size=3)
+    target = RegularisedLogistic(X, y, reg)
+    domain = PaperBall(0.6, squared=True)
+    ref = constrained_lasso_reference(
+        target, domain, data, n_iter=40000, n_warmup=10000, seed=0
+    )
+    assert 0.1 < ref["acceptance"] < 0.5
+    metric = np.linalg.pinv(ref["posterior_cov"])
+    errors = {}
+    for field in (ZeroField(6), ConstantField(6, 1.0), ball_axial_field(6, 1.0)):
+        out = run_anchored_srnsgld(
+            target, field, domain, data, n_iter=20000, n_walkers=16, step_size=2e-4,
+            batch_size=len(y), seed=2, start_radius=0.3,
+            reference_mean=ref["posterior_mean"], reference_metric=metric,
+        )
+        assert out["failed_retractions"] == 0, field.key
+        assert out["boundary_rate"] > 0.05, field.key
+        errors[field.key] = out["mean_error"]
+        assert out["mean_error"] < 0.9, (field.key, out["mean_error"])
+    assert max(errors.values()) - min(errors.values()) < 0.3, errors
 
 
 if __name__ == "__main__":

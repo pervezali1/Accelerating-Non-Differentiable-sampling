@@ -443,8 +443,206 @@ def curvature_blocks(target, domain) -> np.ndarray:
 
 
 # -------------------------------------------------------------------- targets
-class LassoLogistic:
-    r"""``U(x) = NLL(x) + lam |x|_1`` with the smooth anchor and its clock.
+class Regularizer:
+    r"""A non-differentiable penalty, its smooth majoriser, and the clock bound.
+
+    Anchored Langevin needs three things of a regularizer and nothing else:
+
+    * ``value(x)`` -- the penalty in the target, kinked;
+    * ``anchor(x)`` and ``anchor_grad(x)`` -- a smooth ``R_0 >= R`` and its
+      gradient, which is what the drift follows;
+    * ``log_gap(x) = R_0(x) - R(x) >= 0`` and a bound ``max_gap`` on it, which
+      give the clock ``a = exp(-log_gap)`` and its floor ``exp(-max_gap)``.
+
+    Every penalty below is a sum of ``n_terms`` smoothed absolute values, each
+    contributing at most ``lam delta`` to the gap, so ``max_gap`` is
+    ``lam n_terms delta``.  What differs between them is *where* the kinks are,
+    which is the geometry that matters here: the lasso kinks on the ``d``
+    coordinate hyperplanes, the group lasso on ``d / 3`` block subspaces, total
+    variation on the ``d - 1`` hyperplanes ``x_j = x_{j+1}``.
+    """
+
+    key = "abstract"
+    label = "abstract"
+
+    def __init__(self, lam: float, delta: float, d: int) -> None:
+        self.lam, self.delta, self.d = float(lam), float(delta), int(d)
+
+    @property
+    def n_terms(self) -> int:
+        raise NotImplementedError
+
+    @property
+    def max_gap(self) -> float:
+        return self.lam * self.n_terms * self.delta
+
+    def value(self, W: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def anchor(self, W: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def anchor_grad(self, W: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    def log_gap(self, W: np.ndarray) -> np.ndarray:
+        return self.anchor(W) - self.value(W)
+
+
+class L1(Regularizer):
+    r"""``lam |x|_1``: the lasso.  Kinks on every coordinate hyperplane."""
+
+    key, label = "l1", r"lasso, $\lambda\|x\|_1$"
+
+    @property
+    def n_terms(self) -> int:
+        return self.d
+
+    def value(self, W):
+        return self.lam * np.abs(W).sum(axis=0)
+
+    def anchor(self, W):
+        return self.lam * np.sqrt(W * W + self.delta**2).sum(axis=0)
+
+    def anchor_grad(self, W):
+        return self.lam * W / np.sqrt(W * W + self.delta**2)
+
+
+class GroupLasso(Regularizer):
+    r"""``lam sum_g |x_g|_2``: the group lasso, on consecutive blocks of ``size``.
+
+    The kinked set is now the ``d / size`` block subspaces ``{x_g = 0}`` rather
+    than the coordinate hyperplanes -- a coarser, lower-dimensional kink that a
+    coordinate-wise lasso cannot produce.  With ``size = 3`` the groups are
+    exactly the triples the paper's state-dependent field rotates within, which
+    is the interesting case: the penalty's kinks and the field's blocks align.
+    """
+
+    key, label = "group", r"group lasso, $\lambda\sum_g\|x_g\|_2$"
+
+    def __init__(self, lam: float, delta: float, d: int, size: int = 3) -> None:
+        super().__init__(lam, delta, d)
+        if d % size:
+            raise ValueError(f"group lasso needs d divisible by {size}, got {d}")
+        self.size = int(size)
+
+    @property
+    def n_terms(self) -> int:
+        return self.d // self.size
+
+    def _norms(self, W: np.ndarray) -> np.ndarray:
+        """Group norms, shape ``(n_groups, m)``."""
+        B = W.reshape(self.n_terms, self.size, -1)
+        return np.sqrt((B * B).sum(axis=1))
+
+    def value(self, W):
+        return self.lam * self._norms(W).sum(axis=0)
+
+    def anchor(self, W):
+        r = self._norms(W)
+        return self.lam * np.sqrt(r * r + self.delta**2).sum(axis=0)
+
+    def anchor_grad(self, W):
+        r = self._norms(W)  # (g, m)
+        scale = self.lam / np.sqrt(r * r + self.delta**2)  # (g, m)
+        return (W.reshape(self.n_terms, self.size, -1) * scale[:, None, :]).reshape(W.shape)
+
+
+class TotalVariation(Regularizer):
+    r"""``lam sum_j |x_{j+1} - x_j|``: total variation along the coordinates.
+
+    Non-separable: the kinks sit on the ``d - 1`` hyperplanes
+    ``{x_j = x_{j+1}}``, so the penalty pushes *neighbouring* coordinates
+    together rather than each one to zero -- and those are exactly the pairs the
+    constant tridiagonal ``J_a`` couples.
+    """
+
+    key, label = "tv", r"total variation, $\lambda\sum_j|x_{j+1}-x_j|$"
+
+    @property
+    def n_terms(self) -> int:
+        return self.d - 1
+
+    def value(self, W):
+        return self.lam * np.abs(np.diff(W, axis=0)).sum(axis=0)
+
+    def anchor(self, W):
+        Z = np.diff(W, axis=0)
+        return self.lam * np.sqrt(Z * Z + self.delta**2).sum(axis=0)
+
+    def anchor_grad(self, W):
+        Z = np.diff(W, axis=0)
+        t = self.lam * Z / np.sqrt(Z * Z + self.delta**2)  # (d-1, m)
+        out = np.zeros_like(W)
+        out[:-1] -= t
+        out[1:] += t
+        return out
+
+
+class MaxNorm(Regularizer):
+    r"""``lam max_j |x_j|``: the ``l_infinity`` penalty, smoothed by log-sum-exp.
+
+    The anchor is ``(lam / beta) log sum_j exp(beta sqrt(x_j^2 + delta^2))``,
+    which majorises because the soft maximum is above the maximum and
+    ``sqrt(x^2 + delta^2) >= |x|``; the gap is at most
+    ``lam (log(d) / beta + delta)``, so ``beta`` is fixed from ``delta`` by
+    ``beta = log(d) / delta`` and the bound reads ``2 lam delta``, i.e. two
+    smoothed absolute values' worth.
+    """
+
+    key, label = "linf", r"max norm, $\lambda\|x\|_\infty$"
+
+    def __init__(self, lam: float, delta: float, d: int) -> None:
+        super().__init__(lam, delta, d)
+        self.beta = np.log(max(d, 2)) / max(delta, 1e-12)
+
+    @property
+    def n_terms(self) -> int:
+        return 2
+
+    def value(self, W):
+        return self.lam * np.abs(W).max(axis=0)
+
+    def _soft(self, W):
+        A = np.sqrt(W * W + self.delta**2)
+        top = A.max(axis=0, keepdims=True)
+        return top[0] + np.log(np.exp(self.beta * (A - top)).sum(axis=0)) / self.beta
+
+    def anchor(self, W):
+        return self.lam * self._soft(W)
+
+    def anchor_grad(self, W):
+        A = np.sqrt(W * W + self.delta**2)
+        top = A.max(axis=0, keepdims=True)
+        E = np.exp(self.beta * (A - top))
+        weights = E / E.sum(axis=0, keepdims=True)
+        return self.lam * weights * (W / A)
+
+
+REGULARIZERS = {r.key: r for r in (L1, GroupLasso, TotalVariation, MaxNorm)}
+
+
+def make_regularizer(key: str, lam: float, delta: float, d: int) -> Regularizer:
+    if key not in REGULARIZERS:
+        raise KeyError(f"unknown regularizer {key!r}; have {sorted(REGULARIZERS)}")
+    return REGULARIZERS[key](lam, delta, d)
+
+
+def delta_for(key: str, lam: float, d: int, budget: float = 0.5) -> float:
+    r"""The anchor's smoothing, set so every regularizer has the same clock floor.
+
+    A penalty with ``n_terms`` smoothed absolute values has worst-case gap
+    ``lam n_terms delta``.  Holding that equal to what an ``l_1`` penalty on all
+    ``d`` coordinates would give at ``delta = budget / lam`` -- the rule the
+    lasso runs used -- means ``delta = budget d / (lam n_terms)``, so the clock
+    never falls below ``exp(-budget d)`` whichever penalty is in use.
+    """
+    probe = make_regularizer(key, 1.0, 1.0, d)
+    return budget * d / (lam * probe.n_terms)
+
+
+class RegularisedLogistic:
+    r"""``U(x) = NLL(x) + R(x)`` with ``R``'s smooth anchor and its clock.
 
     ``potential`` is the exact, kinked target -- used by the Metropolis
     reference and never by the sampler.  ``anchor_grad`` is the mini-batch
@@ -453,13 +651,12 @@ class LassoLogistic:
     the penalty term is exact because it costs ``O(d)``.
     """
 
-    def __init__(
-        self, X: np.ndarray, y: np.ndarray, lam: float = 0.0, delta: float = 0.02
-    ) -> None:
+    def __init__(self, X: np.ndarray, y: np.ndarray, regularizer: Regularizer) -> None:
         self.X = np.ascontiguousarray(X, float)
         self.y = np.ascontiguousarray(y, float)
         self.n, self.d = self.X.shape
-        self.lam, self.delta = float(lam), float(delta)
+        self.regularizer = regularizer
+        self.lam, self.delta = regularizer.lam, regularizer.delta
 
     # ------------------------------------------------------------ potentials
     def nll(self, W: np.ndarray) -> np.ndarray:
@@ -467,21 +664,21 @@ class LassoLogistic:
         return softplus(Z).sum(axis=0) - self.y @ Z
 
     def potential(self, W: np.ndarray) -> np.ndarray:
-        return self.nll(W) + self.lam * np.abs(W).sum(axis=0)
+        return self.nll(W) + self.regularizer.value(W)
 
     def anchor_potential(self, W: np.ndarray) -> np.ndarray:
-        return self.nll(W) + self.lam * np.sqrt(W * W + self.delta**2).sum(axis=0)
+        return self.nll(W) + self.regularizer.anchor(W)
 
     def log_clock(self, W: np.ndarray) -> np.ndarray:
         """``U - U_0``; the likelihood cancels, so this is ``O(d)`` to evaluate."""
-        return -self.lam * (np.sqrt(W * W + self.delta**2) - np.abs(W)).sum(axis=0)
+        return -self.regularizer.log_gap(W)
 
     def clock(self, W: np.ndarray) -> np.ndarray:
         return np.exp(self.log_clock(W))
 
     @property
     def clock_floor(self) -> float:
-        return float(np.exp(-self.lam * self.d * self.delta))
+        return float(np.exp(-self.regularizer.max_gap))
 
     # ------------------------------------------------------------- gradients
     def batch(self, m_size: int, rng) -> np.ndarray:
@@ -493,11 +690,29 @@ class LassoLogistic:
         Xb, yb = self.X[idx], self.y[idx]
         resid = _sigmoid(Xb @ W) - yb[:, None]
         scale = self.n / len(idx)
-        smooth = self.lam * W / np.sqrt(W * W + self.delta**2)
-        return scale * (Xb.T @ resid) + smooth
+        return scale * (Xb.T @ resid) + self.regularizer.anchor_grad(W)
 
     def predict_proba(self, W: np.ndarray, X: np.ndarray) -> np.ndarray:
         return _sigmoid(X @ W)
+
+
+class LassoLogistic(RegularisedLogistic):
+    """The lasso case, kept as its own name because most of the runs use it."""
+
+    def __init__(
+        self, X: np.ndarray, y: np.ndarray, lam: float = 0.0, delta: float = 0.02
+    ) -> None:
+        super().__init__(X, y, L1(lam, delta, X.shape[1]))
+
+
+def reference_path(problem: str, domain: str, lam: float, regularizer: str = "l1") -> str:
+    """Where the exact reference for one target lives.
+
+    The lasso runs came first and their files carry no regularizer tag, so that
+    naming is kept and every other penalty adds one.
+    """
+    tag = "" if regularizer == "l1" else f"_{regularizer}"
+    return f"reference_anchored_{problem}_{domain}{tag}_lam{lam:.4g}.npz"
 
 
 # -------------------------------------------------------------------- scoring

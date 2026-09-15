@@ -42,6 +42,7 @@ from nds.anchored_constrained import (  # noqa: E402
     ball_axial_field,
     constrained_lasso_map,
     curvature_blocks,
+    reference_path,
     run_anchored_srnsgld,
     outward_tilt_direction,
     sublevel_axial_field,
@@ -127,6 +128,8 @@ def main() -> None:
     parser.add_argument("--n-walkers", type=int, default=None)
     parser.add_argument("--score-every", type=int, default=None)
     parser.add_argument("--start-radius", type=float, default=1.0)
+    parser.add_argument("--regularizer", default="l1",
+                        choices=["l1", "group", "tv", "linf"])
     parser.add_argument("--lam-scale", type=float, default=None)
     parser.add_argument("--lam", type=float, default=None)
     parser.add_argument("--delta", type=float, default=None)
@@ -149,9 +152,9 @@ def main() -> None:
     n_walkers = args.n_walkers or cfg["n_walkers"]
     eta_base = args.eta or cfg["step_size"]
 
-    lam_tag = f"{target.lam:.4g}"
     ref = dict(np.load(os.path.join(
-        RESULTS, f"reference_anchored_{args.problem}_{args.domain}_lam{lam_tag}.npz")))
+        RESULTS,
+        reference_path(args.problem, args.domain, target.lam, args.regularizer))))
     ref_mean = np.asarray(ref["posterior_mean"], float)
     metric = np.linalg.pinv(np.asarray(ref["posterior_cov"], float))
     ref_acc = float(ref["accuracy_test"])
@@ -245,6 +248,8 @@ def main() -> None:
             )
 
     tag = f"{args.problem}_{args.domain}"
+    if args.regularizer != "l1":
+        tag += f"_{args.regularizer}"
     if args.block_order != "columns":
         tag += f"_{args.block_order}"
     if any(args.tilts):
@@ -255,6 +260,7 @@ def main() -> None:
         "domain": args.domain,
         "profile": args.profile,
         "block_order": args.block_order,
+        "regularizer": args.regularizer,
         "lam": target.lam,
         "delta": target.delta,
         "n_walkers": n_walkers,

@@ -1,0 +1,125 @@
+{
+  "problem": "synthetic",
+  "pretty": "Synthetic ($d$ = 3)",
+  "domain": "lp",
+  "domain_label": "smoothed $\\ell_p$ sublevel set, p = 4, $\\varepsilon$ = 0.2, $\\lambda$ = 1",
+  "d": 3,
+  "n_train": 1600,
+  "n_test": 400,
+  "lam": 16.0,
+  "lam_scale": 0.01,
+  "regularizer": "tv",
+  "regularizer_label": "total variation, $\\lambda\\sum_j|x_{j+1}-x_j|$",
+  "regularizer_terms": 2,
+  "delta": 0.046875,
+  "clock_floor": 0.22313016014842982,
+  "step_size": 6.25e-06,
+  "eta_lam": 0.0001,
+  "batch_size": 50,
+  "n_iter": 250,
+  "score_every": 1,
+  "n_walkers": 100,
+  "start_radius": 1.0,
+  "anchored": true,
+  "amp_scale": {
+    "constant": 1.0,
+    "state": 1.0
+  },
+  "tilt": 0.0,
+  "amplitudes": {
+    "a": 1.0,
+    "s": [
+      10.0
+    ]
+  },
+  "operator_norms": {
+    "constant": 1.4142135623730951,
+    "state": 10.0
+  },
+  "reference": {
+    "accuracy_train": 0.7482539531250001,
+    "accuracy_test": 0.7746803125,
+    "accuracy_test_sd": 0.004073368526458631,
+    "accuracy_test_halves": [
+      0.774681,
+      0.7746796250000001
+    ],
+    "acceptance": 0.24276625,
+    "posterior_mean": [
+      0.8719554330632795,
+      -0.5511509766443619,
+      0.0482375188190702
+    ],
+    "mean_radius": 1.0326667102828606,
+    "n_near_zero": 0
+  },
+  "runs": [
+    {
+      "key": "zero",
+      "label": "$J = 0$ (anchored PSGLD)",
+      "train_final": 0.7155625000000001,
+      "test_final": 0.7275500000000001,
+      "test_final_sd": 0.0540265906753332,
+      "mean_error": 12.562094820396032,
+      "time_mean": [
+        0.39972916759781146,
+        -0.22839767205037043,
+        0.02917457890547895
+      ],
+      "clock_mean": 0.8336138599006965,
+      "boundary_rate": 0.0,
+      "failed_retractions": 0,
+      "posterior_mean": [
+        0.4771205772576825,
+        -0.27252914952810553,
+        0.03699912886846106
+      ],
+      "n_near_zero": 0
+    },
+    {
+      "key": "constant",
+      "label": "constant $J_a$, $a$ = 1",
+      "train_final": 0.7125500000000001,
+      "test_final": 0.7432000000000002,
+      "test_final_sd": 0.03506080432619879,
+      "mean_error": 12.761425815020859,
+      "time_mean": [
+        0.33385682578288434,
+        -0.5347538596378316,
+        0.10210934833684777
+      ],
+      "clock_mean": 0.886620653136404,
+      "boundary_rate": 0.00888,
+      "failed_retractions": 0,
+      "posterior_mean": [
+        0.4560032349739246,
+        -0.6249433037468322,
+        0.07608034378549998
+      ],
+      "n_near_zero": 0
+    },
+    {
+      "key": "sublevel",
+      "label": "state-dependent $J_g(x)$, $s$ = [10.0]",
+      "train_final": 0.6875999999999998,
+      "test_final": 0.6941750000000002,
+      "test_final_sd": 0.08069390853713804,
+      "mean_error": 12.920146697249802,
+      "time_mean": [
+        0.3848802947796677,
+        -0.22064420240059138,
+        0.05429792837505719
+      ],
+      "clock_mean": 0.8382052742362867,
+      "boundary_rate": 0.04976,
+      "failed_retractions": 0,
+      "posterior_mean": [
+        0.4734988471409445,
+        -0.24492151638710868,
+        0.05254394678249857
+      ],
+      "n_near_zero": 0
+    }
+  ],
+  "runtime_seconds": 54.821701526641846
+}
