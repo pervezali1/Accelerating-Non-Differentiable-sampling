@@ -22,6 +22,8 @@ gap.  Uncertainties are standard errors over the walker seeds.
 | MAGIC | ball | group | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | MAGIC | ball | group | 6.25e-06 | `J_a` | -- | 0.3 | 0 | -- | 1.72x +/- 1.63 | 1.42x +/- 0.06 |
 | MAGIC | ball | group | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 2.42x +/- 2.01 | 1.04x +/- 0.05 |
+| MAGIC | ball | l1 | 1.56e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
+| MAGIC | ball | l1 | 1.56e-06 | `J_s` / `J_g` | spectral | 0.3 | 1 | 3.32x | 1.15x +/- 0.05 | 1.10x +/- 0.01 |
 | MAGIC | ball | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | MAGIC | ball | l1 | 6.25e-06 | `J_a` | -- | 0.3 | 0 | -- | 1.51x +/- 0.47 | 1.58x +/- 0.06 |
 | MAGIC | ball | l1 | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 1.14x +/- 0.46 | 1.41x +/- 0.04 |
@@ -39,6 +41,8 @@ gap.  Uncertainties are standard errors over the walker seeds.
 | MAGIC | sublevel | group | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | MAGIC | sublevel | group | 6.25e-06 | `J_a` | -- | 0.3 | 0 | -- | 2.21x +/- 0.83 | 1.12x +/- 0.03 |
 | MAGIC | sublevel | group | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 0.47x +/- 0.27 | 1.04x +/- 0.05 |
+| MAGIC | sublevel | l1 | 1.56e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
+| MAGIC | sublevel | l1 | 1.56e-06 | `J_s` / `J_g` | spectral | 0.3 | 0 | 1.96x | 1.03x +/- 0.07 | 1.01x +/- 0.02 |
 | MAGIC | sublevel | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | MAGIC | sublevel | l1 | 6.25e-06 | `J_a` (bias traded) | -- | 1 | 0 | -- | 1.35x +/- 0.28 | 1.30x +/- 0.03 |
 | MAGIC | sublevel | l1 | 6.25e-06 | `J_s` / `J_g` | columns | 0.03 | 1 | -- | 1.15x +/- 0.16 | 1.01x +/- 0.03 |
@@ -50,8 +54,9 @@ gap.  Uncertainties are standard errors over the walker seeds.
 | MAGIC | sublevel | tv | 6.25e-06 | `J_a` | -- | 0.3 | 0 | -- | 0.40x +/- 0.22 | 1.08x +/- 0.04 |
 | MAGIC | sublevel | tv | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 0.78x +/- 0.62 | 1.59x +/- 0.28 |
 | Synthetic | ball | group | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Synthetic | ball | group | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.48x +/- 0.06 | 1.08x +/- 0.02 |
+| Synthetic | ball | group | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.47x +/- 0.06 | 1.08x +/- 0.02 |
 | Synthetic | ball | group | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 1.02x +/- 0.03 | 1.01x +/- 0.02 |
+| Synthetic | ball | group | 6.25e-06 | `J_s` / `J_g` | spectral | 0.3 | 0 | 1.00x | 0.88x +/- 0.03 | 1.00x +/- 0.02 |
 | Synthetic | ball | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | Synthetic | ball | l1 | 6.25e-06 | `J_s` / `J_g` | spectral | 1 | 0 | 1.00x | 0.82x +/- 0.04 | 0.99x +/- 0.02 |
 | Synthetic | ball | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
@@ -62,10 +67,14 @@ gap.  Uncertainties are standard errors over the walker seeds.
 | Synthetic | ball | l1 | 2.5e-05 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 0.25x +/- 0.15 | 1.00x +/- 0.02 |
 | Synthetic | ball | tv | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | Synthetic | ball | tv | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.61x +/- 0.09 | 1.06x +/- 0.02 |
-| Synthetic | ball | tv | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 1.06x +/- 0.04 | 1.01x +/- 0.02 |
+| Synthetic | ball | tv | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 1.05x +/- 0.04 | 1.01x +/- 0.02 |
+| Synthetic | ball | tv | 6.25e-06 | `J_s` / `J_g` | spectral | 0.3 | 0 | 1.00x | 0.89x +/- 0.04 | 1.00x +/- 0.02 |
 | Synthetic | sublevel | group | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Synthetic | sublevel | group | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.32x +/- 0.15 | 1.02x +/- 0.03 |
-| Synthetic | sublevel | group | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 1.02x +/- 0.14 | 1.01x +/- 0.03 |
+| Synthetic | sublevel | group | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.31x +/- 0.15 | 1.02x +/- 0.03 |
+| Synthetic | sublevel | group | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 1.01x +/- 0.14 | 1.01x +/- 0.03 |
+| Synthetic | sublevel | group | 6.25e-06 | `J_s` / `J_g` | spectral | 0.3 | 1 | 1.05x | 1.12x +/- 0.16 | 1.03x +/- 0.03 |
+| Synthetic | sublevel | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
+| Synthetic | sublevel | l1 | 6.25e-06 | `J_s` / `J_g` | spectral | 0.3 | 1 | 1.06x | 1.16x +/- 0.13 | 1.04x +/- 0.03 |
 | Synthetic | sublevel | l1 | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
 | Synthetic | sublevel | l1 | 6.25e-06 | `J_a` | -- | 3 | 0 | -- | 20.92x +/- 5.71 | 1.36x +/- 0.03 |
 | Synthetic | sublevel | l1 | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 1.03x +/- 0.07 | 1.02x +/- 0.02 |
@@ -73,35 +82,30 @@ gap.  Uncertainties are standard errors over the walker seeds.
 | Synthetic | sublevel | l1 | 2.5e-05 | `J_a` | -- | 0.3 | 0 | -- | 1.00x +/- 0.61 | 1.03x +/- 0.03 |
 | Synthetic | sublevel | l1 | 2.5e-05 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 0.20x +/- 0.09 | 1.04x +/- 0.03 |
 | Synthetic | sublevel | tv | 6.25e-06 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Synthetic | sublevel | tv | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.50x +/- 0.18 | 1.00x +/- 0.03 |
+| Synthetic | sublevel | tv | 6.25e-06 | `J_a` | -- | 1 | 0 | -- | 1.49x +/- 0.18 | 1.00x +/- 0.03 |
 | Synthetic | sublevel | tv | 6.25e-06 | `J_s` / `J_g` | columns | 0.3 | 0 | -- | 1.00x +/- 0.13 | 1.00x +/- 0.03 |
+| Synthetic | sublevel | tv | 6.25e-06 | `J_s` / `J_g` | spectral | 0.3 | 1 | 1.07x | 1.15x +/- 0.15 | 1.02x +/- 0.03 |
 | Titanic | ball | group | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | group | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 3 | 3.76x | 1.81x +/- 0.34 | 1.31x +/- 0.01 |
-| Titanic | ball | group | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | group | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.52x +/- 1.67 | 1.48x +/- 0.03 |
-| Titanic | ball | group | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | -- | 3.25x +/- 0.80 | 1.34x +/- 0.02 |
+| Titanic | ball | group | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.51x +/- 1.67 | 1.48x +/- 0.03 |
+| Titanic | ball | group | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | 1.37x | 3.25x +/- 0.80 | 1.34x +/- 0.02 |
+| Titanic | ball | group | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 3 | 3.76x | 2.49x +/- 0.55 | 1.30x +/- 0.03 |
 | Titanic | ball | l1 | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | l1 | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 1 | 4.04x | 2.64x +/- 1.07 | 1.06x +/- 0.01 |
-| Titanic | ball | l1 | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | l1 | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.26x +/- 1.47 | 1.37x +/- 0.03 |
-| Titanic | ball | l1 | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | -- | 4.43x +/- 1.65 | 1.31x +/- 0.02 |
+| Titanic | ball | l1 | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.25x +/- 1.47 | 1.37x +/- 0.03 |
+| Titanic | ball | l1 | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | 1.30x | 4.45x +/- 1.65 | 1.31x +/- 0.02 |
+| Titanic | ball | l1 | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 1 | 4.04x | 2.63x +/- 0.65 | 1.07x +/- 0.02 |
 | Titanic | ball | tv | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | tv | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 0 | 2.87x | 1.26x +/- 0.33 | 1.00x +/- 0.01 |
-| Titanic | ball | tv | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | ball | tv | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.10x +/- 2.03 | 1.40x +/- 0.02 |
-| Titanic | ball | tv | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 3.50x +/- 0.83 | 1.11x +/- 0.02 |
+| Titanic | ball | tv | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 5.07x +/- 2.02 | 1.40x +/- 0.02 |
+| Titanic | ball | tv | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 1 | -- | 3.48x +/- 0.82 | 1.11x +/- 0.02 |
+| Titanic | ball | tv | 0.0001 | `J_s` / `J_g` | spectral | 2 | 0 | 3.42x | 1.31x +/- 0.30 | 1.04x +/- 0.02 |
 | Titanic | sublevel | group | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | group | 0.0001 | `J_s` / `J_g` | spectral | 1 | 1 | 4.36x | 2.93x +/- 1.40 | 1.19x +/- 0.03 |
-| Titanic | sublevel | group | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | group | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 6.94x +/- 2.38 | 1.13x +/- 0.02 |
-| Titanic | sublevel | group | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | -- | 1.38x +/- 0.22 | 1.34x +/- 0.02 |
+| Titanic | sublevel | group | 0.0001 | `J_a` | -- | 0.3 | 0 | 1.54x | 7.05x +/- 2.48 | 1.13x +/- 0.02 |
+| Titanic | sublevel | group | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | 1.64x | 1.38x +/- 0.22 | 1.34x +/- 0.02 |
+| Titanic | sublevel | group | 0.0001 | `J_s` / `J_g` | spectral | 1 | 1 | 4.36x | 2.32x +/- 0.61 | 1.18x +/- 0.02 |
 | Titanic | sublevel | l1 | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | l1 | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 1 | 4.83x | 3.07x +/- 1.55 | 1.18x +/- 0.02 |
-| Titanic | sublevel | l1 | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | l1 | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 6.77x +/- 2.54 | 1.09x +/- 0.01 |
-| Titanic | sublevel | l1 | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | -- | 1.41x +/- 0.21 | 1.38x +/- 0.01 |
+| Titanic | sublevel | l1 | 0.0001 | `J_a` | -- | 0.3 | 0 | 1.55x | 6.85x +/- 2.59 | 1.09x +/- 0.01 |
+| Titanic | sublevel | l1 | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | 1.63x | 1.42x +/- 0.22 | 1.38x +/- 0.01 |
+| Titanic | sublevel | l1 | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 1 | 4.83x | 4.86x +/- 2.55 | 1.19x +/- 0.02 |
 | Titanic | sublevel | tv | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | tv | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 3 | 5.07x | 6.83x +/- 1.40 | 1.40x +/- 0.08 |
-| Titanic | sublevel | tv | 0.0001 | `J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |
-| Titanic | sublevel | tv | 0.0001 | `J_a` | -- | 0.3 | 0 | -- | 6.01x +/- 1.29 | 1.10x +/- 0.01 |
-| Titanic | sublevel | tv | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | -- | 1.59x +/- 0.45 | 1.32x +/- 0.02 |
+| Titanic | sublevel | tv | 0.0001 | `J_a` | -- | 0.3 | 0 | 1.54x | 6.02x +/- 1.29 | 1.10x +/- 0.01 |
+| Titanic | sublevel | tv | 0.0001 | `J_s` / `J_g` | columns | 0.3 | 3 | 2.12x | 1.59x +/- 0.46 | 1.32x +/- 0.02 |
+| Titanic | sublevel | tv | 0.0001 | `J_s` / `J_g` | spectral | 0.3 | 3 | 5.07x | 3.48x +/- 1.18 | 1.42x +/- 0.05 |

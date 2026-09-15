@@ -52,6 +52,14 @@ def main() -> None:
                         help="which error the selection guard protects; see "
                              "select_anchored.select")
     parser.add_argument("--out", default="anchored_frames.md")
+    parser.add_argument("--best-frame", action="store_true",
+                        help="one row per field per cell: the better of the frames, "
+                             "named.  Which frame to read J_s in is a free design "
+                             "choice like the amplitude, so this is the honest "
+                             "'best this family does here' reading -- and, like the "
+                             "amplitudes, it is selected on the runs it is reported on")
+    parser.add_argument("--etas", nargs="+", type=float, default=None,
+                        help="restrict to these step sizes")
     args = parser.parse_args()
 
     # (problem, domain, penalty, eta, seeds) -> {frame: rows}
@@ -88,8 +96,12 @@ def main() -> None:
         f"gap ratio | {args.guard} ratio |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
+    if args.best_frame:
+        best: dict = {}
     for key in sorted(groups):
         problem, domain, reg, eta, seeds = key
+        if args.etas and not any(abs(eta - e) < 1e-12 for e in args.etas):
+            continue
         per_frame = groups[key]
         base = None
         for order in args.frames:
@@ -110,24 +122,33 @@ def main() -> None:
                                      "gap", args.guard)
                 if pick is None:
                     continue
-                if not shown_baseline:
+                if not shown_baseline and not args.best_frame:
                     lines.append(
                         f"| {PRETTY[problem]} | {SET[domain]} | {reg} | {eta:.3g} | "
                         f"`J = 0` | -- | -- | -- | 1.00x | 1.00x | 1.00x |"
                     )
-                    shown_baseline = True
+                shown_baseline = True
                 g, gs = ratio(base, pick, "gap_tail")
                 e, es = ratio(base, pick, args.guard)
                 pr = pick.get("slowest_rate")
                 rate = f"{pr / rate0:.2f}x" if (pr and rate0) else "--"
                 flag = "" if clean else " (bias traded)"
-                lines.append(
+                row = (
                     f"| {PRETTY[problem]} | {SET[domain]} | {reg} | {eta:.3g} | "
                     f"{NAME[field]}{flag} | "
                     f"{'--' if field == 'constant' else order} | {pick['kappa']:g} | "
                     f"{pick.get('tilt', 0.0):g} | {rate} | "
                     f"{g:.2f}x +/- {gs:.2f} | {e:.2f}x +/- {es:.2f} |"
                 )
+                if args.best_frame:
+                    cell = (problem, domain, reg, eta, field)
+                    if cell not in best or g > best[cell][0]:
+                        best[cell] = (g, row)
+                else:
+                    lines.append(row)
+    if args.best_frame:
+        for cell in sorted(best):
+            lines.append(best[cell][1])
     text = "\n".join(lines) + "\n"
     print(text)
     open(os.path.join(RESULTS, args.out), "w").write(text)
