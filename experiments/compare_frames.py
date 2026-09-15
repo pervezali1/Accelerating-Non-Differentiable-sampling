@@ -47,6 +47,10 @@ def main() -> None:
     parser.add_argument("--n-iter", type=int, default=250)
     parser.add_argument("--frames", nargs="+", default=["columns", "spectral"])
     parser.add_argument("--max-fail-rate", type=float, default=0.001)
+    parser.add_argument("--guard", default="error",
+                        choices=["error", "error_running"],
+                        help="which error the selection guard protects; see "
+                             "select_anchored.select")
     parser.add_argument("--out", default="anchored_frames.md")
     args = parser.parse_args()
 
@@ -80,7 +84,8 @@ def main() -> None:
         "wins.  Amplitudes are selected by the rule in `select_anchored.py` against the",
         "gap.  Uncertainties are standard errors over the walker seeds.",
         "",
-        "| problem | set | penalty | eta | field | frame | kappa | c | rate | gap ratio | error ratio |",
+        f"| problem | set | penalty | eta | field | frame | kappa | c | rate | "
+        f"gap ratio | {args.guard} ratio |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for key in sorted(groups):
@@ -101,7 +106,8 @@ def main() -> None:
             for field in ("constant", "state"):
                 if field == "constant" and order != args.frames[0]:
                     continue  # the constant field has no frame to choose
-                pick, clean = select(rows, field, base, args.max_fail_rate, "gap")
+                pick, clean = select(rows, field, base, args.max_fail_rate,
+                                     "gap", args.guard)
                 if pick is None:
                     continue
                 if not shown_baseline:
@@ -111,7 +117,7 @@ def main() -> None:
                     )
                     shown_baseline = True
                 g, gs = ratio(base, pick, "gap_tail")
-                e, es = ratio(base, pick, "error")
+                e, es = ratio(base, pick, args.guard)
                 pr = pick.get("slowest_rate")
                 rate = f"{pr / rate0:.2f}x" if (pr and rate0) else "--"
                 flag = "" if clean else " (bias traded)"

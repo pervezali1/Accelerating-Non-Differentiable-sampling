@@ -30,7 +30,7 @@ RESULTS = os.path.join(ROOT, "results")
 
 
 def select(rows: list, field: str, base: dict, max_fail_rate: float,
-           objective: str = "band") -> tuple:
+           objective: str = "band", guard_stat: str | None = None) -> tuple:
     """The best amplitude for ``field``, under the rule in the module docstring.
 
     ``objective="band"`` minimises the iterations to the accuracy band, which is
@@ -39,19 +39,32 @@ def select(rows: list, field: str, base: dict, max_fail_rate: float,
     question when the budget is fixed and short -- there, when a chain first
     touched a band matters less than where it actually is when the iterations
     run out.
+
+    ``guard_stat`` names the error the guard is applied to.  ``"error"`` is the
+    whitened error of the mean *time-averaged over the whole run*, which stands
+    in for stationary bias and is the right guard for an open-ended budget.
+    ``"error_running"`` is the running mean at the last iteration, which is the
+    estimate a fixed budget actually hands you; on a run that never
+    equilibrated the time-average is dominated by the transient it spent
+    climbing out of the start, so guarding a fixed-budget objective with it
+    asks the field not to change the very thing it is there to change.  The
+    two disagree on MAGIC's sublevel set and nowhere else, and both selections
+    are reported rather than one chosen quietly.  Defaults to ``"error"`` for
+    ``objective="band"`` and to ``"error"`` for ``"gap"`` as well, so the
+    stricter reading stays the published default.
     """
     cands = [r for r in rows if r["field"] == field]
     if not cands:
         return None, False
     steps = base["n_iter"] * 1.0
+    stat = guard_stat or "error"
+    limit = base[stat] + base.get(stat + "_se", 0.0)
     if objective == "gap":
         key = lambda r: r["gap_tail"]  # noqa: E731
-        guard = lambda r: r["error"] <= base["error"] + base["error_se"]  # noqa: E731
+        guard = lambda r: r[stat] <= limit  # noqa: E731
     else:
         key = lambda r: r["band"]  # noqa: E731
-        guard = lambda r: (
-            r["error"] <= base["error"] + base["error_se"] and r["reached_all"]
-        )  # noqa: E731
+        guard = lambda r: r[stat] <= limit and r["reached_all"]  # noqa: E731
     ok = [r for r in cands if guard(r) and r["failed"] <= max_fail_rate * steps]
     if ok:
         return min(ok, key=key), True
@@ -62,6 +75,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--max-fail-rate", type=float, default=0.001)
     parser.add_argument("--out", default="anchored_selected_amplitudes.md")
+    parser.add_argument("--guard", default="error",
+                        choices=["error", "error_running"],
+                        help="which error the guard protects: the mean time-averaged "
+                             "over the whole run, or the running mean at the last "
+                             "iteration, which is what a fixed budget hands you")
     parser.add_argument("--objective", default="band", choices=["band", "gap"],
                         help="what to minimise: iterations to the accuracy band, or the "
                              "accuracy gap left at the end of a fixed budget")
@@ -120,7 +138,8 @@ def main() -> None:
             f"{base['error']:.3f} +/- {base['error_se']:.3f} | 1.00x |"
         )
         for field, name in (("constant", "`J_a`"), ("state", "`J_s` / `J_g`")):
-            pick, clean = select(here, field, base, args.max_fail_rate, args.objective)
+            pick, clean = select(here, field, base, args.max_fail_rate, args.objective,
+                                  args.guard)
             if pick is None:
                 continue
             flag = "" if clean else " **(bias traded)**"
