@@ -151,3 +151,60 @@ def load_all(magic_n=2000, seed=0):
     return {"titanic": load_titanic(seed=seed),
             "magic": load_magic(n_max=magic_n, seed=seed),
             "breast_cancer": load_breast_cancer_wdbc()}
+
+
+# ----------------------------------------------------------------------------------
+# d = 9 variants with a held-out split, for the block-diagonal skew field
+# ----------------------------------------------------------------------------------
+# The block-diagonal J_s(x) is built from 3x3 cross-product blocks, so it needs a
+# dimension divisible by 3.  Both tables are therefore cut to exactly nine features and
+# the intercept is dropped (the columns are already centred, so it carries little).
+
+# fConc1 is the concentration ratio of the two brightest pixels and fConc of the single
+# brightest; they correlate at ~0.98, so dropping fConc1 is the cheapest way to nine.
+MAGIC_D9_DROP = "fConc1"
+
+
+def load_magic_d9(n_max=None, seed=0):
+    """MAGIC Gamma Telescope at d = 9, the dimension quoted in the paper.
+
+    ``n_max=None`` keeps all 19 020 rows: nothing here needs a reference chain over the
+    exact potential, so the full table is affordable.
+    """
+    ds = load_magic(n_max=n_max, seed=seed)
+    keep = [j for j, nm in enumerate(ds.feature_names)
+            if nm not in ("intercept", MAGIC_D9_DROP)]
+    return Dataset("magic_d9", "MAGIC Gamma Telescope (d = 9)",
+                   ds.Phi[:, keep], ds.y, [ds.feature_names[j] for j in keep])
+
+
+def load_titanic_d9(seed=0):
+    """Titanic at d = 9 -- the nine engineered columns, without the intercept."""
+    ds = load_titanic(seed=seed)
+    keep = [j for j, nm in enumerate(ds.feature_names) if nm != "intercept"]
+    return Dataset("titanic_d9", "Titanic (d = 9)",
+                   ds.Phi[:, keep], ds.y, [ds.feature_names[j] for j in keep])
+
+
+def train_test_split(ds, test_frac=0.2, seed=0):
+    """Stratified split into two ``Dataset`` objects, the paper's 80/20.
+
+    Standardisation is recomputed on the training rows alone and applied to the test
+    rows, so no test statistic leaks into the fit.
+    """
+    rng = np.random.default_rng(seed)
+    te = []
+    for c in (1.0, -1.0):
+        idx = np.flatnonzero(ds.y == c)
+        rng.shuffle(idx)
+        te.append(idx[:int(round(test_frac * len(idx)))])
+    te = np.concatenate(te)
+    mask = np.zeros(ds.n, dtype=bool)
+    mask[te] = True
+
+    Xtr, Xte = ds.Phi[~mask], ds.Phi[mask]
+    mu, sd = Xtr.mean(axis=0), Xtr.std(axis=0)
+    sd = np.where(sd > 1e-12, sd, 1.0)
+    Xtr, Xte = (Xtr - mu) / sd, (Xte - mu) / sd
+    return (Dataset(ds.key + "_train", ds.title + " [train]", Xtr, ds.y[~mask], ds.feature_names),
+            Dataset(ds.key + "_test", ds.title + " [test]", Xte, ds.y[mask], ds.feature_names))

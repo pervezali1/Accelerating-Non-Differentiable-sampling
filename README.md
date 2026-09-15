@@ -123,8 +123,9 @@ constant-$J$ $W_1$ plateaus at 0.0387 → 0.0371 → 0.0397.
 ands/
   targets.py       the hinge + L1 Gibbs posterior, its anchor and projection
   penalties.py     Lasso, MCP, SCAD with exact Gaussian smoothing and anchor bounds
+  logistic.py      unconstrained NALD: logistic target, anchored at a smoothed L1
   data.py          Titanic, MAGIC Gamma Telescope, Wisconsin breast cancer
-  skew.py          the three fields, closed-form divergences, autograd checks
+  skew.py          the four fields, closed-form divergences, autograd checks
   samplers.py      projected anchored Langevin; exact random-walk Metropolis reference
   diagnostics.py   W1 per coordinate, KS, boundary mass, reference floor
   experiments.py   the experiment grid and its result cache
@@ -302,6 +303,46 @@ cannot see bias, which is the constrained study's finding again.
 This notebook is also where $a > 1$ first appears on real data: breast cancer under MCP (1.0056) and
 SCAD (1.0043), the non-convexity correction doing visible work, inside the proven bound both times.
 All accuracies are in-sample.
+
+## The same experiment without the wall
+
+[`notebooks/Unconstrained_NALD_real_data.ipynb`](notebooks/Unconstrained_NALD_real_data.ipynb)
+takes the constrained real-data protocol -- Telescope and Titanic at $d = 9$, $\eta = 10^{-4}$,
+minibatch $m = 30$, 100 walkers started uniform on the unit ball, 1000 and 1500 iterations,
+accuracy over an 80/20 split -- and runs it under the unconstrained dynamics
+
+$$dX_t = -a(X_t)\bigl(I + J(X_t)\bigr)\nabla U_0(X_t)\,dt + \sqrt{2a(X_t)}\,dW_t,
+\qquad a = e^{U - U_0}.$$
+
+There is no projection and no reflection, so the boundary condition $J(x)n(x) = 0$ has
+nothing to act on and the constant field $J_a$ becomes admissible. To keep the anchoring
+non-vacuous the hard wall is replaced by an L1 charge, so $U$ stays non-differentiable and
+$\Delta = \lambda\|w\|_1 - p_0(w)$ carries no data and cannot underflow with $n$.
+
+**The verdict reverses.** Iterations for mean training accuracy to reach 99% of the exact
+posterior's, 5 replicas with bootstrap intervals:
+
+| | $J = 0$ | best $J_a$ | best $J_s(x)$ |
+|---|---|---|---|
+| Telescope | 450 | **1.13× [1.03, 1.26]** | 1.06× [0.98, 1.13] |
+| Titanic | 362 | **1.83× [1.62, 2.04]** | 1.12× [0.98, 1.32] |
+
+Every block-field interval contains 1: across both datasets and four strengths, $J_s(x)$
+never produced a speed-up that survives its error bars. The same ordering holds for $W_1$
+against a random-walk Metropolis reference, where on the Telescope data $J_a$ cuts the
+distance to the posterior from 9.3 floor units to 4.6 and $J_s(x)$ moves it by nothing.
+
+The cause is the kernel. A real skew matrix in odd dimension is singular, so $J_a$ gives up
+one direction; the block field gives up three, one per block, holding 41% of
+$\|\nabla U_0\|^2$ on the Telescope posterior and 37% on Titanic against 16% and 13% for
+$J_a$. On a centred ball that kernel *is* the tangency $J_s(x)x = 0$ that makes the field
+admissible at the wall. Unconstrained it is dead weight, exactly as the remark introducing
+the construction warns.
+
+Strengths tuned against a wall do not transfer: $J_a$ at $a = 2$ on the Telescope data is
+0.69× [0.65, 0.74], materially slower than $J = 0$, while cutting $W_1$ from 9.3 to 5.3
+floor units. Speed and fidelity disagree about that setting, and an accuracy figure alone
+would have called it a regression.
 
 ## Running it
 

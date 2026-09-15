@@ -102,9 +102,14 @@ class ConstantSkew(SkewField):
 
     name = "const"
 
-    def __init__(self, dim: int, s: float, dtype=torch.float64):
+    def __init__(self, dim: int, s: float, normalise: bool = True, dtype=torch.float64):
         self.dim, self.s = dim, float(s)
-        self.A = unit_skew(dim, dtype)
+        # ``normalise=False`` is the literal matrix of the paper: superdiagonal ``a``,
+        # subdiagonal ``-a``.  The default rescales to unit spectral norm so that ``s``
+        # means the same push for every field and every dimension; the two differ by
+        # ||J_a||_2 = 2 cos(pi/(d+1)), which is 1.90 at d = 9.
+        self.normalise = bool(normalise)
+        self.A = unit_skew(dim, dtype) if normalise else tridiagonal_skew(dim, dtype)
         self.J = self.s * self.A
 
     def apply(self, x, g):
@@ -150,6 +155,53 @@ class AxialSkew(SkewField):
         return -self.c * (self.dim - 2) * (x @ self.A.T)
 
 
+class BlockCrossSkew(SkewField):
+    """Block-diagonal 3x3 cross-product blocks -- the field ``J_s(x)`` of the paper.
+
+    For ``d = 3B`` and scales ``s = [s_1, ..., s_B]``, block ``k`` acts on the coordinate
+    triple ``I_k = (3k, 3k+1, 3k+2)`` as ``v -> s_k (x_{I_k} times v_{I_k})``, i.e.
+
+        [[0, -s_k x_3,  s_k x_2],
+         [ s_k x_3, 0, -s_k x_1],
+         [-s_k x_2,  s_k x_1, 0]].
+
+    This is the tensor ``J_I`` of the higher-dimensional ball construction, one block per
+    coordinate triple.  Each block is skew-symmetric, divergence-free, and annihilates its
+    own sub-vector, so
+
+        div J_s(x) = 0,        J_s(x) x = 0.
+
+    The first two make it admissible.  The third is what makes it *tangent* to a centred
+    sphere, which is why it wins under a ball constraint -- and, unconstrained, is exactly
+    what costs it: it annihilates any part of the drift parallel to ``x``, the isotropic
+    Gaussian prior's gradient included.
+    """
+
+    name = "block"
+    state_dependent = True
+
+    def __init__(self, dim: int, s, dtype=torch.float64):
+        if dim % 3:
+            raise ValueError("block cross field needs dim divisible by 3, got {}".format(dim))
+        self.dim = dim
+        self.n_blocks = dim // 3
+        vals = [float(s)] * self.n_blocks if np.isscalar(s) else [float(v) for v in s]
+        if len(vals) != self.n_blocks:
+            raise ValueError("need one scale per 3-block, got {} for {} blocks".format(
+                len(vals), self.n_blocks))
+        self.s = torch.tensor(vals, dtype=dtype)
+
+    def apply(self, x, g):
+        n = x.shape[0]
+        xb = x.reshape(n, self.n_blocks, 3)
+        gb = g.reshape(n, self.n_blocks, 3)
+        out = torch.linalg.cross(xb, gb, dim=2) * self.s.view(1, -1, 1)
+        return out.reshape(n, self.dim)
+
+    def divergence(self, x):
+        return torch.zeros_like(x)
+
+
 def build_skew(kind: str, dim: int, s: float, radius: float = 1.0,
                drop_correction: bool = False) -> SkewField:
     if kind == "none":
@@ -158,6 +210,8 @@ def build_skew(kind: str, dim: int, s: float, radius: float = 1.0,
         return ConstantSkew(dim, s)
     if kind == "axial":
         return AxialSkew(dim, s, radius=radius, drop_correction=drop_correction)
+    if kind == "block":
+        return BlockCrossSkew(dim, s)
     raise ValueError("unknown skew field {!r}".format(kind))
 
 
