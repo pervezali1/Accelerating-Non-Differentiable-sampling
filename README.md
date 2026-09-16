@@ -61,6 +61,24 @@ Speed-ups are never reported on their own — the measured discretisation bias i
 one of them, and configurations whose bias exceeds the tolerance are flagged, because a large `alpha`
 at fixed `h` buys apparent mixing with real bias.
 
+### Headline result
+
+Integrated autocorrelation times in simulated time, at the strongest `alpha` whose measured bias stays
+within tolerance (`alpha = 4` in all four cases); speed-up over `J = 0` in brackets. Same `h`, same step
+count, same one gradient per step for every row.
+
+| target | config | `tau_x1` (slow) | `tau_x2` | `tau_x3` (fast) | `tau_U` | max&#124;bias&#124; |
+|---|---|---|---|---|---|---|
+| A | `J = 0` | 55.30 | 8.78 | 2.32 | 21.94 | 0.008 |
+| A | `J_a` | **27.71 (2.00x)** | 2.50 (3.52x) | 0.64 (3.64x) | 12.37 (1.77x) | 0.014 |
+| A | `J_s` | 48.57 (1.14x) | **1.27 (6.93x)** | 0.89 (2.60x) | 22.68 (0.97x) | 0.021 |
+| B | `J = 0` | 17.50 | 5.13 | 0.81 | 6.42 | 0.014 |
+| B | `J_a` | **7.77 (2.25x)** | 1.67 (3.07x) | 0.24 (3.41x) | 3.44 (1.87x) | 0.018 |
+| B | `J_s` | 10.90 (1.61x) | **0.96 (5.34x)** | 0.64 (1.26x) | 6.82 (0.94x) | 0.030 |
+
+`J_a` is the better accelerator of the slow coordinate on both targets; `J_s` gives the larger gains on
+the fast ones and essentially none on `U(x)`.
+
 Findings worth flagging:
 
 * Plain Euler–Maruyama is **unstable** for `J_s`. The exact `J_s` flow is a rotation
@@ -83,5 +101,5 @@ pip install numpy scipy matplotlib jupyter
 jupyter lab notebooks/nald_laplace_experiments.ipynb
 ```
 
-The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 35 minutes to execute end
+The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 30 minutes to execute end
 to end on a single core; it is committed with outputs, so it can be read without running anything.
