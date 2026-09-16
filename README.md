@@ -57,7 +57,11 @@ the invariant law from the smoothing parameter `delta`; a paired stationarity-dr
 discretisation bias as a function of `alpha` and `h`; integrated autocorrelation times, ESS, speed-ups
 and ergodic-average MSE at matched cost; and an analysis of *why* the two `J`s behave differently.
 
-Two findings worth flagging:
+Speed-ups are never reported on their own — the measured discretisation bias is printed next to every
+one of them, and configurations whose bias exceeds the tolerance are flagged, because a large `alpha`
+at fixed `h` buys apparent mixing with real bias.
+
+Findings worth flagging:
 
 * Plain Euler–Maruyama is **unstable** for `J_s`. The exact `J_s` flow is a rotation
   `dx/dt = omega x x` with `omega = alpha s a grad U0` and conserves `|x|`, but an explicit Euler step
@@ -66,7 +70,11 @@ Two findings worth flagging:
   one-gradient-per-step cost.
 * The `J_s` perturbation `alpha c = (alpha s a grad U0) x x` **vanishes wherever `x` is parallel to
   `grad U0(x)`** — for target A that is exactly the principal axes of `Sigma`, i.e. the slow directions.
-  This is why the constant `J_a` is the better accelerator of the slow coordinate here.
+  This is why the constant `J_a` is the better accelerator of the slow coordinate here, while `J_s`
+  mostly stirs the fast ones.
+* `delta` cannot bias the answer, so it is free to tune — but it is not a free lunch. Small `delta`
+  keeps `a = exp(U - U0)` near 1 and mixes fast while stiffening `grad U0`; large `delta` conditions the
+  drift but collapses `a` and throttles the diffusion.
 
 ## Running
 
@@ -75,5 +83,5 @@ pip install numpy scipy matplotlib jupyter
 jupyter lab notebooks/nald_laplace_experiments.ipynb
 ```
 
-The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 15–20 minutes to execute
-end to end; it is committed with outputs.
+The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 35 minutes to execute end
+to end on a single core; it is committed with outputs, so it can be read without running anything.
