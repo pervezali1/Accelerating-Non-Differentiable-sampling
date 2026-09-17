@@ -79,6 +79,25 @@ count, same one gradient per step for every row.
 `J_a` is the better accelerator of the slow coordinate on both targets; `J_s` gives the larger gains on
 the fast ones and essentially none on `U(x)`.
 
+![speed-up vs alpha](figures/09-speed-up-vs-alpha-with-the-accuracy-cost-shown-a.png)
+
+Crosses mark `alpha` values whose measured bias exceeds tolerance — the large `J_s` gains at
+`alpha = 8` are discretisation error, not mixing.
+
+Correctness, on the harder target: NALD marginals over exact i.i.d. draws across four orders of
+magnitude, for all three perturbations, with `grad U` never evaluated.
+
+![l1 Laplace marginals](figures/04-marginal-densities-nald-three-perturbations-vs-e-2.png)
+
+Why the two `J`s differ — `||J_s grad U0||` is exactly zero along the principal axes (target A) and
+along the per-orthant rays (target B), while `||J_a grad U0||` is nonzero everywhere:
+
+![perturbation magnitude](figures/15-magnitude-of-the-antisymmetric-drift-relative-to.png)
+
+And the instability that forces the Rodrigues splitting (dashed = plain Euler-Maruyama):
+
+![J_s instability](figures/07-b-the-instability-shown-directly.png)
+
 Findings worth flagging:
 
 * Plain Euler–Maruyama is **unstable** for `J_s`. The exact `J_s` flow is a rotation
@@ -103,3 +122,4 @@ jupyter lab notebooks/nald_laplace_experiments.ipynb
 
 The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 30 minutes to execute end
 to end on a single core; it is committed with outputs, so it can be read without running anything.
+All 15 figures are also extracted to `figures/`.
