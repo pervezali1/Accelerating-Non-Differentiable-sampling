@@ -161,3 +161,54 @@ def nald(tgt, J="none", alpha=0.0, s=0.0, Ja=J_A, h=0.01, n_steps=100_000, n_cha
         if store and n >= burn and (n - burn) % thin == 0:
             out[kk] = record(X); kk += 1
     return (out[:kk] if store else None), X
+
+
+# ---------------------------------------------------------------------------
+# Designing the constant perturbation J_a
+# ---------------------------------------------------------------------------
+def surrogate_gap(u, S, alpha):
+    """Spectral gap  min Re spec( (I + alpha*hat(u)) S )  of the Gaussian surrogate.
+
+    For a target whose covariance is Cov, take S = Cov^{-1}.  Because tr(hat(u) S) = 0 for
+    skew hat(u) and symmetric S, the three eigenvalues always sum to tr(S), so
+
+        min Re spec( (I + alpha J) S )  <=  tr(S)/3
+
+    for EVERY skew J and every alpha -- a hard ceiling, attained when the perturbation
+    equalises the three relaxation rates.  The unperturbed gap is min diag(S) in the
+    principal frame, so the best achievable improvement is tr(S)/3 / lambda_min(S).
+    """
+    u = np.asarray(u, float)
+    n = np.linalg.norm(u)
+    if n < 1e-12:
+        return float(np.min(np.linalg.eigvals(S).real))
+    return float(np.min(np.linalg.eigvals((np.eye(3) + alpha*hat(u/n)) @ S).real))
+
+
+def optimal_axis(Cov, n_grid=4000, seed=3, tol=1e-8):
+    """Axis u* and the smallest alpha* at which hat(u*) attains the tr(S)/3 ceiling.
+
+    Returns (alpha_star, u_star, ceiling, unperturbed_gap).  The surrogate fixes the
+    DIRECTION; the strength alpha is then chosen by measurement, since the ceiling is
+    attained on a whole family of (alpha, u) and the surrogate cannot separate them.
+    """
+    from scipy.optimize import minimize
+    S = np.linalg.inv(np.asarray(Cov, float))
+    ceiling, base = float(np.trace(S)/3), float(np.min(np.linalg.eigvals(S).real))
+    G = np.random.default_rng(seed).standard_normal((n_grid, 3))
+    G /= np.linalg.norm(G, axis=1, keepdims=True)
+
+    def best(alpha):
+        g = np.array([surrogate_gap(u, S, alpha) for u in G])
+        r = minimize(lambda u: -surrogate_gap(u, S, alpha), G[int(np.argmax(g))],
+                     method="Nelder-Mead", options=dict(xatol=1e-11, fatol=1e-14, maxiter=3000))
+        u = r.x/np.linalg.norm(r.x)
+        return -float(r.fun), (u if u[-1] >= 0 else -u)
+
+    lo, hi = 0.25, 16.0
+    for _ in range(26):
+        mid = 0.5*(lo + hi)
+        if best(mid)[0] >= ceiling*(1 - tol): hi = mid
+        else:                                 lo = mid
+    _, u_star = best(hi)
+    return hi, u_star, ceiling, base
