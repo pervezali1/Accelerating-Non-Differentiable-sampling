@@ -311,24 +311,38 @@ lambda = 10 answers "is the benefit from J or from the anchor?":
 `lambda_experiment.py --lambda-lasso X` runs any value. Held-out ergodic-variance
 ratios (four fresh seeds each, all below 1 in every cell):
 
-| | lambda = 0 | lambda = 0.9 | lambda = 10 |
-|---|---|---|---|
-| L1-smooth ball | 0.531 (46.9%) at s = 3 | 0.530 (47.0%) at s = 3 | 0.529 (47.1%) at s = 3 |
-| unit ball | 0.533 (46.7%) at s = 7 | 0.533 (46.7%) at s = 7 | 0.537 (46.3%) at s = 10 |
+| | lambda = 0 | lambda = 0.9 | lambda = 10 | lambda = 30 |
+|---|---|---|---|---|
+| L1-smooth ball | 0.531 (46.9%) s = 3 | 0.530 (47.0%) s = 3 | 0.529 (47.1%) s = 3 | 0.532 (46.8%) s = 4 |
+| unit ball | 0.533 (46.7%) s = 7 | 0.533 (46.7%) s = 7 | 0.537 (46.3%) s = 10 | 0.541 (45.9%) s = 10 |
 
-**Identical within noise across two orders of magnitude of lambda.** The whole
-variance reduction comes from J; the anchor contributes none of it.
+**Identical within noise across the whole range**, from a vacuous anchor to a
+strongly active one. The variance reduction comes from J; the anchor contributes
+none of it.
 
 How hard the anchor is working, for reference:
 
-| lambda | a bound | a observed | max abs(U - U0) | L | differs from plain Langevin by |
-|---|---|---|---|---|---|
-| 0 | [1, 1] | [1, 1] | 0 | 894 | 0 (exactly) |
-| 0.9 | [0.866, 1] | [0.981, 0.994] | 0.019 | 939 | 2.4e-3 |
-| 10 | [0.202, 1] | [0.775, 1] | 0.255 | 1394 | - |
+| lambda | a bound | a observed | max abs(U - U0) | L | eta*L | differs from plain Langevin |
+|---|---|---|---|---|---|---|
+| 0 | [1, 1] | [1, 1] | 0 | 894 | 0.089 | 0 (exactly) |
+| 0.9 | [0.866, 1] | [0.981, 0.994] | 0.019 | 939 | 0.094 | 2.4e-3 |
+| 10 | [0.202, 1] | [0.775, 1.000] | 0.255 | 1394 | 0.139 | - |
+| 30 | [0.008, 1] | [0.390, 0.768] | 0.941 | 2394 | 0.239 | 9.3e-2 |
 
-At lambda = 0.9 the anchor is active but barely: `a` stays within 2% of 1. It only
-becomes genuinely load-bearing near lambda = 10. That is the expected division of labour - the anchor
+At lambda = 0.9 the anchor is active but barely — `a` stays within 2% of 1. Only
+by lambda = 30 is it strongly load-bearing, with `a` down to 0.39 and the chain
+9.3e-2 away from plain projected Langevin.
+
+**One genuine interaction shows up at lambda = 30.** Because `a` multiplies the
+whole drift, including the `alpha J grad_U0` term, a strong anchor damps the
+non-reversible perturbation and pushes the oversized-step failure to larger `s`.
+On the L1 ball the projection rate at s = 7 collapses from 0.49 (lambda = 0.9) to
+0.0006 (lambda = 30). So the anchor does not help the sampler mix, but it does
+widen the usable range of `s`.
+
+The cost is accuracy: LASSO shrinkage at lambda = 30 pulls the test accuracy from
+0.660 down to 0.652, since `beta_true` is not sparse. And `eta*L` rises to 0.24,
+so the step size has less headroom. That is the expected division of labour - the anchor
 exists to handle non-differentiability, not to accelerate - but it is worth
 having measured rather than assumed.
 
