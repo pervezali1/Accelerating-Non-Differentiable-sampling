@@ -487,3 +487,54 @@ At converged step sizes (Titanic η = 3e-5, MAGIC η = 1e-5) every triple is wit
 reversible arm, exactly as in the isotropic grid. Per-block tuning widens the usable strength
 range and locates where the rotation does its work; it does not change the fact that the gain
 lives in the transient.
+
+## LASSO weight λ from 5 to 20 — does the non-reversible lead grow?
+
+`lambda_lasso_study.py`; table `results/lambda/lambda_lasso.csv`, 40 figures in `figures/lambda/`
+(same layout). Back to the `091b02b` setup: exact gradient, LASSO anchor, d = 10, R = 100,
+seed 4100. λ ∈ {5, 7.5, 10, 15, 20} absolute (at `091b02b` the rule `λ = 0.01 n_train` gave 152.2
+on MAGIC and 7.12 on Titanic, so this range puts both datasets on the same footing). Two step
+sizes per dataset — transient and converged — and `s ∈ {1, 5}`. Everything reported.
+
+**Coupling to declare:** `δ = log2/(9λ)` is kept, so `a ∈ [½,1]` at every λ. Raising λ therefore
+also sharpens the smoothing (δ falls 0.0154 → 0.00385). The two cannot both be fixed while
+holding the anchor bound constant; δ is in every row of the CSV.
+
+### Yes — on Titanic, at the transient step, the lead grows monotonically with λ
+
+Paired Δ test accuracy (t), η = 1e-5:
+
+| | λ = 5 | 7.5 | 10 | 15 | 20 |
+|---|---|---|---|---|---|
+| Titanic ball, s = 5 | +0.0162 (4.8) | +0.0163 (4.8) | +0.0175 (5.1) | +0.0203 (5.9) | **+0.0240 (6.4)** |
+| Titanic ball, s = 1 | +0.0016 (0.6) | +0.0018 (0.7) | +0.0022 (0.8) | +0.0063 (2.4) | +0.0075 (2.8) |
+| Titanic ℓ_p, s = 1 | +0.0088 (4.3) | +0.0089 (4.4) | +0.0098 (4.8) | +0.0122 (5.6) | **+0.0142 (5.9)** |
+| Titanic ℓ_p, s = 5 | +0.0082 (3.6) | +0.0084 (3.8) | +0.0092 (3.9) | +0.0097 (3.9) | +0.0152 (5.4) |
+
+The lead roughly **doubles** from λ = 5 to λ = 20. On MAGIC it is flat (ball s = 1 holds at
++0.0003, t ≈ 2.0 across the whole range; ℓ_p s = 5 at +0.0005–0.0006, t ≈ 2).
+
+The mechanism is visible in the "near-kink" column: the number of coefficients with |w_j| < 0.05
+rises from ~1.2 to ~2.8 on Titanic as λ grows. More coordinates sit at kinks, which is exactly
+the regime the anchor is built for, and the rotation helps the chain keep moving there.
+
+### But the lead grows because the reversible arm degrades faster, not because the non-reversible arm improves
+
+Absolute test accuracy, Titanic ℓ_p, η = 1e-5:
+
+| | λ = 5 | 7.5 | 10 | 15 | 20 |
+|---|---|---|---|---|---|
+| reversible | **0.7920** | 0.7915 | 0.7900 | 0.7848 | 0.7778 |
+| non-rev, s = 1 | **0.8008** | 0.8004 | 0.7998 | 0.7970 | 0.7920 |
+
+Both arms fall with λ; the reversible one falls faster. The non-reversible arm at λ = 20 (0.7920)
+only matches the reversible arm at λ = 5 (0.7920). So the widening gap is not worth anything in
+absolute terms — the best accuracy is still at the **smallest** λ.
+
+Best absolute cell anywhere in the study, non-reversible vs best reversible: MAGIC ball +0.0001,
+MAGIC ℓ_p +0.0001, Titanic ball −0.0000, Titanic ℓ_p +0.0011. And at the converged step
+(η = 3e-5) there is no lead at any λ — every |t| < 2.8 and most < 1.5.
+
+**Answer:** raising λ does give the non-reversible arm a larger and cleaner lead (t up to 6.4),
+and it is the one knob so far that widens the gap systematically rather than by luck. It buys
+that lead by making the problem harder for both arms, so it does not produce a better model.
