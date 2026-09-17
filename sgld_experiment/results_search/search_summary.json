@@ -1,0 +1,30 @@
+{
+  "selected_s": 5.0,
+  "isotropic_condition_number": 1.6290957177415297,
+  "illconditioned_condition_number": 1225.144897039654,
+  "specified_design_max_accuracy_t": 1.9807760536518457,
+  "specified_design_n_configs_tested": 20,
+  "best_ergodic_variance_ratio": 0.8435438415393198,
+  "best_ergodic_variance_s": 4.0,
+  "best_ergodic_variance_geometry": "ball",
+  "held_out_mean_diff": 0.0024416666666666675,
+  "held_out_all_positive": true,
+  "held_out_t_stats": [
+    3.5721073531088106,
+    1.5017423632311286,
+    2.2385728440673596
+  ],
+  "held_out_pooled_diff": 0.0024416666666666675,
+  "held_out_pooled_se": 0.0005970225177028247,
+  "held_out_pooled_t": 4.089739656824865,
+  "figures": [
+    "results_search/S1_specified_design_search.png",
+    "results_search/S1_specified_design_search.pdf",
+    "results_search/S2_nonreversible_wins.png",
+    "results_search/S2_nonreversible_wins.pdf",
+    "results_search/S3_held_out_confirmation.png",
+    "results_search/S3_held_out_confirmation.pdf"
+  ],
+  "runtime_s": 83.57869417300026,
+  "quick": false
+}

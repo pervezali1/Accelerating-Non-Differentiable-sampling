@@ -1579,3 +1579,66 @@ def check_projection_solvers_agree(
             reference, _ = geometry._project_one(z[row])
         worst = max(worst, float(np.abs(fast[row] - reference).max()))
     return {"max_abs_difference": worst}
+
+
+# ==========================================================================
+# 12. Ill-conditioned design variant
+# ==========================================================================
+def make_correlated_dataset(cfg: ExperimentConfig, rho_x: float = 0.99) -> Dataset:
+    """Same pipeline as :func:`make_dataset` but with AR(1)-correlated predictors.
+
+    ``X_j ~ N(0, Sigma)`` with ``Sigma[i,k] = 2 * rho_x**|i-k|``.  The marginal
+    coordinate variance is still 2, so only the *conditioning* changes: at
+    ``rho_x = 0.99`` the posterior Hessian condition number is ~1200 rather than
+    ~1.6 for the isotropic design.
+
+    This exists because non-reversible perturbations buy their advantage from
+    anisotropy.  With ``Sigma = 2I`` there is essentially nothing for ``J`` to
+    exploit, which is a property of the *problem*, not of the sampler.
+    """
+    rng = np.random.default_rng(cfg.data_seed)
+    index = np.arange(cfg.d)
+    Sigma = 2.0 * (rho_x ** np.abs(index[:, None] - index[None, :]))
+    X = rng.multivariate_normal(np.zeros(cfg.d), Sigma, size=cfg.n_total)
+    beta_true = cfg.beta_true()
+    y = (rng.uniform(size=cfg.n_total) <= expit(X @ beta_true)).astype(float)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=cfg.test_fraction, random_state=cfg.split_seed,
+        stratify=y, shuffle=True,
+    )
+    return Dataset(
+        X_train=np.ascontiguousarray(X_train), y_train=y_train,
+        X_test=np.ascontiguousarray(X_test), y_test=y_test,
+        beta_true=beta_true, data_seed=cfg.data_seed, split_seed=cfg.split_seed,
+    )
+
+
+def posterior_condition_number(dataset: Dataset) -> float:
+    """Condition number of the observed-information matrix at ``beta_true``."""
+    p = expit(dataset.X_train @ dataset.beta_true)
+    weights = p * (1.0 - p)
+    hessian = (dataset.X_train * weights[:, None]).T @ dataset.X_train
+    eigenvalues = np.linalg.eigvalsh(hessian)
+    return float(eigenvalues.max() / eigenvalues.min())
+
+
+def paired_difference(a: np.ndarray, b: np.ndarray) -> tuple[float, float, float]:
+    """Paired mean difference, its standard error and the t statistic.
+
+    Valid because both methods run on identical starting points, mini-batch
+    streams and Gaussian increments within each replicate, so the comparison is
+    matched and the replicate-level noise cancels.
+    """
+    difference = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
+    mean = float(difference.mean())
+    standard_error = float(difference.std(ddof=1) / np.sqrt(difference.size))
+    return mean, standard_error, (mean / standard_error if standard_error > 0 else np.nan)
+
+
+def ergodic_average(result: RunResult, burn_checkpoints: int) -> np.ndarray:
+    """Time-averaged coefficient per replicate, ``(R, d)``.
+
+    The asymptotic variance of such ergodic averages is exactly the quantity
+    non-reversible perturbations are designed to reduce.
+    """
+    return result.beta[burn_checkpoints:].mean(axis=0)

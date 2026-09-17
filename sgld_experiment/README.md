@@ -162,3 +162,80 @@ deviations directly.
 §11c of the notebook reloads the arrays from disk, rebuilds the result objects and
 redraws a main figure, asserting the reloaded values match to 0.0 — figures are
 regenerable without rerunning any sampler.
+
+
+---
+
+## Block-strength search: can non-reversible beat reversible?
+
+`block_strength_search.py` → `results_search/`. Only the **two anchored methods**
+appear (ρ = log 2 in both; α = 0 vs 1), so every comparison isolates
+non-reversibility at a fixed anchor.
+
+Both methods share starting points, mini-batch streams and Gaussian increments
+within each replicate, so the test is **paired** on the per-replicate difference.
+That matters: at R = 100 an unpaired comparison cannot resolve a 0.003 accuracy
+difference, and a paired one can.
+
+### On the specified design, no s wins on accuracy
+
+Twenty configurations (s ∈ [0.25, 10] × both geometries). The best paired
+t-statistic is **+1.98** — which is what you expect from the *best of twenty*
+tests under the null. Every error bar crosses zero, and the sign flips between
+metrics (at s = 1 on the ball the final-accuracy difference is +0.0010 while the
+area-under-the-curve difference is −0.0001, t = −2.09).
+
+The reason is structural, not a tuning failure: **accuracy has no headroom.** The
+Bayes ceiling is 0.671, `beta_true` itself scores 0.655, and both methods reach
+0.654. There is nothing left for a better sampler to win.
+
+### On the specified design, s does win on the metric non-reversibility targets
+
+Non-reversible perturbations are designed to reduce the **asymptotic variance of
+ergodic averages**, not to move the invariant measure. Measuring exactly that —
+the across-replicate variance of the time-averaged coefficient — gives a clean,
+monotone effect:
+
+| s | 0.25 | 1 | 2 | **3** | **4** | 5 | 7.5 | 10 |
+|---|---|---|---|---|---|---|---|---|
+| Var ratio NR/REV (ball) | 0.995 | 0.953 | 0.884 | 0.846 | **0.844** | 0.878 | 1.21 | 2.22 |
+
+A **15.6 % variance reduction at s = 4**, then a sharp reversal as J's
+amplification of mini-batch noise takes over (and, on the quartic set at s ≥ 7.5,
+as the projection starts firing). That U-shape is the whole mechanism in one row.
+
+### Where non-reversibility wins on accuracy
+
+Non-reversibility buys its advantage from **anisotropy**, and the specified design
+has almost none (posterior condition number **1.63**). Switching the predictors to
+AR(1) with ρ_x = 0.99 — same pipeline, same marginal variance 2, only the
+conditioning changes — gives condition number **1225**, and then the win appears:
+
+| | REV | NR (s = 5) | paired diff | t |
+|---|---|---|---|---|
+| search seed | 0.6973 | 0.6991 | +0.0017 | +1.89 |
+| held-out 101 | 0.6941 | 0.6975 | +0.0034 | +3.57 |
+| held-out 202 | 0.6962 | 0.6979 | +0.0018 | +1.50 |
+| held-out 303 | 0.6963 | 0.6984 | +0.0022 | +2.24 |
+
+`s = 5` was selected on the search seed and then **confirmed on three sampler
+seeds that took no part in the search**: all three positive, pooled difference
+**+0.0024 (SE 0.00060, t = +4.09)**. The effect is strongest mid-trajectory
+(t = +2.7 at iteration 400) and is monotone in s up to the point where the
+projection rate starts to bite — consistent with the mechanism being *faster
+convergence in the slow direction*, which only pays while the run is still
+convergence-limited. At s = 7 the mid-run advantage is larger (t = +4.1 at
+iteration 400) but has evaporated by iteration 1000, because a 32 % projection
+rate costs more than the acceleration is worth.
+
+### Honest scope of this claim
+
+* The win required **changing the design** to an ill-conditioned one. Tuning s
+  alone on the specified isotropic problem does not produce an accuracy win, and
+  this README does not claim otherwise.
+* The effect is small in absolute terms (**+0.24 accuracy points**) and is a
+  *convergence-rate* effect, not a better fixed point: both methods target the
+  same posterior.
+* It is a paired, held-out-confirmed result, not a single lucky configuration —
+  but it is one data set, one split, and one constraint set (the unit ball).
+* Accuracy still says nothing about posterior fidelity; see the limitations above.
