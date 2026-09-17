@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Three curves, d = 3: J = 0, a constant J_a at a = 4, and J_s at s = 4.
+"""d = 3: J = 0, a constant J_a at a = 4, and optionally J_s at s = 4.
 
     J_s(x) = [[  0,    -s x3,   s x2 ],
               [  s x3,   0,    -s x1 ],
@@ -13,7 +13,17 @@ Protocol as established: stepsizes equalised on the stationary error of the
 50th/70th/90th percentiles along the principal axes, calibrated so J = 0 sits
 at 2 % stationary covariance bias; five replications; a run counts only if all
 five survive, and the stepsize is backed off until they do.
+
+``--prior`` selects the starting ensemble, the paper's two:
+
+    normal10   X_0 ~ N(0, 10 I_d)
+    uniform5   X_0 ~ Uniform(-5, 5)^d
+
+The equal-accuracy stepsize is a property of the stationary law and the target,
+not of the prior, so it is the same for both; only the transient differs.  The
+prior is recorded in the output and carried in its filename.
 """
+import argparse
 import os
 import sys
 import json
@@ -27,13 +37,26 @@ from skewanchor import analysis, metrics, runner, samplers, skew, skewfield as s
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                    "results", "data")
+
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--prior", default="normal10", choices=["normal10", "uniform5"],
+                 help="starting ensemble: N(0, 10 I) or Uniform(-5, 5)^d")
+_ap.add_argument("--fields", nargs="*", default=["zero", "const"],
+                 choices=["zero", "const", "cross"],
+                 help="J = 0, the constant J_a, and the cross-product J_s. "
+                      "J_s at s = 4 needs --steps 40000 to show anything")
+_ap.add_argument("--steps", type=int, default=20000)
+_ap.add_argument("--n", type=int, default=5000)
+_ap.add_argument("--reps", type=int, default=5)
+ARGS = _ap.parse_args()
+
 T = anisotropic_student_t(3, 6.0, 100.0)
 V = T.Sigma_evecs
 Jopt = skew.lnp_optimal(T.Sigma_inv); nopt = float(np.linalg.norm(Jopt, 2))
 PCTS = (0.5, 0.7, 0.9)
 scl = np.sqrt([V[:, i] @ T.Sigma @ V[:, i] for i in range(3)])
 qtrue = np.array([[c * stats.t.ppf((1 + p) / 2, T.nu) for p in PCTS] for c in scl])
-N, REPS, STEPS = 5000, 5, 40000
+N, REPS, STEPS = ARGS.n, ARGS.reps, ARGS.steps
 REC = runner.log_schedule(STEPS, 90)
 floor, fstd = metrics.w2_reference_floor(T, N, np.random.default_rng(0), n_rep=20)
 
@@ -80,7 +103,7 @@ def run(key, label, field, ramp):
     def ensemble(eta):
         curves, div = [], 0
         for r in range(REPS):
-            x = runner.make_prior("normal10", 3, N, np.random.default_rng(500 + r))
+            x = runner.make_prior(ARGS.prior, 3, N, np.random.default_rng(500 + r))
             st = mk(field, eta, ramp)()
             rr = np.random.default_rng(9000 + r)
             w, k, blew = [], 0, False
@@ -108,11 +131,19 @@ def run(key, label, field, ramp):
                      backoff=eta_equal/eta, ramp=ramp, diverged=div, rise=rise,
                      iters=hit, speedup=sp, w2=list(map(float, w)), rec=list(REC)))
 
-run("zero",  "J = 0",      None,                  0.0)
-run("const", "J_a,  a = 4", sf.ConstantSkew(4.0 * Jopt / nopt), 10.0)
-run("cross", "J_s,  s = 4", sf.CrossProductSkew(4.0),           40.0)
+PRIOR_LABEL = {"normal10": "X_0 ~ N(0, 10 I)",
+               "uniform5": "X_0 ~ Uniform(-5, 5)^d"}
+print(f"prior: {ARGS.prior}  ({PRIOR_LABEL[ARGS.prior]})\n")
 
+SPEC = {"zero":  ("J = 0",       None,                                0.0),
+        "const": ("J_a,  a = 4", sf.ConstantSkew(4.0 * Jopt / nopt),  10.0),
+        "cross": ("J_s,  s = 4", sf.CrossProductSkew(4.0),            40.0)}
+for key in ARGS.fields:
+    run(key, *SPEC[key])
+
+path = os.path.join(OUT, f"exp12_three_fields_{ARGS.prior}.json")
 json.dump(dict(floor=float(floor), floor_std=float(fstd), d=3, nu=6.0, kappa=100.0,
+               prior=ARGS.prior, prior_label=PRIOR_LABEL[ARGS.prior],
                n=N, reps=REPS, steps=STEPS, rows=rows),
-          open(os.path.join(OUT, "exp12_three_fields.json"), "w"), indent=1)
-print("\nwrote", os.path.join(OUT, "exp12_three_fields.json"))
+          open(path, "w"), indent=1)
+print("\nwrote", path)

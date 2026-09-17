@@ -485,68 +485,78 @@ def fig_curl_potentials(mode):
 # ------------------------------------------------------------------ fig 12
 
 
-# which curves fig 12 shows, in order.  The cross-product row is still measured
-# and still in the data file; it is simply not plotted here.
+# which curves fig 12 shows, in order.  The cross-product row, when present in
+# the data file, is simply not plotted.
 FIG12_KEYS = ("zero", "const")
 
 
 def fig_three_fields(mode):
-    """d = 3: the reversible anchored sampler against a constant skew field."""
-    path = os.path.join(DATA, "exp12_three_fields.json")
-    if not os.path.exists(path):
-        print("  skip: exp12_three_fields.json not found")
-        return
-    b = runner.load_json(path)
-    floor = b["floor"]
+    """d = 3: the reversible anchored sampler against a constant skew field.
+
+    One figure per starting ensemble.  The stepsizes are identical across the
+    two -- equal accuracy is a property of the stationary law and the target,
+    not of where the chain starts -- so the panels differ only in the transient.
+    """
+    paths = sorted(glob.glob(os.path.join(DATA, "exp12_three_fields_*.json")))
+    if not paths:                                    # pre-prior-split data file
+        paths = [os.path.join(DATA, "exp12_three_fields.json")]
     pretty = {"zero": "$J = 0$   (reversible anchored)",
               "const": "$J$ constant,  $a = 4$",
               "cross": "$J_s$,  $s = 4$   (state dependent)"}
-    p = plotting.use_style(mode)
-    fig, ax = plt.subplots(figsize=(6.8, 4.7))
-    rows = [r for k in FIG12_KEYS for r in b["rows"] if r["key"] == k]
-    base = next(r["iters"] for r in rows if r["key"] == "zero")
-    for i, r in enumerate(rows):
-        colour = p["categorical"][i % len(p["categorical"])]
-        it = np.asarray(r["rec"], dtype=float)
-        it[0] = max(it[1] * 0.5, 0.5)
-        w = np.asarray(r["w2"], dtype=float)
-        lab = pretty[r["key"]]
-        if r["iters"] > 0:
-            lab += f"    $\\bf{{{r['iters']:d}}}$ it,  {base / r['iters']:.2f}$\\times$"
-        else:
-            lab += f"    not reached in {b['steps']:d}"
-        ax.plot(it, w, color=colour, lw=2.0, label=lab, zorder=3 - 0.1 * i)
-        if r["iters"] > 0:
-            j = int(np.argmin(np.abs(it - r["iters"])))
-            ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
-                    markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
-    ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
-    ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
-    ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
-                textcoords="offset points", color=p["text_secondary"], fontsize=8,
-                va="bottom")
-    ax.annotate("measurement floor", xy=(ax.get_xlim()[0], floor * 0.76), xytext=(6, 0),
-                textcoords="offset points", color=p["text_secondary"], fontsize=8,
-                ha="left", va="center")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlabel("iteration")
-    ax.set_ylabel("sliced 2-Wasserstein distance")
-    ax.set_title("Anchored Langevin on a heavy-tailed $d=3$ Student-t "
-                 "($\\nu=6$, $\\kappa=100$)", loc="left")
-    etas = {r["key"]: r["eta"] for r in rows}
-    sp = base / next(r["iters"] for r in rows if r["key"] == "const")
-    ax.text(0.008, 0.02,
-            "equal stationary accuracy, so each runs at its own stepsize:  "
-            f"$\\eta$ = {etas['zero']:.2e} and {etas['const']:.2e}.\n"
-            f"Five replications, none diverged, neither curve rises out of a "
-            f"trough.   Speed-up {sp:.2f}$\\times$.",
-            transform=ax.transAxes, fontsize=8.3, va="bottom", ha="left",
-            color=p["text_secondary"])
-    ax.legend(loc="upper right", fontsize=9, framealpha=0.93)
-    ax.set_ylim(top=ax.get_ylim()[1] * 3.2, bottom=ax.get_ylim()[0] * 0.5)
-    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig12_three_fields_{mode}.png")))
-
+    for path in paths:
+        if not os.path.exists(path):
+            continue
+        b = runner.load_json(path)
+        floor = b["floor"]
+        prior = b.get("prior", "normal10")
+        prior_math = {"normal10": r"$X_0 \sim N(0,\,10\,I_d)$",
+                      "uniform5": r"$X_0 \sim \mathrm{Uniform}(-5,5)^d$"}.get(prior, prior)
+        p = plotting.use_style(mode)
+        fig, ax = plt.subplots(figsize=(6.8, 4.7))
+        rows = [r for k in FIG12_KEYS for r in b["rows"] if r["key"] == k]
+        base = next(r["iters"] for r in rows if r["key"] == "zero")
+        for i, r in enumerate(rows):
+            colour = p["categorical"][i % len(p["categorical"])]
+            it = np.asarray(r["rec"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            w = np.asarray(r["w2"], dtype=float)
+            lab = pretty[r["key"]]
+            if r["iters"] > 0:
+                lab += f"    $\\bf{{{r['iters']:d}}}$ it,  {base / r['iters']:.2f}$\\times$"
+            else:
+                lab += f"    not reached in {b['steps']:d}"
+            ax.plot(it, w, color=colour, lw=2.0, label=lab, zorder=3 - 0.1 * i)
+            if r["iters"] > 0:
+                j = int(np.argmin(np.abs(it - r["iters"])))
+                ax.plot([it[j]], [w[j]], "o", color=colour, ms=6,
+                        markeredgecolor=p["surface"], markeredgewidth=1.4, zorder=4)
+        ax.axhspan(0, floor * 1.12, color=p["reference"], alpha=0.18, linewidth=0)
+        ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+        ax.annotate("twice the measurement floor", xy=(1.0, 2 * floor), xytext=(0, 4),
+                    textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                    va="bottom")
+        ax.annotate("measurement floor", xy=(ax.get_xlim()[0], floor * 0.76), xytext=(6, 0),
+                    textcoords="offset points", color=p["text_secondary"], fontsize=8,
+                    ha="left", va="center")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_ylabel("sliced 2-Wasserstein distance")
+        ax.set_title(f"$d=3$ Student-t ($\\nu=6$, $\\kappa=100$),  {prior_math}",
+                     loc="left")
+        etas = {r["key"]: r["eta"] for r in rows}
+        sp = base / next(r["iters"] for r in rows if r["key"] == "const")
+        ax.text(0.008, 0.02,
+                "equal stationary accuracy, so each runs at its own stepsize:  "
+                f"$\\eta$ = {etas['zero']:.2e} and {etas['const']:.2e}.\n"
+                f"Five replications, none diverged, neither curve rises out of a "
+                f"trough.   Speed-up {sp:.2f}$\\times$.",
+                transform=ax.transAxes, fontsize=8.3, va="bottom", ha="left",
+                color=p["text_secondary"])
+        ax.legend(loc="upper right", fontsize=9, framealpha=0.93)
+        ax.set_ylim(top=ax.get_ylim()[1] * 3.2, bottom=ax.get_ylim()[0] * 0.5)
+        out = os.path.join(FIGS, f"fig12_three_fields_{prior}_{mode}.png")
+        print(" ", plotting.finish(fig, out))
 
 # ------------------------------------------------------------------ fig 13
 
