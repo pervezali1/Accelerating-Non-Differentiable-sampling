@@ -193,3 +193,41 @@ an inset zooms the same curves so the separation is legible.
 
 `h` was chosen per experiment from a small grid on a training-only criterion, which is a real
 selection cost and is disclosed here and in every figure caption.
+
+## Follow-up: what does the smoothed-set level `Λ` do?
+
+`lambda_study.py`; table in `results/strength/lambda_study.csv` and
+`results/strength/lambda_spec_init.csv`.
+
+Geometry first (`p = 2.4`, `ε = 0.2 / 0.18`, `d = 9`):
+
+| Λ | D = Λ − 9ε^p | radius of K (axis → diagonal) | ‖∇g‖ on ∂K | unit-ball init feasible? |
+|---|---|---|---|---|
+| 4 | 3.81 / 3.85 | 1.74 → 2.05 | 4.59 | yes |
+| 2 | 1.81 / 1.85 | 1.27 → 1.49 | 2.96 | yes |
+| **1** | **0.81 / 0.85** | **0.90 → 1.04** | **1.84** | **no** (max g on the unit ball is 1.216 / 1.170) |
+| 0.5 | 0.31 / 0.35 | 0.60 → 0.67 | 1.05 | no |
+
+`Λ = 1` keeps `D > 0`, so the anchor and the bound `1/2 ≤ a ≤ 1` are untouched. Its costs:
+
+1. **It invalidates the specified initialisation** — the unit ball no longer fits inside `K`, so
+   `beta0` must be shrunk or projected. The study uses a common radius 0.55.
+2. **Titanic test accuracy falls** 0.807 → 0.785 (`h = 1e-4`, reversible arm). MAGIC barely moves
+   (0.770 → 0.768): accuracy is invariant under `β → cβ`, so a tighter Λ bites only through the
+   anisotropy of the ℓ_p set distorting the *direction*, and Titanic's MLE (‖β‖ = 3.59) is
+   distorted far more than MAGIC's (2.17).
+3. **The chain gets pinned to the boundary** — MAGIC reversible projection rate at `h = 1e-5`
+   goes 5% (Λ = 4) → 79% (Λ = 1) → 93% (Λ = 0.5), i.e. more projection bias.
+
+Its one real benefit: since `J`'s axis is `−s ∇g` and `‖∇g‖` falls 2.5×, `Λ = 1` makes `s = 5`
+much less destructive on MAGIC — the paired gap at `h = 1e-5` goes −0.208 (Λ = 4) → −0.082
+(Λ = 1) → −0.033 (Λ = 0.5). It never becomes a win, and lowering `s` achieves the same thing
+without touching the model.
+
+With the **specified** unit-ball init (`h = 1e-5`, `s = 5`, `R = 100`) the Titanic win is
+strongest at the original Λ: `Λ = 4` gives `+0.0069 ± 0.0021` train (t = 3.2), `Λ = 2` gives
+`+0.0049 ± 0.0023` (t = 2.2), and `Λ = 1` cannot run that init at all.
+
+**Λ is part of the model** (`π_K ∝ e^{−U} 1_K`), not a sampler knob — changing it changes the
+posterior being targeted. `s` is purely algorithmic and leaves the target alone. They overlap in
+what they do to `‖J‖`, so `s` is the right knob for that job.
