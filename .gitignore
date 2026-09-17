@@ -1,0 +1,4 @@
+# Raw datasets are not redistributed here -- run `python fetch_data.py`.
+data/
+__pycache__/
+.ipynb_checkpoints/

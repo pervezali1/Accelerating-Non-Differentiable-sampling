@@ -1,0 +1,9 @@
+numpy
+scipy
+scikit-learn
+pandas
+matplotlib
+jupyter
+nbformat
+nbconvert
+ucimlrepo
