@@ -113,6 +113,33 @@ Findings worth flagging:
   keeps `a = exp(U - U0)` near 1 and mixes fast while stiffening `grad U0`; large `delta` conditions the
   drift but collapses `a` and throttles the diffusion.
 
+## Convergence in Wasserstein and total variation
+
+[`notebooks/nald_wasserstein_tv.ipynb`](notebooks/nald_wasserstein_tv.ipynb) measures how fast the
+*law* of `X_t` reaches `pi`, rather than how fast one trajectory decorrelates: 40,000 independent
+chains from a common point mass at `x0 = 2 sd_pi`, with `pi` represented by exact i.i.d. draws.
+Sliced `W1` over 64 fixed directions in standardised coordinates (exact in each direction), and binned
+TV on 50 equiprobable reference bins (a lower bound on the true TV). Both floors are measured and
+plotted: the finite-sample floor from applying the same estimator to two independent exact samples, and
+the `O(h)` discretisation bias as whatever the curves plateau at above it.
+
+![W1 and TV vs time](figures/wasserstein-tv/01-w1-tv-vs-time.png)
+
+Speed-up in the time for the law to reach a fixed multiple of the finite-sample floor, `alpha = 4`:
+
+| target | metric | `J_a` | `J_s` |
+|---|---|---|---|
+| A — elliptical | `W1` | **2.01–2.05x** | 1.08–1.15x |
+| A — elliptical | TV | **1.60–1.94x** | 1.14–1.16x |
+| B — l1 | `W1` | 1.66–1.76x | **1.83–2.12x** |
+| B — l1 | TV | 1.31–1.62x | **1.88–1.99x** |
+
+The ordering flips between the two targets. `J_a` roughly doubles the rate on the elliptical target
+while `J_s` barely moves it; `J_s` is the better of the two on the `l1` target in both metrics. That
+matches the degeneracy above: the `J_s` drift vanishes on the principal axes, which for target A are
+the slow directions dominating the distance, whereas target B's degenerate set is a per-orthant ray
+the slow mode does not lie along.
+
 ## Running
 
 ```bash
@@ -122,4 +149,5 @@ jupyter lab notebooks/nald_laplace_experiments.ipynb
 
 The notebook is self-contained (NumPy + Matplotlib only) and takes roughly 30 minutes to execute end
 to end on a single core; it is committed with outputs, so it can be read without running anything.
-All 15 figures are also extracted to `figures/`.
+All figures are also extracted to `figures/`. `nald.py` at the repository root holds the shared target,
+perturbation and integrator definitions used by both notebooks.
