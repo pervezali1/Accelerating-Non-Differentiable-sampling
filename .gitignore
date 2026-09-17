@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+env/
+
+# Experiment artefacts are reproducible from the code and configuration
+results/
+results_*/
+*.npz
+
+# The UCI data file is not redistributed here
+data/magic04.data
+data/magic04.names
