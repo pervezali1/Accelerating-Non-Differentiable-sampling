@@ -375,3 +375,48 @@ repo: the non-reversible drift buys **convergence rate within a fixed iteration 
 too-small step**, not a better answer. Where the chain converges inside the budget, the two arms
 are indistinguishable, which is exactly what the theory says should happen — `J` is tangential
 and conservative, and leaves the invariant law alone.
+
+## The (η, s) landscape
+
+`grid_study.py`; full table `results/grid/grid.csv`, per-cell curves `results/grid/curves_*.npz`,
+20 figures in `figures/grid/` (same layout as before — training left, test right, common `[0,1]`
+axis, zoom inset; one figure per experiment × η, with the reversible arm in blue and the
+non-reversible arm at each `s` in a green ramp). Exact gradient, LASSO anchor, R = 100, seed 4100.
+**The entire grid is reported — nothing was selected.**
+
+Final test accuracy (rows = η, columns = s; "rev" = reversible):
+
+| MAGIC ball | rev | 0.25 | 1 | 2 | 5 | | MAGIC ℓ_p | rev | 0.25 | 1 | 2 | 5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| η=1e-6 | .7810 | .7809 | .7809 | .7809 | .7811 | | η=1e-6 | .7810 | .7811 | .7811 | .7814 | .7811 |
+| η=3e-6 | .7835 | .7835 | .7835 | .7834 | .7833 | | η=3e-6 | .7839 | .7838 | .7836 | .7835 | .7786 |
+| η=1e-5 | .7835 | .7836 | .7835 | .7834 | .7835 | | η=1e-5 | **.7841** | .7841 | .7840 | .7839 | **.5358** |
+| η=3e-5 | .7834 | .7834 | .7835 | .7835 | **.6134** | | η=3e-5 | .7841 | .7841 | .7839 | **.5931** | **.5168** |
+| η=1e-4 | **.7835** | .7836 | .7834 | .7601 | **.5660** | | η=1e-4 | .7841 | .7841 | **.6283** | **.5857** | **.5482** |
+
+| Titanic ball | rev | 0.25 | 1 | 2 | 5 | | Titanic ℓ_p | rev | 0.25 | 1 | 2 | 5 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| η=1e-6 | .6036 | .6042 | .6050 | .6054 | .6084 | | η=1e-6 | .6341 | .6332 | .6320 | .6296 | .6325 |
+| η=3e-6 | .7020 | .7017 | .7001 | .7023 | .7056 | | η=3e-6 | .7148 | .7149 | .7141 | .7176 | .7279 |
+| η=1e-5 | .7702 | .7702 | .7722 | .7784 | .7867 | | η=1e-5 | .7921 | .7928 | .8003 | .7997 | .8003 |
+| η=3e-5 | .8054 | .8050 | .8062 | .8065 | .8060 | | η=3e-5 | .8049 | .8059 | .8052 | .8051 | .8055 |
+| η=1e-4 | **.8072** | .8070 | .8063 | .8053 | .8034 | | η=1e-4 | **.8053** | .8047 | .8036 | .8057 | .7808 |
+
+Four things the landscape says:
+
+1. **η governs accuracy; s does not.** Sweeping η moves Titanic test accuracy from 0.60 to 0.81.
+   At any η where the chain converges, changing s moves it by ~0.001.
+2. **s has a stability ceiling that depends on the geometry**, and past it accuracy collapses
+   rather than degrades gracefully (0.78 → 0.52–0.63). The ceiling falls as η rises:
+   MAGIC ℓ_p tolerates `s ≤ 5` at η = 1e-6 but only `s ≤ 0.25` at η = 1e-4. The ℓ_p set is far
+   more fragile than the ball because `J`'s axis is `∇g` (‖∇g‖ ≈ 4.6 on ∂K) rather than `w`
+   (‖w‖ ≈ 1.4), so the same `s` gives a ~3× stronger rotation.
+3. **s only helps in a narrow band** — where the chain is still mid-transient at that η. Titanic
+   at η = 1e-5 (`s = 5`: +0.0165 test on the ball, t = 6.2 on training); MAGIC at η = 1e-6
+   (t = 2.1–4.2). Everywhere else it is neutral (small s) or destructive (large s).
+4. **No cell beats the best reversible cell.** Best non-reversible vs best reversible, over the
+   whole grid: MAGIC ball +0.0000, MAGIC ℓ_p −0.0000, Titanic ball −0.0001, Titanic ℓ_p +0.0006.
+   The `s = 0` control returns exactly the reversible arm at every η, confirming the pairing.
+
+So the usable recipe is: pick the largest η that is still stable, at which point s is free to be
+small; the band where s pays is the band where η is too small.
