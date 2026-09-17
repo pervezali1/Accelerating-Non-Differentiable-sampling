@@ -228,6 +228,49 @@ convergence-limited. At s = 7 the mid-run advantage is larger (t = +4.1 at
 iteration 400) but has evaporated by iteration 1000, because a 32 % projection
 rate costs more than the acceleration is worth.
 
+### Exact-gradient LASSO variant, and a correction
+
+`anchored_lasso.py` + `accuracy_curves_lasso_exact.ipynb` replace the target with
+the genuinely non-differentiable LASSO potential and drop the mini-batch:
+
+```
+U(w) = sum_j [softplus(x_j.w) - y_j x_j.w] + w0^2/(2 sigma^2)   <- f, differentiable
+       + lambda_lasso * sum_{j>=1} |w_j|                        <- g, NOT differentiable
+U0   = f + g_delta,   a = exp(U - U0) = exp(lambda * sum(|w_j| - sqrt(w_j^2+delta^2)))
+x_{k+1} = Pi_K[ x_k - eta a grad_U0 + eta alpha a J_s grad_U0 + sqrt(2 eta a) xi ]
+```
+
+Here the anchor does real work: only `grad U0` is evaluated, exactly (no
+subsampling), while the invariant measure carries the true kinked `g`. Column 0
+of `X` is now an intercept, because `U` prices `w0` separately. Run over the
+Euclidean ball and a general smoothed l^p ball (`SmoothLpBallGeometry`, which
+reproduces the independently verified quartic set at p = 4 to 3e-16).
+
+**Result: the two methods are statistically indistinguishable on both constraint
+sets**, at every swept block strength. Held-out confirmation fails on both
+(pooled t = -0.71 and -0.89).
+
+**Correction to the earlier unit-ball result.** The confirmed win reported in
+`block_strength_search.py` (pooled held-out +0.00244, t = +4.09) was measured
+with mini-batch gradients. Holding target, design, s, seeds and geometry fixed
+and changing only the gradient:
+
+| gradient | pooled held-out | t | all positive |
+|---|---|---|---|
+| mini-batch (as reported) | +0.00244 | +4.09 | yes |
+| exact | -0.00000 | -0.00 | no |
+
+That win was the stochastic gradient interacting with J, not non-reversibility.
+The earlier notebooks stand with their mini-batch settings, but the claim should
+be read with this correction attached.
+
+**What exact gradients did fix.** With mini-batch gradients, s = 10 on the
+Euclidean ball drove the projection rate to 0.04 and cost 0.026 accuracy; with
+exact gradients the same s leaves the projection rate at 0.000 and accuracy
+within noise — direct confirmation that the damage was J amplifying the gradient
+*error*. What survives at large s on the l^p ball is the separate deterministic
+mechanism, an oversized `alpha J grad_U0` step.
+
 ### Running in Colab
 
 The notebooks import `anchored_sgld.py`, which sits next to them in this
