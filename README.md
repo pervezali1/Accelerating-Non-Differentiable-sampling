@@ -276,3 +276,70 @@ no sampler can demonstrate more than that on accuracy at that step size.
 
 **Summary of the strength sweet spot:** `s = 5` is far too large for MAGIC (rotation 1.7–2.8×
 the drift), `s = 0.25` far too small (under 0.2×), `s = 1` is where it works (0.3–0.6×).
+
+---
+
+# Exact-gradient anchored Langevin with an ℓ₁ (LASSO) potential
+
+`exact_anchored.py`; figures in `figures/exact/`, sweep and confirmation in `results/exact/`.
+
+This is the construction the method is actually for: the anchor now smooths a **genuinely
+non-differentiable** potential rather than acting as a constraint barrier.
+
+```
+U(w)   = Σ_j [softplus(x_j·w) − y_j x_j·w] + w₀²/(2σ²) + λ Σ_{j≥1} |w_j|          (non-smooth)
+U₀(w)  = Σ_j [softplus(x_j·w) − y_j x_j·w] + w₀²/(2σ²) + λ Σ_{j≥1} √(w_j²+δ²)      (smooth)
+a(w)   = exp(U − U₀) = exp(−λ Σ_{j≥1} [√(w_j²+δ²) − |w_j|])
+
+w_{k+1} = Π_K[ w_k − η a(w_k) ∇U₀(w_k) + η α a(w_k) J_s(w_k) ∇U₀(w_k) + √(2η a(w_k)) ξ_{k+1} ]
+```
+
+The **exact** gradient is used throughout — no mini-batching anywhere. Note the `J` term now
+carries a **plus** sign (as specified); `J` is skew, so this simply rotates the opposite way from
+the earlier runs.
+
+## Declared choices (the spec fixes the form, not these numbers)
+
+* **d = 10**: intercept `w₀` plus the nine features. The Gaussian acts on `w₀`, the LASSO on
+  `w₁..w₉` — exactly the 3×3 block structure `J` needs. `J`'s intercept row and column are zero.
+* **K constrains the full vector** (`‖w‖² ≤ 2`, or `g(w) = Σ_{i=0}^{9}(w_i²+ε²)^{p/2} ≤ Λ`).
+  Leaving `w₀` free would make `K` non-compact and break the reflection argument. `g_min` is now
+  `10ε^p`, so `D = Λ − 10ε^p` = 3.790 / 3.839 > 0.
+* `σ = 10`; `λ_lasso = 0.01 · n_train` (152.2 MAGIC, 7.12 Titanic) so the penalty keeps a fixed
+  weight against a *summed* log-likelihood; `δ = log2/(9λ)` so that **a ∈ [½, 1] everywhere** —
+  the same bound the earlier `ρ = log2` anchor had.
+
+## Verification
+
+`a = exp(U−U₀)` to 1e-12; `a ∈ [0.500000, 0.999947]` over a wide sample; exact `∇U₀` matches
+central differences to 3e-10; `J' = −J` and `div J = 0` exactly, `‖Jn‖/‖n‖ ≤ 5e-16` on both
+boundaries, matrix-free equals explicit to 5e-16, intercept row/column identically zero;
+projection infeasibility ≤ 3e-15; unit-ball init feasible for both geometries.
+
+## Results (confirmation on independent replicates, seed 4100, R = 150)
+
+`η` and `s` selected by a **training-only** sweep over 5 step sizes × 4 strengths.
+
+| | η | s | reversible train | non-rev train | paired Δ train | reversible test | non-rev test | paired Δ test |
+|---|---|---|---|---|---|---|---|---|
+| **Titanic ball** | 1e-5 | 5 | 0.7630 ± 0.0264 | **0.7763 ± 0.0216** | **+0.0133 ± 0.0020** (t = 6.6) | 0.7690 ± 0.0360 | **0.7880 ± 0.0262** | **+0.0190 ± 0.0029** (t = 6.5) |
+| **Titanic ℓ_p** | 1e-5 | 5 | 0.7822 ± 0.0200 | **0.7919 ± 0.0159** | **+0.0097 ± 0.0016** (t = 6.0) | 0.7908 ± 0.0236 | **0.8003 ± 0.0170** | **+0.0095 ± 0.0022** (t = 4.3) |
+| MAGIC ℓ_p | 1e-6 | 5 | 0.7810 ± 0.0020 | 0.7814 ± 0.0020 | +0.0004 ± 0.0001 (t = 2.6) | 0.7811 ± 0.0026 | 0.7813 ± 0.0025 | +0.0002 ± 0.0002 (t = 1.2) |
+| MAGIC ball | 1e-6 | 5 | 0.7810 ± 0.0020 | 0.7810 ± 0.0022 | +0.0001 ± 0.0001 (t = 0.4) | 0.7811 ± 0.0026 | 0.7810 ± 0.0027 | −0.0001 ± 0.0002 (t = −0.5) |
+
+`U` (the true non-smooth potential) agrees: 400.9 → 396.0 and 390.8 → 386.5 on Titanic.
+
+Three things changed for the better relative to the mini-batch runs: **`s = 5` now works
+directly** on Titanic (no strength search needed), the wins are much stronger (t ≈ 6 rather than
+3), and MAGIC's accuracy rises to 0.781 test from 0.774 — the intercept helps and removing
+mini-batch noise removes a variance floor.
+
+**The same caveat still applies.** At the selected `η` the Titanic chains are mid-transient
+(reversible reaches 0.763 at η = 1e-5 versus 0.798 at η = 3e-5), which is where the metric has
+headroom; MAGIC at η = 1e-6 is nearly converged (0.7810 versus 0.7829 at η = 1e-4), which is why
+its gains are ~0.0004 at best. This remains a **convergence-rate** result, not evidence of a
+better stationary law.
+
+Also worth noting: at the selected `η` the projection rate is ≈ 0, so `K` is not binding and the
+ball/ℓ_p difference enters **only** through `J`'s axes (`s·w` versus `−s·∇g`). That is why the
+two MAGIC reversible arms are numerically identical while their non-reversible arms differ.
