@@ -1,0 +1,15 @@
+geometry,s,ergodic_variance_ratio
+unit ball,0.5,0.9857
+unit ball,1.0,0.9399
+unit ball,2.0,0.822
+unit ball,3.0,0.7293
+unit ball,5.0,0.6294
+unit ball,7.0,0.5865
+unit ball,10.0,0.5894
+smoothed l^4 ball,0.5,0.9937
+smoothed l^4 ball,1.0,0.9754
+smoothed l^4 ball,2.0,0.9198
+smoothed l^4 ball,3.0,0.8577
+smoothed l^4 ball,5.0,1.0183
+smoothed l^4 ball,7.0,53.8091
+smoothed l^4 ball,10.0,127.0348

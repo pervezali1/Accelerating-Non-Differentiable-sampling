@@ -1,0 +1,8 @@
+{
+  "selected_s": 7.0,
+  "search_seed_ratio": 0.5865,
+  "held_out_mean_ratio": 0.571075,
+  "held_out_all_below_one": true,
+  "variance_reduction_percent": 42.8925,
+  "note": "exact gradient, LASSO target, specified design X ~ N(0,2I)"
+}

@@ -246,9 +246,27 @@ of `X` is now an intercept, because `U` prices `w0` separately. Run over the
 Euclidean ball and a general smoothed l^p ball (`SmoothLpBallGeometry`, which
 reproduces the independently verified quartic set at p = 4 to 3e-16).
 
-**Result: the two methods are statistically indistinguishable on both constraint
-sets**, at every swept block strength. Held-out confirmation fails on both
-(pooled t = -0.71 and -0.89).
+**On accuracy: the two methods are statistically indistinguishable on both
+constraint sets**, at every swept block strength, on both the specified and an
+ill-conditioned design. Held-out confirmation fails on both (pooled t = -0.71
+and -0.89). That is a property of the observable, not of the sampler: accuracy
+is saturated here (Bayes ceiling ~0.67, both methods reach it), so it cannot
+resolve a sampler improvement.
+
+**On the observable non-reversibility actually targets, it wins decisively.**
+Non-reversible perturbations are designed to reduce the asymptotic variance of
+ergodic averages, not to move the invariant measure. Measuring that
+(`ergodic_variance_search.py`), with exact gradients:
+
+| s | 0.5 | 1 | 2 | 3 | 5 | **7** | 10 |
+|---|---|---|---|---|---|---|---|
+| Var ratio NR/REV, unit ball | 0.986 | 0.940 | 0.822 | 0.729 | 0.629 | **0.587** | 0.589 |
+| Var ratio NR/REV, l^4 ball | 0.994 | 0.975 | 0.920 | 0.858 | 1.018 | 53.8 | 127 |
+
+Monotone in `s` on the ball down to a **41% variance reduction** at s = 7,
+confirmed on four held-out sampler seeds (0.587, 0.551, 0.604, 0.542 — mean
+0.571, a **43% reduction**, all below 1). On the l^p ball it improves to s = 3
+and then the projection destroys it.
 
 **Correction to the earlier unit-ball result.** The confirmed win reported in
 `block_strength_search.py` (pooled held-out +0.00244, t = +4.09) was measured
