@@ -252,8 +252,13 @@ def per_coefficient_table(summaries: Sequence[AlphaSummary]) -> pd.DataFrame:
 # Figures
 # ==========================================================================
 def _save(fig: plt.Figure, output_dir: str, filename: str) -> str:
+    """Tidy the layout and write the figure to ``output_dir/filename``."""
     os.makedirs(output_dir, exist_ok=True)
     path = os.path.join(output_dir, filename)
+    with warnings.catch_warnings():
+        # tight_layout is noisy about supxlabel/supylabel on some backends.
+        warnings.simplefilter("ignore")
+        fig.tight_layout()
     fig.savefig(path, dpi=140, bbox_inches="tight")
     plt.close(fig)
     return path

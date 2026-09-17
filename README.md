@@ -189,39 +189,105 @@ every one of them is projected onto `K`.
 
 ## 4. What the experiment shows
 
-See `results/` for the tables and figures produced by `main.py`.
+`results/` holds the tables and figures produced by `python main.py`
+(≈ 8 minutes: 20 000 iterations, 5 000 burn-in, thin 5, 4 chains, 5 values of
+`alpha`, plus the sensitivity sweep, the tight variant and the validation
+target).
 
-**Non-reversibility helps, monotonically in `alpha`.** Per-coordinate ESS and
-split R-hat both improve as `alpha` grows from 0 to 1, at essentially identical
-cost per iteration, so ESS-per-second improves too. Mean squared jumping
-distance is nearly unchanged — the gain comes from the *directional* structure
-of the added drift, not from larger steps.
+### Non-reversibility accelerates mixing, monotonically in `alpha`
 
-**A caveat about the recommended constraint.** With `radius_budget = 4.5` the
-threshold is `Lambda_constraint ≈ 9.6466` while `g(beta_true) ≈ 4.178`, and the
-posterior concentrates within `O(n^{-1/2})` of `beta_true`. The constraint is
-therefore **never active**: projection frequency is exactly 0 and the
-distance-to-boundary diagnostics are flat. Those settings are used verbatim for
-the primary experiment, as specified. To make the projection machinery
-observable, `main.py` additionally runs a **tight-constraint variant**
-(`radius_budget = 1.45`, everything else unchanged) in which roughly half of
-the iterations are projected and the chain genuinely rides the boundary.
+Identical seeds, step size and starting points for every row; only `alpha`
+changes.
 
-**`beta_true` needed no rescaling.** `g(beta_raw) ≈ 4.178` is already below the
+| `alpha` | min ESS | median ESS | min ESS/s | median ESS/s | max split R-hat | median IAT (iters) | MSJD |
+|---|---|---|---|---|---|---|---|
+| 0.0  | 365.2 | 461.8 | 24.4 | 30.8 | 1.0084 | 130 | 1.702e-3 |
+| 0.1  | 368.7 | 464.4 | 23.8 | 30.0 | 1.0079 | 129 | 1.703e-3 |
+| 0.25 | 382.1 | 471.5 | 24.9 | 30.7 | 1.0068 | 127 | 1.707e-3 |
+| 0.5  | 405.3 | 615.7 | 28.6 | 43.5 | 1.0065 |  97 | 1.720e-3 |
+| 1.0  | **442.3** | **887.1** | **30.2** | **60.6** | 1.0071 | **68** | 1.775e-3 |
+
+Going from the reversible baseline to `alpha = 1` gives **+21 % minimum ESS**
+and **+92 % median ESS** at essentially unchanged cost per iteration, halving
+the integrated autocorrelation time. Mean squared jumping distance moves by
+only 4 %, so the gain does *not* come from taking larger steps — it comes from
+the direction of the added drift. The autocorrelation plot makes the mechanism
+visible: at `alpha = 1` several coordinates show autocorrelation dipping
+*below zero* around lag 5–15, the oscillatory decay characteristic of a
+rotational drift.
+
+Posterior summaries are unaffected, as they must be — the added term does not
+change the invariant measure. All five values of `alpha` give the same test
+ROC-AUC (0.7967), the same confusion matrix to within one or two cases, and
+`||posterior_mean - beta_true||_2 = 0.329` throughout (that residual is mostly
+LASSO shrinkage from `lambda_lasso = 10`, not sampling error).
+
+### Step-size sensitivity (`h`, `h/2`, `h/4`)
+
+Nothing diverges at any step size and the `alpha` ordering is preserved in
+median ESS/s at every one. Note that this sweep holds the *iteration count*
+fixed, so smaller steps simply explore less: at `h/4` the chains have not
+converged within 8 000 iterations (max split R-hat ≈ 1.09), which makes the
+minimum-ESS column there unreliable. It is a stability check, not an accuracy
+comparison — for that, see the time-matched validation below.
+
+### The recommended constraint is inactive
+
+With `radius_budget = 4.5` the threshold is `Lambda_constraint ≈ 9.6466` while
+`g(beta_true) ≈ 4.178`, and the posterior concentrates within `O(n^{-1/2})` of
+`beta_true`. Observed `g(w)` stays near 4.4, so the **projection frequency is
+exactly 0** and the distance-to-boundary diagnostics are flat. Those settings
+are used verbatim for the primary experiment, as specified.
+
+To make the projection machinery observable, `main.py` also runs a
+**tight-constraint variant** (`radius_budget = 1.45`, everything else
+unchanged), where ~56 % of iterations are projected and the chain genuinely
+rides the boundary. The acceleration survives the active constraint, and is if
+anything cleaner:
+
+| `alpha` | min ESS | median ESS | max split R-hat | projection freq. |
+|---|---|---|---|---|
+| 0.0 | 405.7 | 542.5 | 1.0117 | 0.559 |
+| 0.5 | 454.3 | 629.3 | 1.0061 | 0.560 |
+| 1.0 | **461.6** | **866.0** | **1.0050** | 0.561 |
+
+`beta_true` needed no rescaling: `g(beta_raw) ≈ 4.178` is already below the
 midpoint level `≈ 4.874`, so the bisection returns `t = 1`. The bisection is
 implemented and is exercised by a test on a vector that does violate the bound.
 
-**The sampler is validated against an exact reference.** On the weighted-L1
-target `U(x) = sum_i omega_i |x_i|` restricted to the same `K`, exact
-independent draws come from rejection sampling
-(`x_i ~ Laplace(0, 1/omega_i)`, keep if `g(x) <= Lambda_constraint`;
-acceptance ≈ 0.76, so the reference sample is large and trustworthy). Step-size
-runs are **time-matched** (halving `h` doubles the iteration count), and the
-comparison reports the Monte-Carlo standard error next to each discrepancy —
-without it, sampling noise is easily mistaken for discretisation bias. The
-coordinate means agree to within about one MC standard error.
+### Validation against an exact reference
 
----
+On the weighted-L1 target `U(x) = sum_i omega_i |x_i|` restricted to the same
+`K`, exact independent draws come from rejection sampling
+(`x_i ~ Laplace(0, 1/omega_i)`, keep if `g(x) <= Lambda_constraint`).
+Acceptance is **0.764**, so the reference sample is large and trustworthy, and
+the truncation genuinely bites (coordinate 0 has variance 1.41 against 3.13
+unconstrained).
+
+Step-size runs are **time-matched** — halving `h` doubles the iteration count,
+burn-in and thinning — so bias is not confounded with reduced exploration. The
+comparison reports the Monte-Carlo standard error beside every discrepancy.
+
+| run | max abs. mean error | in MC SE | max W1 | energy distance | projection freq. |
+|---|---|---|---|---|---|
+| `alpha=0`, `h`   | 0.0698 | 1.9 | 0.0698 | 0.0063 | 0.037 |
+| `alpha=0`, `h/2` | 0.0577 | 2.2 | 0.0640 | 0.0044 | 0.027 |
+| `alpha=0`, `h/4` | 0.0371 | 1.6 | 0.0524 | **0.0026** | 0.018 |
+| `alpha=0.5`, `h`   | 0.0616 | 1.7 | 0.0616 | 0.0066 | 0.038 |
+| `alpha=0.5`, `h/2` | 0.0592 | 2.1 | 0.0616 | 0.0045 | 0.027 |
+| `alpha=0.5`, `h/4` | 0.0323 | 1.7 | 0.0523 | **0.0028** | 0.018 |
+
+Coordinate means agree to within about one to two Monte-Carlo standard errors
+at every step size, and the empirical CDFs lie on top of the reference. The
+multivariate energy distance falls monotonically, 0.0063 → 0.0044 → 0.0026 as
+`h` is quartered: that residual is the Euler–Maruyama and projection
+discretisation bias, and it vanishes with `h` as it should. `alpha` does not
+affect accuracy, only efficiency — which is exactly the claim being tested.
+
+### Reproducibility
+
+Two independent full runs of `main.py` produced **bit-identical** ESS, R-hat
+and MSJD for every `alpha`; only wall-clock timings differed.
 
 ## 5. Correctness tests (§12)
 
