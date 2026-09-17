@@ -1,0 +1,164 @@
+# Non-reversible anchored Langevin with a block state-dependent skew-symmetric matrix
+
+Synthetic Bayesian logistic regression on two constraint sets, comparing four
+samplers that share one implementation and differ only in $(\rho, \alpha)$.
+
+```
+anchored_sgld.py                            reusable library (data, target, geometries,
+                                            projections, anchor, J, sampler, checks, plots)
+nonreversible_anchored_langevin.ipynb       the runnable notebook (clean, no outputs)
+nonreversible_anchored_langevin.executed.ipynb   the same notebook with the full run's outputs
+results/                                    figures (300-dpi PNG + vector PDF) and saved arrays
+```
+
+```bash
+pip install numpy scipy pandas scikit-learn matplotlib jupyter
+jupyter lab nonreversible_anchored_langevin.ipynb     # full run, ~6 min
+NRAL_QUICK=1 jupyter lab ...                          # quick mode: 5 repeats, 300 iterations
+```
+
+Quick-mode artefacts are written with a `_quick` suffix and every printed table is
+tagged `QUICK MODE`, so they cannot be confused with the full experiment. The
+committed `results/` are from the **full** experiment (R = 100, 1000 iterations).
+
+## Setup
+
+| | |
+|---|---|
+| Dimension | $d = 9$ (optional $d = 3$ with one block, $s = 10$) |
+| Observations | $n_{\text{total}} = 2000$, stratified 80/20 → 1600 train / 400 test |
+| Mini-batch | $m = 50$, uniform **without replacement** within each iteration |
+| Iterations / step | 1000 at $h = 10^{-4}$ |
+| Replicates | $R = 100$ (sensitivity sweep: 20, configurable) |
+| Block strengths | $s = (10, 10, 10)$, configurable independently |
+| Seeds | `data_seed = 2026`, `split_seed = 2027`, `sampler_seed = 3000` |
+
+Data: $X_j \sim N(0, 2I_d)$ (coordinate sd $\sqrt2$), $y_j = \mathbf 1\{u_j \le
+\sigma(X_j^\top\beta_{\text{true}})\}$, no intercept, no standardisation. The
+constraints act on the **coefficients**, not on the feature vectors. The data set
+and split are frozen across every method, replicate and geometry, so the replicate
+spread is sampler randomness only.
+
+Target: uniform prior on $K$ times the logistic likelihood, with $U$ a **sum** over
+the 1600 training rows and
+$\widehat G_k = \frac{n_{\text{train}}}{m} X_{B_k}^\top[\sigma(X_{B_k}\beta_k) - y_{B_k}]$.
+
+Anchor: $U_0 = U + \rho H_K$, $a = e^{-\rho H_K}$, computed exactly from the
+geometry (never by exponentiating a noisy likelihood difference). $H_K \in [0,1]$
+on $K$, so $\rho = \log 2$ gives $\tfrac12 \le a \le 1$.
+
+Update:
+$$\beta_{k+1} = \Pi_K\!\left[\beta_k - h a_k\bigl(v_k + \alpha J(\beta_k)v_k\bigr) + \sqrt{2ha_k}\,\xi_k\right],\quad v_k = \widehat G_k + \rho\nabla H_K(\beta_k).$$
+
+No $\nabla a$ correction; $J$ is never rescaled beyond the constant block
+strengths. Within a replicate and geometry all four methods get identical starting
+coefficients, mini-batch streams and Gaussian increments, from separate spawned
+sub-streams so the noise is independent of the batch.
+
+| Method | $\rho$ | $\alpha$ |
+|---|---:|---:|
+| Projected SGLD | 0 | 0 |
+| Non-reversible SGLD | 0 | 1 |
+| Reversible anchored Langevin | $\log 2$ | 0 |
+| Non-reversible anchored Langevin | $\log 2$ | 1 |
+
+## Verified before any production run
+
+Every item is an assertion in §7 of the notebook.
+
+| check | result |
+|---|---|
+| $\nabla U$ vs finite differences | rel. error 3.4e-10 |
+| mini-batch scaling, **all 56 batches enumerated** | error 4.4e-16; without the $n/m$ factor, off by 1.08 |
+| $J^\top = -J$ | 0.0 exactly (both geometries) |
+| $\operatorname{div} J = 0$ (finite differences) | 0.0 exactly |
+| $Jn = 0$ on $\partial K$ | ≤ 8.9e-16 |
+| $J\nabla H_K = 0$ | ≤ 5.7e-15 |
+| matrix-free $Jv$ vs explicit matrix | ≤ 7.1e-15 |
+| $\tfrac12 \le a \le 1$ on $K$ | holds |
+| projection KKT residual / feasibility | ≤ 2.7e-15 / ≤ 1.1e-15 |
+| vectorised bisection vs scalar `brentq` | 1.4e-15 |
+| $J\nabla U_0 \ne 0$ | median norm 2248 (ball), 4996 (quartic) |
+| radial scaling on the quartic set | strictly worse in **40/40** projected cases |
+| **ball** $J$ on the quartic boundary | $\max|Jn| = 2.88 \ne 0$ — this is why the quartic uses $-s\nabla_{I}g$ |
+
+## What was observed
+
+**At $h=10^{-4}$ with $s=10$, the non-reversible methods are worse on accuracy**,
+on both geometries. The two reversible methods are indistinguishable from each
+other, so the anchor alone is neutral here.
+
+| geometry | Projected SGLD | Reversible anchored | Non-rev. anchored | proj. rate (NR) | $\|\alpha Jv\|/\|v\|$ |
+|---|---|---|---|---|---|
+| unit ball | 0.6548 ± 0.0102 | 0.6540 ± 0.0095 | 0.6281 ± 0.0238 | 0.041 | 4.2 |
+| quartic set | 0.6543 ± 0.0099 | 0.6541 ± 0.0096 | 0.5429 ± 0.0529 | 0.767 | 13.3 |
+
+This is reported as measured. It is **not** evidence against non-reversible
+sampling — it is a step-size failure specific to this modified sampler, supported
+by four independent pieces of evidence:
+
+1. **The added term dominates the update.** $\|\alpha Jv\|/\|v\|$ is 4–13, and the
+   mean per-step displacement reaches 0.57 on a domain of radius ~1. The
+   projection then fires on up to 77% of iterations: the chain is pinned to the
+   boundary rather than circulating in the interior.
+2. **Mini-batch noise is amplified.** $J$ multiplies the gradient *error* as well
+   as the gradient — measured amplification ×4.5. The resulting per-step
+   displacement (0.215) is ~6× the injected $\sqrt{2ha}$ increment (0.037), so the
+   added term sets the noise level instead of perturbing the dynamics. The
+   continuous-time invariance argument assumes the *exact* gradient and does not
+   cover this.
+3. **The full-gradient control isolates it.** With exact gradients the ball
+   deficit vanishes entirely; what remains on the quartic is the deterministic
+   oversized $\alpha Jv$ step.
+4. **Refinement removes the gap.** At constant simulated time $t = kh$:
+
+   | geometry | gap at $h$ | at $h/2$ | at $h/4$ |
+   |---|---|---|---|
+   | unit ball | −0.0335 | −0.0205 | −0.0071 |
+   | quartic set | −0.1018 | −0.0505 | **−0.0002** |
+
+   The block-strength sweep agrees: accuracy is at parity for $s \le 5$ (drift
+   ratio ≤ 1.7, projection ≈ 0) and collapses only at $s = 10$.
+
+**Answer to the stated question.** Which method reaches 0.64 test accuracy sooner,
+in iterations and wall time? At $h = 10^{-4}$, Projected SGLD, on both geometries
+(ball 20 vs 60 iterations; quartic 30 vs 245). **That conclusion does not survive
+step refinement** — by $h/4$ the two are within 0.0002 accuracy of each other.
+
+## Limitations
+
+* **Accuracy is not posterior convergence.** These are single-iterate
+  classification accuracies; they say nothing about whether $\pi_K$ was reached or
+  about asymptotic variance. A method can match on accuracy and still be biased.
+* **The invariance identity does not cover the algorithm.** It holds for the
+  continuous-time process with exact gradients. The implementation adds finite-$h$
+  discretisation bias, mini-batch gradient noise, and the projection, which places
+  mass on $\partial K$ and is not a discretisation of a measure-preserving
+  reflected process.
+* **Bounded iterates prove nothing.** $\Pi_K$ keeps every state in $K$ by
+  construction, so the absence of blow-up is not evidence of numerical accuracy.
+  Projection rates and non-finite counts are reported for exactly this reason.
+* **One data set, one split, one $\beta_{\text{true}}$.** Replicate spread is
+  conditional on the frozen data; it excludes data-sampling variability.
+* **Bands are repeat-run variability** — not confidence intervals and not
+  posterior credible intervals.
+* The problem is intrinsically noisy: the Bayes ceiling is ≈ 0.671 test accuracy
+  and $\beta_{\text{true}}$ itself scores 0.655, so ≈ 0.654 is essentially optimal,
+  not an underfit.
+
+Nothing was tuned against test labels, the $n_{\text{train}}/m$ factor was never
+removed, the drift was never clipped, and $J$ was never rescaled.
+
+## Saved results
+
+`results/results_d9.npz` holds every checkpoint array (train/test accuracy per
+replicate, coefficient checkpoints, training loss, constraint values, anchor
+values) for the main runs, the full-gradient control, the $d=3$ runs and all three
+sensitivity step sizes. `results_d9_metadata.json` records the configuration,
+seeds, package versions, timings, per-run diagnostics and all check outputs.
+`accuracy_curves_mean_sd.csv` holds the per-checkpoint means and sample standard
+deviations directly.
+
+§11c of the notebook reloads the arrays from disk, rebuilds the result objects and
+redraws a main figure, asserting the reloaded values match to 0.0 — figures are
+regenerable without rerunning any sampler.

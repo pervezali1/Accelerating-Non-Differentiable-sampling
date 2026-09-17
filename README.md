@@ -351,3 +351,14 @@ strength) are distinct throughout.
 | `delta_anchor` | smoothing parameter of the L1 anchor |
 | `alpha` | non-reversibility strength |
 | `step_size` | Euler step size |
+
+---
+
+## A second, separate experiment
+
+`sgld_experiment/` holds an independent study with its own notebook and library:
+**non-reversible anchored Langevin with a block state-dependent skew-symmetric
+matrix**, mini-batch SGLD on a uniform-prior-on-K logistic posterior, compared
+across four methods on a unit ball and a smoothed quartic set. It answers a
+different question from the study above and shares no code with it. See
+[`sgld_experiment/README.md`](sgld_experiment/README.md).
