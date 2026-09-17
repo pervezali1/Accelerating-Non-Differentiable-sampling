@@ -1,8 +1,17 @@
 {
-  "selected_s": 7.0,
-  "search_seed_ratio": 0.5865,
-  "held_out_mean_ratio": 0.571075,
-  "held_out_all_below_one": true,
-  "variance_reduction_percent": 42.8925,
-  "note": "exact gradient, LASSO target, specified design X ~ N(0,2I)"
+  "L1-smooth ball": {
+    "selected_s": 3.0,
+    "search_seed_ratio": 0.48252878323757126,
+    "held_out_mean_ratio": 0.5287171447406313,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 47.128285525936874
+  },
+  "unit ball": {
+    "selected_s": 10.0,
+    "search_seed_ratio": 0.5372900321225418,
+    "held_out_mean_ratio": 0.5365431003490598,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 46.34568996509402
+  },
+  "note": "exact gradient, LASSO target U=f+g, specified design X~N(0,2I); constraints: unit ball and smoothed L1 ball (Lambda=3.7)"
 }

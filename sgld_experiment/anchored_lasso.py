@@ -41,6 +41,7 @@ Euclidean projection.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import time
 from dataclasses import dataclass, field
@@ -87,9 +88,9 @@ class LassoConfig:
     checkpoint_every: int = 10
     block_scales: tuple[float, ...] = (5.0, 5.0, 5.0)
     # l^p ball
-    p_constraint: float = 4.0
+    p_constraint: float = 1.0        # smoothed L1 ball
     epsilon: float = 0.2
-    lp_Lambda: float = 1.0           # threshold; radius = (Lambda - d*eps^p)^(1/p)
+    l1_radius: float = 1.9           # Lambda = d*eps + l1_radius = 3.7
     # design
     rho_x: float | None = None       # None -> X ~ N(0, 2I); else AR(1) correlation
     # seeds
@@ -436,7 +437,11 @@ class Streams:
 
 
 def make_streams(cfg: LassoConfig, geometry: Geometry, seed_offset: int = 0) -> Streams:
-    base = np.random.SeedSequence([cfg.sampler_seed + seed_offset, hash(geometry.name) % 10_000])
+    # NOTE: Python's built-in hash() on str is salted per process, so it must not
+    # be used to derive a seed -- that silently breaks reproducibility between
+    # runs.  A stable digest of the geometry name is used instead.
+    tag = int.from_bytes(hashlib.sha256(geometry.name.encode()).digest()[:4], "big")
+    base = np.random.SeedSequence([cfg.sampler_seed + seed_offset, tag])
     init_ss, noise_ss = base.spawn(2)
     w_init = geometry.sample_uniform(np.random.default_rng(init_ss), cfg.n_repeats)
     noise = np.empty((cfg.n_repeats, cfg.n_iterations, cfg.d))

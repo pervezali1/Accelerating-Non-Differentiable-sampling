@@ -243,8 +243,9 @@ x_{k+1} = Pi_K[ x_k - eta a grad_U0 + eta alpha a J_s grad_U0 + sqrt(2 eta a) xi
 Here the anchor does real work: only `grad U0` is evaluated, exactly (no
 subsampling), while the invariant measure carries the true kinked `g`. Column 0
 of `X` is now an intercept, because `U` prices `w0` separately. Run over the
-Euclidean ball and a general smoothed l^p ball (`SmoothLpBallGeometry`, which
-reproduces the independently verified quartic set at p = 4 to 3e-16).
+Euclidean ball and the smoothed **L1** ball (Lambda = 3.7). `SmoothLpBallGeometry`
+handles any p >= 1 and reproduces the independently verified quartic set at p = 4
+and the L1-smooth ball at p = 1, both to ~1e-16.
 
 **On accuracy: the two methods are statistically indistinguishable on both
 constraint sets**, at every swept block strength, on both the specified and an
@@ -260,13 +261,20 @@ ergodic averages, not to move the invariant measure. Measuring that
 
 | s | 0.5 | 1 | 2 | 3 | 5 | **7** | 10 |
 |---|---|---|---|---|---|---|---|
-| Var ratio NR/REV, unit ball | 0.986 | 0.940 | 0.822 | 0.729 | 0.629 | **0.587** | 0.589 |
-| Var ratio NR/REV, l^4 ball | 0.994 | 0.975 | 0.920 | 0.858 | 1.018 | 53.8 | 127 |
+| Var ratio NR/REV, unit ball | 0.978 | 0.927 | 0.798 | 0.694 | 0.584 | 0.539 | **0.537** |
+| Var ratio NR/REV, **L1 ball** | 0.853 | 0.668 | 0.517 | **0.483** | 0.655 | 4.36 | 4.32 |
 
-Monotone in `s` on the ball down to a **41% variance reduction** at s = 7,
-confirmed on four held-out sampler seeds (0.587, 0.551, 0.604, 0.542 — mean
-0.571, a **43% reduction**, all below 1). On the l^p ball it improves to s = 3
-and then the projection destroys it.
+Both geometries win, and the **L1 ball wins fastest** — it reaches its optimum at
+s = 3, where the unit ball still needs s = 10:
+
+| | selected s | held-out ratios | mean | reduction | all below 1 |
+|---|---|---|---|---|---|
+| **L1-smooth ball** | 3 | 0.520, 0.516, 0.553, 0.526 | **0.529** | **47.1%** | yes |
+| unit ball | 10 | 0.519, 0.501, 0.567, 0.560 | 0.537 | 46.3% | yes |
+
+Past its optimum the L1 ball degrades sharply (s >= 7 drives the projection rate
+to 0.31 and the variance ratio above 4), which is the same oversized-step
+mechanism seen elsewhere.
 
 **Correction to the earlier unit-ball result.** The confirmed win reported in
 `block_strength_search.py` (pooled held-out +0.00244, t = +4.09) was measured
