@@ -1,0 +1,70 @@
+{
+  "magic_ball": {
+    "balanced_mean1": [
+      0.207,
+      0.492,
+      2.3
+    ],
+    "balanced_mean5": [
+      1.036,
+      2.462,
+      11.502
+    ],
+    "reversed_mean5": [
+      11.502,
+      2.462,
+      1.036
+    ]
+  },
+  "magic_lp": {
+    "balanced_mean1": [
+      0.208,
+      0.491,
+      2.301
+    ],
+    "balanced_mean5": [
+      1.04,
+      2.455,
+      11.505
+    ],
+    "reversed_mean5": [
+      11.505,
+      2.455,
+      1.04
+    ]
+  },
+  "titanic_ball": {
+    "balanced_mean1": [
+      1.669,
+      0.666,
+      0.665
+    ],
+    "balanced_mean5": [
+      8.346,
+      3.328,
+      3.326
+    ],
+    "reversed_mean5": [
+      3.326,
+      3.328,
+      8.346
+    ]
+  },
+  "titanic_lp": {
+    "balanced_mean1": [
+      1.663,
+      0.653,
+      0.683
+    ],
+    "balanced_mean5": [
+      8.317,
+      3.267,
+      3.417
+    ],
+    "reversed_mean5": [
+      3.417,
+      3.267,
+      8.317
+    ]
+  }
+}

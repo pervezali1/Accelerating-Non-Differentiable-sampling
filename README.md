@@ -420,3 +420,70 @@ Four things the landscape says:
 
 So the usable recipe is: pick the largest η that is still stable, at which point s is free to be
 small; the band where s pays is the band where η is too small.
+
+## Per-block strengths `s = (s₁, s₂, s₃)`
+
+`block_study.py`; table `results/blocks/blocks.csv`, triples `results/blocks/blocks_meta.json`,
+16 figures in `figures/blocks/` (same layout). Exact gradient, LASSO anchor, R = 100, seed 4100,
+all triples reported.
+
+The three blocks are not interchangeable:
+
+| | I₁ = w₁..w₃ | I₂ = w₄..w₆ | I₃ = w₇..w₉ |
+|---|---|---|---|
+| MAGIC | PC1–PC3, ‖∇‖ = 5762 | PC4–PC6, ‖∇‖ = 2292 | PC7–PC9, ‖∇‖ = 732 |
+| Titanic | Age, SibSp, Parch, ‖∇‖ = 89 | Fare, is_female, Pclass_2, ‖∇‖ = 113 | Pclass_3, Emb_Q, Emb_S, ‖∇‖ = 131 |
+
+Block `ℓ` contributes rotational drift `η·s_ℓ·r_ℓ·‖∇_{I_ℓ}U₀‖`, so a principled anisotropic rule
+is **`s_ℓ ∝ 1/(r_ℓ‖∇_{I_ℓ}U₀‖)`** — every block contributes equally. That gives
+`(1.04, 2.46, 11.5)` for MAGIC and `(8.35, 3.33, 3.33)` for Titanic at mean strength 5. The
+**reversed** triple is run as a control: same total strength, wrong ordering.
+
+### 1. The effect localises to one block
+
+Titanic ball, η = 1e-5, paired Δ test (t):
+
+| reversible | (5,5,5) | (5,0,0) | (0,5,0) | (0,0,5) |
+|---|---|---|---|---|
+| — | +0.0165 (4.9) | −0.0002 (−0.2) | **+0.0174 (6.2)** | +0.0051 (2.5) |
+
+**Block 2 alone reproduces the entire isotropic effect**; block 1 contributes nothing. Block 2 is
+Fare / is_female / Pclass_2 — the strongest predictors. The same holds on Titanic ℓ_p
+((0,5,0): +0.0068, t = 3.3; (5,0,0) and (0,0,5) both null). This is why the hand-picked
+`(2,7,2)` worked: it happened to boost block 2.
+
+### 2. Instability also localises — to a different block
+
+MAGIC ℓ_p, η = 1e-5, test accuracy (reversible 0.7841):
+
+| (5,5,5) | (5,0,0) | (0,5,0) | (0,0,5) | balanced (1.04, 2.46, 11.5) |
+|---|---|---|---|---|
+| **0.5358** | **0.5483** | 0.7839 | 0.7841 | **0.7838** |
+
+Isotropic `s = 5` collapses, and `(5,0,0)` shows **block 1 alone is the cause** — blocks 2 and 3
+are perfectly stable at `s = 5`. The balanced triple carries `s₃ = 11.5`, more than double the
+isotropic value that collapsed, and stays stable. **Anisotropic `s` buys back the stability
+ceiling.**
+
+### 3. The ordering matters, not just the magnitude
+
+The reversed control has identical total strength and fails:
+
+| | balanced | reversed | 
+|---|---|---|
+| MAGIC ℓ_p, η = 1e-6 | +0.0006 train (t = 5.0) | **−0.0801 (t = −7.9)** |
+| MAGIC ball, η = 1e-5 | −0.0001 (t = −1.1) | **−0.2076 (t = −52)** |
+
+So matching `s_ℓ` to each block's gradient scale is doing real work.
+
+### 4. Best cells, and the unchanged caveat
+
+Best paired test gain anywhere in the study: Titanic ℓ_p at η = 1e-5 with the balanced triple
+`(8.32, 3.27, 3.42)`, **+0.0100 ± 0.0021 (t = 4.7)**, ahead of isotropic `(5,5,5)` at +0.0083 and
+of `(2,7,2)` at +0.0093. On MAGIC ℓ_p at η = 1e-6 the balanced triple is also the best
+(+0.0006 train, t = 5.0; +0.0005 test, t = 2.9 at mean strength 1).
+
+At converged step sizes (Titanic η = 3e-5, MAGIC η = 1e-5) every triple is within noise of the
+reversible arm, exactly as in the isotropic grid. Per-block tuning widens the usable strength
+range and locates where the rotation does its work; it does not change the fact that the gain
+lives in the transient.
