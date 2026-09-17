@@ -1,0 +1,300 @@
+{
+  "h_grid": [
+    0.0001,
+    3e-05,
+    1e-05,
+    3e-06,
+    1e-06
+  ],
+  "s_grid": [
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.02,
+      0.02,
+      0.02
+    ],
+    [
+      0.05,
+      0.05,
+      0.05
+    ],
+    [
+      0.1,
+      0.1,
+      0.1
+    ],
+    [
+      0.25,
+      0.25,
+      0.25
+    ],
+    [
+      0.5,
+      0.5,
+      0.5
+    ],
+    [
+      1.0,
+      1.0,
+      1.0
+    ],
+    [
+      2.0,
+      2.0,
+      2.0
+    ],
+    [
+      3.0,
+      3.0,
+      3.0
+    ],
+    [
+      5.0,
+      5.0,
+      5.0
+    ],
+    [
+      7.0,
+      7.0,
+      7.0
+    ],
+    [
+      10.0,
+      10.0,
+      10.0
+    ],
+    [
+      2.0,
+      7.0,
+      2.0
+    ],
+    [
+      1.0,
+      0.25,
+      1.0
+    ]
+  ],
+  "sweep_reps": 25,
+  "final_reps": 100,
+  "selection": "training accuracy, last 25% of checkpoints; test unused",
+  "chosen": {
+    "magic_ball": {
+      "h": 1e-05,
+      "s": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "s_label": "(0.5,0.5,0.5)",
+      "sel_train_acc": 0.7807255520504731,
+      "paired_dtrain": 9.043112513147378e-06,
+      "paired_dtrain_se": 4.907226727490499e-05
+    },
+    "magic_lp": {
+      "h": 1e-05,
+      "s": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "s_label": "(0,0,0)",
+      "sel_train_acc": 0.7803685594111462,
+      "paired_dtrain": 0.0,
+      "paired_dtrain_se": 0.0
+    },
+    "titanic_ball": {
+      "h": 0.0001,
+      "s": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "s_label": "(2,2,2)",
+      "sel_train_acc": 0.7920683027794208,
+      "paired_dtrain": 0.000782081608515699,
+      "paired_dtrain_se": 0.0009101605580661126
+    },
+    "titanic_lp": {
+      "h": 0.0001,
+      "s": [
+        1.0,
+        0.25,
+        1.0
+      ],
+      "s_label": "(1,0.25,1)",
+      "sel_train_acc": 0.8014157303370786,
+      "paired_dtrain": 0.0003696629213483682,
+      "paired_dtrain_se": 0.0007379744716118161
+    }
+  },
+  "finals": {
+    "magic_ball": {
+      "h": 1e-05,
+      "s": [
+        0.5,
+        0.5,
+        0.5
+      ],
+      "summary": {
+        "ranch": {
+          "label": "Reversible anchored Langevin",
+          "train_mean": 0.7809240273396426,
+          "train_sd": 0.0017529498973756932,
+          "test_mean": 0.7757124079915877,
+          "test_sd": 0.002627668393605213,
+          "projection_rate": 0.48923,
+          "n_nonfinite": 0,
+          "train_loss_U": 7566.116735704375
+        },
+        "nranch": {
+          "label": "Non-reversible anchored Langevin",
+          "train_mean": 0.7809759463722398,
+          "train_sd": 0.001971587921693902,
+          "test_mean": 0.775578338590957,
+          "test_sd": 0.0027241370536260964,
+          "projection_rate": 0.49105,
+          "n_nonfinite": 0,
+          "train_loss_U": 7567.891614510403
+        },
+        "paired": {
+          "dtrain": 5.1919032597266265e-05,
+          "dtrain_se": 6.481316805448247e-05,
+          "dtest": -0.0001340694006309129,
+          "dtest_se": 0.00011036677839455411,
+          "win_rate_train": 0.46,
+          "win_rate_test": 0.35
+        }
+      },
+      "png": "figures/strength/magic_ball_anchored_tuned.png",
+      "pdf": "figures/strength/magic_ball_anchored_tuned.pdf",
+      "npz": "figures/strength/magic_ball_anchored_tuned.npz"
+    },
+    "magic_lp": {
+      "h": 1e-05,
+      "s": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "summary": {
+        "ranch": {
+          "label": "Reversible anchored Langevin",
+          "train_mean": 0.7805750525762356,
+          "train_sd": 0.0018351079123845612,
+          "test_mean": 0.774490010515247,
+          "test_sd": 0.002505838629827412,
+          "projection_rate": 0.05634,
+          "n_nonfinite": 0,
+          "train_loss_U": 7402.7556384522095
+        },
+        "nranch": {
+          "label": "Non-reversible anchored Langevin",
+          "train_mean": 0.7805750525762356,
+          "train_sd": 0.0018351079123845612,
+          "test_mean": 0.774490010515247,
+          "test_sd": 0.002505838629827412,
+          "projection_rate": 0.05634,
+          "n_nonfinite": 0,
+          "train_loss_U": 7402.7556384522095
+        },
+        "paired": {
+          "dtrain": 0.0,
+          "dtrain_se": 0.0,
+          "dtest": 0.0,
+          "dtest_se": 0.0,
+          "win_rate_train": 0.0,
+          "win_rate_test": 0.0
+        }
+      },
+      "png": "figures/strength/magic_lp_anchored_tuned.png",
+      "pdf": "figures/strength/magic_lp_anchored_tuned.pdf",
+      "npz": "figures/strength/magic_lp_anchored_tuned.npz"
+    },
+    "titanic_ball": {
+      "h": 0.0001,
+      "s": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "summary": {
+        "ranch": {
+          "label": "Reversible anchored Langevin",
+          "train_mean": 0.7928932584269662,
+          "train_sd": 0.011090341494155163,
+          "test_mean": 0.8031284916201119,
+          "test_sd": 0.013454764238104487,
+          "projection_rate": 0.2646866666666667,
+          "n_nonfinite": 0,
+          "train_loss_U": 365.0121726618674
+        },
+        "nranch": {
+          "label": "Non-reversible anchored Langevin",
+          "train_mean": 0.7919662921348315,
+          "train_sd": 0.010529744269994624,
+          "test_mean": 0.8030167597765363,
+          "test_sd": 0.014284401423288715,
+          "projection_rate": 0.26948666666666665,
+          "n_nonfinite": 0,
+          "train_loss_U": 365.08830911437076
+        },
+        "paired": {
+          "dtrain": -0.000926966292134831,
+          "dtrain_se": 0.0009712627157021867,
+          "dtest": -0.00011173184357541444,
+          "dtest_se": 0.0010915717608754442,
+          "win_rate_train": 0.44,
+          "win_rate_test": 0.41
+        }
+      },
+      "png": "figures/strength/titanic_ball_anchored_tuned.png",
+      "pdf": "figures/strength/titanic_ball_anchored_tuned.pdf",
+      "npz": "figures/strength/titanic_ball_anchored_tuned.npz"
+    },
+    "titanic_lp": {
+      "h": 0.0001,
+      "s": [
+        1.0,
+        0.25,
+        1.0
+      ],
+      "summary": {
+        "ranch": {
+          "label": "Reversible anchored Langevin",
+          "train_mean": 0.8010112359550563,
+          "train_sd": 0.0069407915751591625,
+          "test_mean": 0.8069273743016759,
+          "test_sd": 0.012512676580275432,
+          "projection_rate": 0.171305,
+          "n_nonfinite": 0,
+          "train_loss_U": 345.124814922413
+        },
+        "nranch": {
+          "label": "Non-reversible anchored Langevin",
+          "train_mean": 0.8008005617977528,
+          "train_sd": 0.007867030338035624,
+          "test_mean": 0.8051396648044693,
+          "test_sd": 0.013005843337467956,
+          "projection_rate": 0.17613,
+          "n_nonfinite": 0,
+          "train_loss_U": 345.3993933511293
+        },
+        "paired": {
+          "dtrain": -0.00021067415730337104,
+          "dtrain_se": 0.0007129127087285558,
+          "dtest": -0.0017877094972067055,
+          "dtest_se": 0.0011933923761752033,
+          "win_rate_train": 0.39,
+          "win_rate_test": 0.32
+        }
+      },
+      "png": "figures/strength/titanic_lp_anchored_tuned.png",
+      "pdf": "figures/strength/titanic_lp_anchored_tuned.pdf",
+      "npz": "figures/strength/titanic_lp_anchored_tuned.npz"
+    }
+  }
+}

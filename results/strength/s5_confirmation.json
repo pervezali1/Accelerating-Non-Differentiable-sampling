@@ -1,0 +1,182 @@
+{
+  "s": [
+    5.0,
+    5.0,
+    5.0
+  ],
+  "h_scan": {
+    "magic": [
+      1e-05,
+      3e-06,
+      1e-06,
+      3e-07,
+      1e-07
+    ],
+    "titanic": [
+      3e-05,
+      1e-05,
+      3e-06
+    ]
+  },
+  "chosen_h": {
+    "magic_ball": 3e-07,
+    "magic_lp": 1e-07,
+    "titanic_ball": 1e-05,
+    "titanic_lp": 1e-05
+  },
+  "search_seed": 3000,
+  "confirm_seed": 4100,
+  "scan_reps": 40,
+  "final_reps": 100,
+  "selection": "paired TRAINING gain only; test labels unused",
+  "confirmation": {
+    "magic_ball": {
+      "h": 3e-07,
+      "s": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "verdict": "no significant difference",
+      "paired": {
+        "dtrain": 0.002407991587802317,
+        "dtrain_se": 0.0013780745008888655,
+        "dtest": 0.0028943217665615105,
+        "dtest_se": 0.0015160171703842338,
+        "t_train": 1.7473595123116707,
+        "t_test": 1.9091615999493898,
+        "win_train": 0.58,
+        "win_test": 0.59
+      },
+      "ranch": {
+        "train": 0.7486704784437436,
+        "train_sd": 0.01679354476537518,
+        "test": 0.7453522607781283,
+        "test_sd": 0.01726557854425518,
+        "U": 8498.299784183459,
+        "proj": 0.0
+      },
+      "nranch": {
+        "train": 0.7510784700315457,
+        "train_sd": 0.015906538790558748,
+        "test": 0.7482465825446899,
+        "test_sd": 0.016357930599809906,
+        "U": 8462.216764232951,
+        "proj": 0.0
+      },
+      "png": "figures/strength/magic_ball_s5_anchored.png",
+      "pdf": "figures/strength/magic_ball_s5_anchored.pdf"
+    },
+    "magic_lp": {
+      "h": 1e-07,
+      "s": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "verdict": "no significant difference",
+      "paired": {
+        "dtrain": 0.004029968454258679,
+        "dtrain_se": 0.004052005286242626,
+        "dtest": 0.004458464773922193,
+        "dtest_se": 0.003972306856283064,
+        "t_train": 0.9945614996952827,
+        "t_test": 1.122386798207738,
+        "win_train": 0.58,
+        "win_test": 0.54
+      },
+      "ranch": {
+        "train": 0.6460916140904311,
+        "train_sd": 0.06961083405892675,
+        "test": 0.6442744479495268,
+        "test_sd": 0.06914464405476389,
+        "U": 9674.834890229164,
+        "proj": 0.0
+      },
+      "nranch": {
+        "train": 0.6501215825446899,
+        "train_sd": 0.06347323854916016,
+        "test": 0.648732912723449,
+        "test_sd": 0.06438185657428148,
+        "U": 9633.949435556213,
+        "proj": 0.0
+      },
+      "png": "figures/strength/magic_lp_s5_anchored.png",
+      "pdf": "figures/strength/magic_lp_s5_anchored.pdf"
+    },
+    "titanic_ball": {
+      "h": 1e-05,
+      "s": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "verdict": "non-reversible WINS",
+      "paired": {
+        "dtrain": 0.012738764044943824,
+        "dtrain_se": 0.0029471238305341574,
+        "dtest": 0.019329608938547495,
+        "dtest_se": 0.00357885605915799,
+        "t_train": 4.322439360355944,
+        "t_test": 5.401057941149843,
+        "win_train": 0.65,
+        "win_test": 0.66
+      },
+      "ranch": {
+        "train": 0.754747191011236,
+        "train_sd": 0.024307529901577897,
+        "test": 0.7660335195530726,
+        "test_sd": 0.032981785545610515,
+        "U": 387.1300496372312,
+        "proj": 0.00144
+      },
+      "nranch": {
+        "train": 0.7674859550561797,
+        "train_sd": 0.022107524627920806,
+        "test": 0.7853631284916202,
+        "test_sd": 0.026788589329394718,
+        "U": 383.73164990639634,
+        "proj": 0.0024533333333333334
+      },
+      "png": "figures/strength/titanic_ball_s5_anchored.png",
+      "pdf": "figures/strength/titanic_ball_s5_anchored.pdf"
+    },
+    "titanic_lp": {
+      "h": 1e-05,
+      "s": [
+        5.0,
+        5.0,
+        5.0
+      ],
+      "verdict": "non-reversible WINS",
+      "paired": {
+        "dtrain": 0.0068960674157303396,
+        "dtrain_se": 0.0021375937685381,
+        "dtest": 0.005698324022346368,
+        "dtest_se": 0.0033368544219672053,
+        "t_train": 3.2260888468282536,
+        "t_test": 1.7076933248370436,
+        "win_train": 0.64,
+        "win_test": 0.52
+      },
+      "ranch": {
+        "train": 0.7754353932584269,
+        "train_sd": 0.017092118946924258,
+        "test": 0.7893296089385475,
+        "test_sd": 0.02307233124818176,
+        "U": 368.82460941081297,
+        "proj": 0.0
+      },
+      "nranch": {
+        "train": 0.7823314606741572,
+        "train_sd": 0.01631811511858333,
+        "test": 0.7950279329608939,
+        "test_sd": 0.02104882227715568,
+        "U": 364.97919119187446,
+        "proj": 0.0
+      },
+      "png": "figures/strength/titanic_lp_s5_anchored.png",
+      "pdf": "figures/strength/titanic_lp_s5_anchored.pdf"
+    }
+  }
+}

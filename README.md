@@ -135,3 +135,61 @@ h = 6688, first and last records matching `magic04.data`; Titanic 891 rows, the 
 columns, 549/342 survived, 177 missing `Age`, 2 missing `Embarked`. SHA-256 digests of the exact
 bytes used are recorded in `results/run_config.json`. Raw data are not committed; run
 `python fetch_data.py`.
+
+---
+
+# Follow-up: searching the block strength `s` (anchored arms only)
+
+Question: **is there a block strength at which non-reversible anchored Langevin beats the
+reversible anchored arm?** Scripts: `strength_search.py` (sweep over `s`), `hs_search.py`
+(joint sweep over `h` and `s`), `final_s5.py` (the requested `s = 5`, with an independent
+confirmation run). Outputs in `figures/strength/` and `results/strength/`.
+
+## Protocol
+
+* Two arms only, both with `rho = log 2`: reversible (`alpha = 0`) and non-reversible
+  (`alpha = 1`). The reversible arm does not depend on `s`, so it is run once per cell and
+  reused as the baseline.
+* Every comparison is **paired** — same initial states, same mini-batches, same Gaussian
+  increments — so the paired standard error is far smaller than the run-to-run SD.
+* `s = 0` is a control: with `J = 0` the two arms come out bit-identical (paired difference
+  exactly 0), which verifies the pairing.
+* **Selection uses training data only** (paired training gain, or mean training accuracy over
+  the last 25% of checkpoints). Test labels select nothing.
+* Because the selected cell is a maximum over a grid, and the maximum of noisy estimates is
+  biased upward, the reported numbers and figures come from a **confirmation run on independent
+  replicates** (sampler seed 4100 vs the 3000 used to search).
+
+## Answer
+
+**At the originally specified `h = 1e-4`, no `s` wins.** Across 14 strength triples the best
+paired training gains were `+0.0000` to `+0.0008` with standard errors of the same size, and
+`s = 5` loses heavily on MAGIC (`-0.190` ball, `-0.254` smoothed) because one non-reversible
+drift step there exceeds the diameter of `K`.
+
+**At `h = 1e-5`, `s = 5` wins on Titanic** — confirmed on independent replicates, `R = 100`:
+
+| | reversible train | non-rev train | paired Δ train | reversible test | non-rev test | paired Δ test |
+|---|---|---|---|---|---|---|
+| Titanic ball | 0.7547 ± 0.0243 | **0.7675 ± 0.0221** | **+0.0127 ± 0.0029** (t = 4.3) | 0.7660 ± 0.0330 | **0.7854 ± 0.0268** | **+0.0193 ± 0.0036** (t = 5.4) |
+| Titanic smoothed ℓ_p | 0.7754 ± 0.0171 | **0.7823 ± 0.0163** | **+0.0069 ± 0.0021** (t = 3.2) | 0.7893 ± 0.0231 | **0.7950 ± 0.0210** | +0.0057 ± 0.0033 (t = 1.7) |
+
+Full training loss `U` agrees: 387.1 → 383.7 (ball) and 368.8 → 365.0 (smoothed).
+
+**On MAGIC no step size produced a win.** The gain rises towards zero as `h` shrinks, but even
+at the most favourable cell it stays inside the noise — ball `h = 3e-7`: `+0.0024 ± 0.0014`
+(t = 1.8); smoothed `h = 1e-7`: `+0.0040 ± 0.0041` (t = 1.0) — and those cells cost a lot of
+absolute accuracy (0.749 and 0.646 training, against 0.781 at `h = 1e-5`).
+
+## What the win is, and what it is not
+
+It is a **convergence-rate** win at a fixed iteration budget, which is what a non-reversible
+drift is supposed to deliver. At `h = 1e-5` the Titanic chains are still inside their transient
+after 1500 / 2000 iterations, and the rotation gets them further along it. Run them to
+convergence (`h = 1e-4`, same budget) and both arms land at the same place and the gap vanishes.
+So the correct claim is "reaches a given accuracy in fewer iterations at this step size", **not**
+"converges to a better posterior". The figures plot the required common `[0, 1]` accuracy axis;
+an inset zooms the same curves so the separation is legible.
+
+`h` was chosen per experiment from a small grid on a training-only criterion, which is a real
+selection cost and is disclosed here and in every figure caption.
