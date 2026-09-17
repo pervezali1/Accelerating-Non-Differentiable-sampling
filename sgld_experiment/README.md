@@ -328,6 +328,23 @@ How hard the anchor is working, for reference:
 | 0.9 | [0.866, 1] | [0.981, 0.994] | 0.019 | 939 | 0.094 | 2.4e-3 |
 | 10 | [0.202, 1] | [0.775, 1.000] | 0.255 | 1394 | 0.139 | - |
 | 30 | [0.008, 1] | [0.390, 0.768] | 0.941 | 2394 | 0.239 | 9.3e-2 |
+| 100 | [1e-7, 1] | [0.0007, 0.171] | 7.245 | 5894 | 0.589 | 1.006 |
+
+**lambda = 100 breaks the experiment, and its numbers are not comparable.** With
+`a` down to 1e-3 the effective step `eta*a` shrinks by ~20x and 1000 iterations is
+nowhere near stationarity: test accuracy is still rising at the final iterate and
+the ergodic average is still drifting. The variance ratio it reports (0.21, an
+apparent 79% reduction) is measuring the transient. Re-running the same
+configuration for 20 000 iterations, where it does converge, gives **0.65 - a 35%
+reduction, worse than the ~47% at lambda <= 30**. `lambda_experiment.py` now
+checks convergence and prints a warning rather than reporting such a number
+silently.
+
+The controlling quantity is the product `lambda * delta`: the anchor bound is
+`exp(-(d-1) * lambda * delta)`. Holding `delta = 0.02` while raising `lambda`
+drives `a` to zero. Keeping `a` usable at `lambda = 100` needs `delta ~ 0.002`,
+which pushes the anchor curvature `lambda/delta` to 50 000 and forces a much
+smaller step - a real trade-off, not a free fix.
 
 At lambda = 0.9 the anchor is active but barely — `a` stays within 2% of 1. Only
 by lambda = 30 is it strongly load-bearing, with `a` down to 0.39 and the chain

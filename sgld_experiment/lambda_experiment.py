@@ -134,6 +134,28 @@ def main() -> int:
     else:
         assert identity_gap > 0.0, "a non-zero lambda must change the chain"
 
+    # --- convergence check -------------------------------------------------
+    # A strong anchor makes a(w) small, which shrinks the effective step eta*a
+    # and can leave the chain far from stationarity within the iteration budget.
+    # The ergodic-average statistic below is then measuring the transient, not
+    # an asymptotic variance, so this must be checked rather than assumed.
+    mean_accuracy, _ = anchored.mean_std("test_accuracy")
+    half = len(anchored.checkpoints) // 2
+    quarter = half + (len(anchored.checkpoints) - half) // 2
+    drift = float(np.linalg.norm(anchored.w[half:quarter].mean(axis=0)
+                                 - anchored.w[quarter:].mean(axis=0), axis=1).mean())
+    still_rising = bool(mean_accuracy[-1] > mean_accuracy[half] + 1e-4)
+    converged = (not still_rising) and drift < 0.08
+    print(f"  accuracy mid -> final                  = {mean_accuracy[half]:.4f} -> "
+          f"{mean_accuracy[-1]:.4f}   still rising: {still_rising}")
+    print(f"  ergodic-average drift across the window= {drift:.5f}")
+    if not converged:
+        print("  *** WARNING: the chain has NOT converged in this iteration budget. ***")
+        print("  *** The ergodic-variance ratios below reflect the transient and are ***")
+        print("  *** NOT comparable to converged runs. Increase n_iterations.        ***")
+    summary_convergence = {"still_rising": still_rising, "ergodic_drift": drift,
+                           "converged": bool(converged)}
+
     s_grid = (1.0, 3.0, 10.0) if args.quick else (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0)
     rows, figure_paths = [], []
     print(f"\n{'s':>5} {'geometry':<18} {'var NR/REV':>11} {'acc diff':>11} {'t':>6} {'proj':>6}")
@@ -161,7 +183,8 @@ def main() -> int:
                "anchor_identity_gap": identity_gap,
                "a_lower_bound": target.a_lower_bound,
                "a_observed_min": float(a_values.min()),
-               "lipschitz": target.lipschitz_constant()}
+               "lipschitz": target.lipschitz_constant(),
+               "convergence": summary_convergence}
     held_rows = []
     for geometry in (l1, ball):
         sub = sweep[sweep.geometry == geometry.name]

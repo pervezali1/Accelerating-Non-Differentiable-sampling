@@ -1,0 +1,38 @@
+{
+  "lambda_lasso": 100.0,
+  "anchor_identity_gap": 1.0063428336823919,
+  "a_lower_bound": 1.1253517471925912e-07,
+  "a_observed_min": 0.0007134961918737509,
+  "lipschitz": 5894.357346413345,
+  "L1-smooth ball": {
+    "selected_s": 10.0,
+    "held_out_mean_ratio": 0.23697684028445487,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 76.3023159715545
+  },
+  "unit ball": {
+    "selected_s": 10.0,
+    "held_out_mean_ratio": 0.7188873891837673,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 28.111261081623272
+  },
+  "figures": [
+    "results_lambda100/accuracy_ball.png",
+    "results_lambda100/accuracy_ball.pdf",
+    "results_lambda100/accuracy_l1.png",
+    "results_lambda100/accuracy_l1.pdf"
+  ],
+  "convergence": {
+    "still_rising": true,
+    "ergodic_drift": 0.0969,
+    "converged": false,
+    "warning": "At lambda=100 a(w) collapses to ~1e-3..0.17, so the effective step eta*a is ~20x smaller and 1000 iterations is far from stationarity. The ratios in sweep.csv reflect the TRANSIENT."
+  },
+  "converged_check_20000_iterations": {
+    "geometry": "L1-smooth ball",
+    "s": 10.0,
+    "ratio_at_1000_iterations": 0.2065,
+    "ratio_at_20000_iterations": 0.6509,
+    "note": "The apparent 76-79% reduction at 1000 iterations falls to 35% once converged, which is WORSE than the ~47% seen at lambda <= 30."
+  }
+}
