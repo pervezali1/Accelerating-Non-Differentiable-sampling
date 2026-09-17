@@ -228,6 +228,15 @@ convergence-limited. At s = 7 the mid-run advantage is larger (t = +4.1 at
 iteration 400) but has evaporated by iteration 1000, because a 32 % projection
 rate costs more than the acceleration is worth.
 
+### Accuracy-only notebook
+
+`accuracy_curves_only.ipynb` (and `.executed.ipynb` with outputs) is a minimal
+notebook that plots **only training and test accuracy** — one figure, no other
+graphs — for the two anchored methods at the configuration found above
+(s = 5, unit ball, AR(1) rho_x = 0.99). The supporting paired statistics and the
+held-out-seed confirmation are reported as tables rather than plots. Outputs go
+to `results_accuracy_only/`.
+
 ### Honest scope of this claim
 
 * The win required **changing the design** to an ill-conditioned one. Tuning s
