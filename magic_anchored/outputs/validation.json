@@ -1,0 +1,109 @@
+{
+  "arviz": true,
+  "checks": {
+    "10_projection_reported": true,
+    "11_step_size_conclusions_consistent": true,
+    "1_states_within_constraint": true,
+    "2_J_skew_symmetric": true,
+    "3_tangency_qJ_zero": true,
+    "4_anchor_bounds": true,
+    "5_all_finite": true,
+    "6_gradient_shape": true,
+    "7_intercept_not_l1_penalised": true,
+    "8_same_target_and_constraint": true,
+    "9_geometry_not_recomputed": true
+  },
+  "details": {
+    "a_bound": 0.010411961390811882,
+    "intercept_penalty_contribution": 0.0,
+    "log_a_bound": -4.564800000000001,
+    "log_a_observed": [
+      -2.0559519959365113,
+      -0.07030372504123522
+    ],
+    "max_center_drift": 0.0,
+    "max_radius_excess": 1.1102230246251565e-16,
+    "max_skew_residual": 0.0,
+    "max_tangency_residual": 6.521048065248022e-19,
+    "projection_frequency_by_alpha": {
+      "0.0": 0.000185,
+      "0.25": 0.00018416666666666665,
+      "0.5": 0.0001833333333333333,
+      "1.0": 0.00017999999999999998,
+      "10.0": 0.00017,
+      "2.0": 0.00017583333333333334,
+      "200.0": 0.0014041666666666668,
+      "50.0": 0.00015916666666666667
+    },
+    "shared_settings": {
+      "h": [
+        4.9087463019355625e-06
+      ],
+      "n_iter": [
+        300000
+      ],
+      "radius": [
+        0.19390470968383125
+      ],
+      "seeds_per_alpha": {
+        "0.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "0.25": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "0.5": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "1.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "10.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "2.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "200.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ],
+        "50.0": [
+          1000,
+          1001,
+          1002,
+          1003
+        ]
+      }
+    },
+    "step_bias_in_sd_alpha_0": 0.22524577337076054,
+    "step_bias_in_sd_alpha_200": 0.25099397554788344
+  },
+  "environment": {
+    "numpy": "2.4.6",
+    "platform": "Linux-6.18.44-fc-v33-x86_64-with-glibc2.39",
+    "python": "3.11.15"
+  },
+  "failures": {},
+  "n_failures": 0
+}

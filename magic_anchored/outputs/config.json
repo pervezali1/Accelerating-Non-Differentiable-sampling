@@ -1,0 +1,135 @@
+{
+  "data": {
+    "negative_label": "h",
+    "path": "../data/magic04.data",
+    "positive_label": "g",
+    "split_seed": 0,
+    "test_size": 0.2
+  },
+  "experiment": {
+    "alphas": [
+      0.0,
+      0.25,
+      0.5,
+      1.0,
+      2.0,
+      10.0,
+      50.0,
+      200.0
+    ],
+    "base_seed": 1000,
+    "burn_in": 50000,
+    "burn_in_sensitivity": 10000,
+    "fixed_radius": null,
+    "h": null,
+    "make_figures": true,
+    "n_chains": 4,
+    "n_chains_sensitivity": 2,
+    "n_iter": 300000,
+    "n_iter_sensitivity": 60000,
+    "n_jobs": 4,
+    "out_dir": "outputs",
+    "radius_factors": [
+      0.9,
+      1.0,
+      1.1
+    ],
+    "step_safety": 0.25,
+    "step_size_factors": [
+      1.0,
+      0.5,
+      0.25
+    ],
+    "thin": 50
+  },
+  "field": {
+    "s": 1.0,
+    "triples": null
+  },
+  "pilot": {
+    "burn_in": 10000,
+    "inflation": 1.1,
+    "init_scale": 0.01,
+    "n_iter": 40000,
+    "quantile": 0.999,
+    "seed": 12345,
+    "thin": 1
+  },
+  "resolved": {
+    "alpha_natural_scale": 12.632440680668154,
+    "anchor_curvature_max": 50929.501062506075,
+    "dataset": {
+      "dim": 11,
+      "n_test": 3804,
+      "n_train": 15216,
+      "param_names": [
+        "intercept",
+        "fLength",
+        "fWidth",
+        "fSize",
+        "fConc",
+        "fConc1",
+        "fAsym",
+        "fM3Long",
+        "fM3Trans",
+        "fAlpha",
+        "fDist"
+      ],
+      "test_positive_rate": 0.6482649842271293,
+      "train_positive_rate": 0.6483964248159831
+    },
+    "delta": 0.003000000000000001,
+    "h": 4.9087463019355625e-06,
+    "lambda": 152.16,
+    "runtime_seconds": 1127.1181751530003,
+    "target_description": {
+      "a_min": 0.010411961390811882,
+      "delta": 0.003000000000000001,
+      "dim": 11,
+      "lambda": 152.16,
+      "log_a_min": -4.564800000000001,
+      "n_obs": 15216,
+      "sigma0": 10.0,
+      "tempered": false
+    },
+    "triples": [
+      [
+        0,
+        1,
+        2
+      ],
+      [
+        2,
+        3,
+        4
+      ],
+      [
+        4,
+        5,
+        6
+      ],
+      [
+        6,
+        7,
+        8
+      ],
+      [
+        8,
+        9,
+        10
+      ],
+      [
+        10,
+        0,
+        1
+      ]
+    ]
+  },
+  "target": {
+    "delta": 0.003000000000000001,
+    "lambda_": 152.16,
+    "lambda_scale": 0.01,
+    "sigma0": 10.0,
+    "tempered": false
+  }
+}

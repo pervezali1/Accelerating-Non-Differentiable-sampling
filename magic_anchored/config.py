@@ -169,6 +169,11 @@ class ExperimentConfig:
     #: not depend on this (each chain's noise is a function of its seed alone).
     #: -1 means "one worker per CPU"
     n_jobs: int = 1
+    #: how many trajectory points to write per chain.  The full trajectory is
+    #: kept in memory -- the validation checks and the radius figure use it --
+    #: but writing all of it is what turns a 20-minute run into a gigabyte of
+    #: NPZ.  ``None`` writes every step.
+    trajectory_points: int | None = 5_000
     #: sensitivity studies are cheaper: fewer chains and, optionally, shorter.
     #: They ask whether the *answer* moves with h or R, which needs far less
     #: effective sample size than the efficiency comparison between alphas.

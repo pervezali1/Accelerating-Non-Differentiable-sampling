@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
-outputs/
+# the sampled trajectories are large and regenerable by re-running main.py
+outputs/samples/
+# vector copies of the figures are produced by every run; the PNGs are committed
+outputs/figures/*.pdf

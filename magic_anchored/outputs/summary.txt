@@ -1,0 +1,81 @@
+Constrained non-reversible anchored Langevin on MAGIC Gamma Telescope
+========================================================================
+
+data           n_train=15216 n_test=3804 D=11
+target         U = sum_i[softplus(x'w) - y x'w] + b0^2/(2 sigma0^2) + lambda sum_{j>=1} |b_j|
+               lambda=152.16 sigma0=10 (sum over observations, not the mean)
+anchor         delta=0.003; clock bound a(w) in [1.0412e-02, 1]
+step size      h=4.908746e-06 = 0.25/lambda_max, lambda_max(Hess U0)=50929.5
+constraint     ball, R=0.193905, source=pilot, pilot exceedance=0.00000
+runtime        1127.1s total
+
+rotation scale  J_s is linear in q = w - center, so the rotation matches
+                the gradient only at alpha* = sqrt(m)/(s R) = 12.63;
+                alpha/alpha* is the dimensionless strength.
+
+Efficiency by alpha (ratios are against the reversible alpha = 0)
+----------------------------------------------------------------------------------------
+  alpha    a/a*  |nr|/|r|    minESS    medESS     ESS/s  ESS/s rel  maxRhat   proj%       MSJD  a_mean
+      0   0.000    0.0000     735.8    2098.1    115.63      1.00x   1.0059   0.02%  6.484e-05  0.5953
+   0.25   0.020    0.0042     735.7    2098.7    108.05      0.93x   1.0059   0.02%  6.484e-05  0.5953
+    0.5   0.040    0.0085     735.7    2099.2    106.05      0.92x   1.0060   0.02%  6.484e-05  0.5953
+      1   0.079    0.0170     735.8    2100.2    105.32      0.91x   1.0060   0.02%  6.484e-05  0.5953
+      2   0.158    0.0339     736.1    2102.8    105.33      0.91x   1.0060   0.02%  6.485e-05  0.5954
+     10   0.792    0.1694     749.7    2117.8    107.30      0.93x   1.0060   0.02%  6.488e-05  0.5954
+     50   3.958    0.8511     888.0    2403.7    127.67      1.10x   1.0054   0.02%  6.541e-05  0.5958
+    200  15.832    3.9706    1083.5    4323.5    205.14      1.77x   1.0054   0.14%  8.139e-05  0.6167
+
+Test-set predictive performance (threshold-free scores are the comparable ones)
+------------------------------------------------------------------------
+ alpha  accuracy  balanced   ROC-AUC  log loss    Brier    sens    spec
+     0   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+  0.25   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+   0.5   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+     1   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+     2   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+    10   0.78891   0.74027   0.83787   0.46007  0.14774  0.9043  0.5762
+    50   0.78891   0.74027   0.83788   0.46007  0.14774  0.9043  0.5762
+   200   0.78864   0.73989   0.83789   0.46007  0.14774  0.9043  0.5755
+
+These posteriors all target the same law, so the predictive scores should
+agree; they are reported to confirm that the rotation does not bias the
+answer, not as evidence that one alpha predicts better.  Differences of a
+few thousandths in accuracy on this test set are inside binomial noise.
+
+Step-size sensitivity (simulated time held fixed)
+------------------------------------------------------------------------
+ step_factor          h  n_iter  alpha  min_ess  ess_per_second  max_r_hat  roc_auc  log_loss  posterior_mean_norm
+           1 4.9087e-06   60000      0   56.455          120.55      1.057  0.83776   0.46001                1.656
+           1 4.9087e-06   60000    200   92.056          197.19      1.028  0.83796   0.45998               1.6491
+         0.5 2.4544e-06  120000      0   75.895          69.187     1.0513  0.83785   0.46009               1.6497
+         0.5 2.4544e-06  120000    200   120.04          136.66     1.0187  0.83797   0.46006               1.6469
+        0.25 1.2272e-06  240000      0    73.56          36.062     1.0384    0.838      0.46               1.6516
+        0.25 1.2272e-06  240000    200   71.853          72.474     1.0414  0.83792   0.46002               1.6527
+
+Radius sensitivity
+------------------------------------------------------------------------
+ radius_factor  radius  alpha  min_ess  ess_per_second  max_r_hat  projection_frequency  posterior_mean_norm  roc_auc  log_loss  accuracy
+           0.9 0.17451      0    59.09          119.25     1.0571                0.0004               1.6561  0.83776   0.46001   0.78996
+           0.9 0.17451    200   119.64           203.5     1.0302             0.0024417               1.6532    0.838   0.45989    0.7897
+             1  0.1939      0   56.455          120.94      1.057            0.00010833                1.656  0.83776   0.46001   0.78996
+             1  0.1939    200   92.056          200.24      1.028              0.001775               1.6491  0.83796   0.45998   0.78891
+           1.1  0.2133      0    57.91          121.32     1.0562               2.5e-05               1.6559  0.83776   0.46001   0.78996
+           1.1  0.2133    200   78.018          206.91     1.0262             0.0011917               1.6492  0.83802   0.45995   0.78917
+
+Validation
+------------------------------------------------------------------------
+  PASS  1_states_within_constraint
+  PASS  2_J_skew_symmetric
+  PASS  3_tangency_qJ_zero
+  PASS  4_anchor_bounds
+  PASS  5_all_finite
+  PASS  6_gradient_shape
+  PASS  7_intercept_not_l1_penalised
+  PASS  8_same_target_and_constraint
+  PASS  9_geometry_not_recomputed
+  PASS  10_projection_reported
+  PASS  11_step_size_conclusions_consistent
+
+Warnings raised
+------------------------------------------------------------------------
+  none

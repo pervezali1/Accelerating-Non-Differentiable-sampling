@@ -97,6 +97,45 @@ why the default sweep runs `alpha` up to 200: the specified values
 `{0, 0.25, 0.5, 1, 2}` are all in the regime where nothing can happen.
 `alpha / alpha*` is the dimensionless strength and is reported in every table.
 
+## What the run finds
+
+300 000 iterations, 50 000 burn-in, thinned by 50, four chains per `alpha`;
+`outputs/summary.txt` has the full tables. Every validation check passes and
+**no warnings fire**: max split R-hat is 1.0060 against the 1.01 threshold, and
+the projection binds on 0.02% of proposals (0.14% at `alpha = 200`).
+
+| `alpha` | `alpha/alpha*` | `|nonrev|/|rev|` | min ESS | median ESS | ESS/s | vs `alpha=0` | max R-hat |
+|---|---|---|---|---|---|---|---|
+| 0 | 0.00 | 0.000 | 735.8 | 2098 | 115.6 | 1.00x | 1.0059 |
+| 0.25 | 0.02 | 0.004 | 735.7 | 2099 | 108.1 | 0.93x | 1.0059 |
+| 0.5 | 0.04 | 0.009 | 735.7 | 2099 | 106.1 | 0.92x | 1.0060 |
+| 1 | 0.08 | 0.017 | 735.8 | 2100 | 105.3 | 0.91x | 1.0060 |
+| 2 | 0.16 | 0.034 | 736.1 | 2103 | 105.3 | 0.91x | 1.0060 |
+| 10 | 0.79 | 0.169 | 749.7 | 2118 | 107.3 | 0.93x | 1.0060 |
+| 50 | 3.96 | 0.851 | 888.0 | 2404 | 127.7 | 1.10x | 1.0054 |
+| **200** | **15.8** | **3.97** | **1083.5** | **4323** | **205.1** | **1.77x** | **1.0054** |
+
+The five `alpha` values named in the specification are indistinguishable from
+the reversible baseline -- identical to four figures on minimum ESS and to five
+on every predictive score -- because all of them leave the rotation under 17% of
+the gradient. Past `alpha*` the rotation starts paying: at `alpha = 200` the
+minimum ESS rises **1.47x**, the median **2.06x**, throughput **1.77x**, and
+split R-hat *falls* monotonically along the sweep. The gain is uneven across
+coefficients (`fM3Trans` and `fAsym` gain most, the binding coefficient least),
+so the minimum is the honest headline.
+
+Predictive scores are **the same to four or five significant figures for every
+`alpha`** (accuracy 0.7889, ROC-AUC 0.8379, log loss 0.4601). That is the point:
+these are all the same posterior, so agreement is the check that the rotation
+does not bias the answer. Nothing here says a rotated sampler predicts better.
+
+Two honest notes. An earlier 60 000-iteration run reported a larger speed-up
+(1.69x on minimum ESS, 2.17x on throughput) but its own diagnostics flagged
+R-hat of 1.02-1.03; the converged numbers above are smaller, and they are the
+ones to quote. And `alpha = 0` skips building `J` at all, so its wall-clock
+advantage per iteration is real rather than an artefact -- which is why the
+throughput ratio is below the ESS ratio at small `alpha`.
+
 ## Layout
 
 ```

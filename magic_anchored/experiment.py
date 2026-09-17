@@ -72,6 +72,12 @@ from sampler import (
 )
 from target import LogisticTarget, anchor_bounds, check_anchor_bounds
 
+#: when reloading, the stored traces no longer say where burn-in ended, so the
+#: figures that need a burn-in mark use this fraction of the stored points.  The
+#: reloaded results are used only for redrawing, never for the validation checks,
+#: which run against the in-memory results of the sampling run itself.
+BURN_IN_FRACTION_FOR_RELOAD = 1.0 / 6.0
+
 __all__ = [
     "ExperimentOutput",
     "run_experiment",
@@ -437,6 +443,11 @@ def load_chains(out_dir: str) -> tuple[dict[float, list[SamplerResult]], Constra
         blob = np.load(path, allow_pickle=False)
         names = tuple(str(v) for v in blob["param_names"])
         alpha = float(os.path.basename(path)[len("alpha_") : -len(".npz")])
+        # the per-iteration traces are written thinned by this stride, so the
+        # burn-in has to be expressed in stored points rather than iterations
+        stride = int(blob["trajectory_stride"][0]) if "trajectory_stride" in blob else 1
+        stored = int(blob["trajectory"].shape[1])
+        burn_in_stored = int(round(stored * BURN_IN_FRACTION_FOR_RELOAD))
         group = []
         for c in range(blob["samples"].shape[0]):
             runtime, n_grad = costs.get((alpha, c), (float("nan"), 0))
@@ -445,10 +456,9 @@ def load_chains(out_dir: str) -> tuple[dict[float, list[SamplerResult]], Constra
                     alpha=alpha,
                     h=float("nan"),
                     seed=int(blob["seeds"][c]),
-                    n_iter=int(blob["log_a"].shape[1]),
-                    burn_in=int(blob["trajectory"].shape[1] - 1
-                               - blob["samples"].shape[1] * 1),
-                    thin=1,
+                    n_iter=int(blob["log_a"].shape[1]) * stride,
+                    burn_in=burn_in_stored,
+                    thin=stride,
                     s=1.0,
                     center=np.asarray(blob["center"], dtype=np.float64),
                     radius=float(blob["radius"][0]),
@@ -744,20 +754,25 @@ def _write_outputs(
         radius_trace=pilot.radius_trace,
         log_a=pilot.log_a,
     )
+    stride = 1
+    if cfg.trajectory_points:
+        longest = max(r.trajectory.shape[0] for g in chains.values() for r in g)
+        stride = max(1, longest // cfg.trajectory_points)
     for alpha, group in chains.items():
         np.savez_compressed(
             os.path.join(sample_dir, f"alpha_{alpha:g}.npz"),
             samples=np.stack([r.samples for r in group]),
-            trajectory=np.stack([r.trajectory for r in group]),
-            log_a=np.stack([r.log_a for r in group]),
-            a=np.stack([r.a for r in group]),
-            radius_trace=np.stack([r.radius_trace for r in group]),
-            drift_norm=np.stack([r.drift_norm for r in group]),
-            reversible_drift_norm=np.stack([r.reversible_drift_norm for r in group]),
+            trajectory=np.stack([r.trajectory[::stride] for r in group]),
+            trajectory_stride=np.array([stride]),
+            log_a=np.stack([r.log_a[::stride] for r in group]),
+            a=np.stack([r.a[::stride] for r in group]),
+            radius_trace=np.stack([r.radius_trace[::stride] for r in group]),
+            drift_norm=np.stack([r.drift_norm[::stride] for r in group]),
+            reversible_drift_norm=np.stack([r.reversible_drift_norm[::stride] for r in group]),
             nonreversible_drift_norm=np.stack(
                 [r.nonreversible_drift_norm for r in group]
             ),
-            projection_occurred=np.stack([r.projection_occurred for r in group]),
+            projection_occurred=np.stack([r.projection_occurred[::stride] for r in group]),
             seeds=np.array([r.seed for r in group]),
             center=np.asarray(constraint.center),
             radius=np.array([constraint.radius]),

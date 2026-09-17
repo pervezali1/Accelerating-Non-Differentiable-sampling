@@ -96,6 +96,7 @@ def make_all_figures(
     pair_coefficients: tuple[int, int, int] = (1, 2, 9),
     max_lag: int = 200,
     alpha_star: float | None = None,
+    max_scatter: int = 4_000,
 ) -> list[str]:
     """Produce the ten requested figures and return every path written."""
     alphas = sorted(chains)
@@ -295,23 +296,40 @@ def make_all_figures(
     if len(picks) >= 2:
         pairs = [(picks[i], picks[j]) for i in range(len(picks))
                  for j in range(i + 1, len(picks))]
-        fig, axes = plt.subplots(len(pairs), len(alphas),
-                                 figsize=(2.7 * len(alphas), 2.7 * len(pairs)),
-                                 layout="constrained", squeeze=False)
+        # the joint shape is a property of the target, so it should be the same
+        # for every alpha; drawing all of them is eight copies of one picture.
+        # The baseline and the strongest rotation are what a reader needs to
+        # compare, and any disagreement between them is the thing to see.
+        shown = [alphas[0], alphas[-1]] if len(alphas) > 1 else list(alphas)
+        # shared axes per row, because the claim being checked is that the two
+        # columns coincide -- with independent limits they always look similar
+        fig, axes = plt.subplots(len(pairs), len(shown),
+                                 figsize=(3.4 * len(shown), 3.2 * len(pairs)),
+                                 layout="constrained", squeeze=False,
+                                 sharex="row", sharey="row")
         for row, (j1, j2) in enumerate(pairs):
-            for col, a in enumerate(alphas):
+            for col, a in enumerate(shown):
                 ax = axes[row][col]
                 _style(ax, grid_axis="both")
                 pooled = np.concatenate([r.samples for r in chains[a]], axis=0)
-                ax.scatter(pooled[:, j1], pooled[:, j2], s=2.0, alpha=0.25,
-                           color=colours[a], linewidths=0)
+                # a scatter of tens of thousands of draws is saturated ink and a
+                # very large vector file; a fixed-seed thinning of the pooled
+                # draws shows the same cloud
+                if pooled.shape[0] > max_scatter:
+                    take = np.random.default_rng(0).choice(
+                        pooled.shape[0], max_scatter, replace=False
+                    )
+                    pooled = pooled[np.sort(take)]
+                ax.scatter(pooled[:, j1], pooled[:, j2], s=2.5, alpha=0.3,
+                           color=colours[a], linewidths=0, rasterized=True)
                 if row == 0:
                     ax.set_title(rf"$\alpha = {a:g}$", fontsize=10, color=INK)
                 if col == 0:
                     ax.set_ylabel(names[j2], fontsize=9, color=INK)
                 ax.set_xlabel(names[j1], fontsize=9, color=MUTED)
-        fig.suptitle("Joint posteriors for selected coefficients",
-                     fontsize=12, color=INK)
+        fig.suptitle("Joint posteriors for selected coefficients:\n"
+                     "the reversible baseline against the strongest rotation "
+                     "(these should coincide)", fontsize=12, color=INK)
         written += save(fig, out_dir, "10_pair_plots")
 
     # predictive calibration, since the scores are computed anyway
