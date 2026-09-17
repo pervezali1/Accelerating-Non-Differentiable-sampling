@@ -343,3 +343,35 @@ better stationary law.
 Also worth noting: at the selected `η` the projection rate is ≈ 0, so `K` is not binding and the
 ball/ℓ_p difference enters **only** through `J`'s axes (`s·w` versus `−s·∇g`). That is why the
 two MAGIC reversible arms are numerically identical while their non-reversible arms differ.
+
+## Titanic at η = 3e-5 — the win disappears
+
+`titanic_eta3e5.py`; table in `results/exact/titanic_eta3e-5.csv`, figures
+`figures/exact/titanic_*_exact_anchored_eta3e-5.*`. `η` here is **specified, not selected**, so
+there is no step-size selection bias. All strengths are reported (R = 150, seed 4100).
+
+`η = 3e-5` is where Titanic has essentially converged — `η = 1e-4` gives the same place
+(ball 0.806 test, `U` 383.4; ℓ_p 0.802 test, `U` 371.1).
+
+| | s = 0 (control) | 0.25 | 1 | 2 | 5 |
+|---|---|---|---|---|---|
+| ball, paired Δ train | 0.00000 | −0.0003 (t = −0.9) | −0.0002 (t = −0.2) | +0.0001 (t = 0.1) | −0.0001 (t = −0.0) |
+| ball, paired Δ test | 0.00000 | −0.0001 (t = −0.1) | +0.0005 (t = 0.6) | +0.0005 (t = 0.5) | +0.0015 (t = 1.3) |
+| ℓ_p, paired Δ train | 0.00000 | +0.0004 (t = 1.0) | −0.0001 (t = −0.2) | −0.0006 (t = −1.0) | **−0.0016 (t = −2.4)** |
+| ℓ_p, paired Δ test | 0.00000 | +0.0008 (t = 1.1) | +0.0003 (t = 0.3) | +0.0006 (t = 0.6) | +0.0004 (t = 0.4) |
+
+The `s = 0` control returns exactly `0.00000`, which verifies the pairing. Every other cell is
+inside the noise, except `s = 5` on the ℓ_p set, where the non-reversible arm is slightly
+**worse** on training.
+
+**The decisive comparison.** The *reversible* arm at `η = 3e-5` reaches **0.8048** (ball) and
+**0.8043** (ℓ_p) test accuracy. The *non-reversible* arm at `η = 1e-5` — the cell that produced
+the t ≈ 6 win — reaches only **0.7880** and **0.8003**. So the win at `η = 1e-5` was recovering
+ground that a larger step size hands you for free, and it never catches up to simply running the
+reversible chain at a well-chosen step.
+
+This is the clearest available statement of the caveat attached to every earlier result in this
+repo: the non-reversible drift buys **convergence rate within a fixed iteration budget at a
+too-small step**, not a better answer. Where the chain converges inside the budget, the two arms
+are indistinguishable, which is exactly what the theory says should happen — `J` is tangential
+and conservative, and leaves the invariant law alone.
