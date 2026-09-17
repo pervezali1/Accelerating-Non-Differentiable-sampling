@@ -1,0 +1,4 @@
+# large regenerable artefacts
+*.png
+*.csv.gz
+pnral_outputs/
