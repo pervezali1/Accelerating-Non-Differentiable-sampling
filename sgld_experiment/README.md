@@ -237,6 +237,32 @@ graphs — for the two anchored methods at the configuration found above
 held-out-seed confirmation are reported as tables rather than plots. Outputs go
 to `results_accuracy_only/`.
 
+### L1-smooth ball variant
+
+`accuracy_curves_l1smooth.ipynb` repeats the accuracy-only notebook with the
+constraint replaced by the **L1-smooth ball**, the `p = 1` member of the same
+smoothed-l^p family: `g(beta) = sum_i sqrt(beta_i^2 + eps^2) <= Lambda`, with
+`Lambda = d*eps + R`. The geometry is implemented in `anchored_sgld.py` as
+`L1SmoothBallGeometry` and verified to the same standard (skew-symmetry and
+divergence exactly 0, `Jn = 0` and `J grad_H = 0` to ~9e-16, projection KKT
+residual ~9e-16, radial scaling strictly worse in 20/20 cases, and the
+vectorised projection cross-checked against scalar `brentq` at 1.8e-15 and
+against SLSQP at 5e-8).
+
+`s = 5` cannot be carried over: `grad_g[i]` saturates towards +/-1 here, so `||J||`
+is much larger at the same `s`. The two free constants are instead matched to the
+unit-ball configuration on the quantities that drive the dynamics — `R = 1.9`
+matches the anchor level (`H(beta_true) = 0.470` vs `0.4725`) and `s = 2.0`
+matches the perturbation size (`||alpha J v||/||v|| = 2.38` vs `2.50`).
+
+**Result: non-reversible does NOT beat reversible on this geometry.** Final test
+accuracy 0.6958 +/- 0.0094 vs 0.6955 +/- 0.0097; the held-out-seed confirmation
+gives pooled −0.00094 (SE 0.00064, t = −1.47), not all batches positive. Four
+candidate configurations were selected across `R` in {1.5, 1.9, 3.0} and `s` in
+[0.25, 5] and **every one failed held-out confirmation** — the table is in the
+notebook. The Euclidean-ball result (pooled t = +4.09) stands unchanged; the
+effect is real but small and geometry-dependent.
+
 ### Honest scope of this claim
 
 * The win required **changing the design** to an ill-conditioned one. Tuning s

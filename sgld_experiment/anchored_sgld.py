@@ -84,8 +84,9 @@ class ExperimentConfig:
     step_size: float = 1e-4                    # h (the paper's candidate value)
     n_repeats: int = 100                       # R
     block_scales: tuple[float, ...] = (10.0, 10.0, 10.0)
-    epsilon: float = 0.2                       # quartic smoothing
+    epsilon: float = 0.2                       # smoothing of the l^p constraints
     Lambda: float = 1.0                        # quartic threshold
+    l1_radius: float = 3.0                     # L1-smooth ball radius budget
     checkpoint_every: int = 10
     data_seed: int = 2026
     split_seed: int = 2027
@@ -629,6 +630,8 @@ def make_geometry(name: str, cfg: ExperimentConfig) -> Geometry:
         return BallGeometry(cfg.d)
     if name == "quartic":
         return QuarticGeometry(cfg.d, cfg.epsilon, cfg.Lambda)
+    if name in ("l1smooth", "l1_smooth_ball"):
+        return L1SmoothBallGeometry(cfg.d, cfg.epsilon, cfg.l1_radius)
     raise ValueError(f"unknown geometry {name!r}")
 
 
@@ -699,7 +702,8 @@ def divergence_J(
 # ==========================================================================
 # 6. Random streams (shared across the four methods)
 # ==========================================================================
-GEOMETRY_ID: dict[str, int] = {"unit ball": 11, "quartic set": 22}
+GEOMETRY_ID: dict[str, int] = {"unit ball": 11, "quartic set": 22,
+                               "L1-smooth ball": 33}
 
 
 @dataclass
@@ -1642,3 +1646,206 @@ def ergodic_average(result: RunResult, burn_checkpoints: int) -> np.ndarray:
     non-reversible perturbations are designed to reduce.
     """
     return result.beta[burn_checkpoints:].mean(axis=0)
+
+
+# ==========================================================================
+# 13. Smoothed L1 ("L1-smooth") ball
+# ==========================================================================
+class L1SmoothBallGeometry(Geometry):
+    """``K = {beta : g(beta) = sum_i sqrt(beta_i^2 + eps^2) <= Lambda}``.
+
+    The ``p = 1`` member of the same smoothed-l^p family as
+    :class:`QuarticGeometry` (``p = 4``): a smooth surrogate for the L1 ball
+    ``sum_i |beta_i| <= R``.  Following the same convention,
+
+        g_min  = d * eps,          attained at the origin,
+        Lambda = d * eps + R,      R the L1 radius budget,
+        D      = Lambda - g_min = R,
+        H_K    = (g(beta) - d*eps) / D  in [0, 1] on K,
+
+        grad_g[i] = beta_i / sqrt(beta_i^2 + eps^2),   grad_H_K = grad_g / D.
+
+    Note ``|grad_g[i]| < 1`` and it saturates towards 1 once ``|beta_i| >> eps``,
+    so ``||J||`` is larger here than on the Euclidean ball at the same block
+    strength: the useful range of ``s`` is correspondingly smaller.
+    """
+
+    name = "L1-smooth ball"
+
+    def __init__(self, d: int, epsilon: float = 0.2, l1_radius: float = 3.0) -> None:
+        self.d = d
+        self.epsilon = epsilon
+        self.l1_radius = l1_radius
+        self.g_min = d * epsilon
+        self.Lambda = self.g_min + l1_radius
+        self.D = self.l1_radius
+        if self.D <= 0:
+            raise ValueError("l1_radius must be positive")
+
+    # ---- constraint ----
+    def constraint_value(self, beta: np.ndarray) -> np.ndarray:
+        beta2, squeeze = _as_2d(beta)
+        value = np.sqrt(beta2 * beta2 + self.epsilon ** 2).sum(axis=1)
+        return value[0] if squeeze else value
+
+    @property
+    def threshold(self) -> float:
+        return self.Lambda
+
+    def grad_g(self, beta: np.ndarray) -> np.ndarray:
+        beta = np.asarray(beta, dtype=float)
+        return beta / np.sqrt(beta * beta + self.epsilon ** 2)
+
+    # ---- anchor ----
+    def H(self, beta: np.ndarray) -> np.ndarray:
+        return (self.constraint_value(beta) - self.g_min) / self.D
+
+    def grad_H(self, beta: np.ndarray) -> np.ndarray:
+        return self.grad_g(beta) / self.D
+
+    # ---- boundary geometry ----
+    def normal(self, beta: np.ndarray) -> np.ndarray:
+        gradient, squeeze = _as_2d(self.grad_g(beta))
+        norm = np.linalg.norm(gradient, axis=1, keepdims=True)
+        out = np.divide(gradient, norm, out=np.zeros_like(gradient), where=norm > 0)
+        return out[0] if squeeze else out
+
+    def boundary_point(self, direction: np.ndarray) -> np.ndarray:
+        direction = np.asarray(direction, dtype=float)
+        objective = lambda t: float(self.constraint_value(t * direction)) - self.Lambda
+        upper = 1.0
+        while objective(upper) < 0.0:
+            upper *= 2.0
+        t = brentq(objective, 0.0, upper, xtol=1e-14, rtol=8.9e-16, maxiter=200)
+        return t * direction
+
+    def j_block_vectors(self, beta: np.ndarray) -> np.ndarray:
+        """``w_l = -grad_{I_l} g(beta)`` — the normal here is parallel to grad g."""
+        gradient, _ = _as_2d(self.grad_g(beta))
+        return (-gradient).reshape(gradient.shape[0], -1, 3)
+
+    # ---- Euclidean projection through the KKT system ----
+    def _solve_coordinates(
+        self, z_abs: np.ndarray, mu, inner_steps: int = 60
+    ) -> np.ndarray:
+        """Solve ``b + mu * b / sqrt(b^2 + eps^2) = |z|`` for ``b >= 0``.
+
+        The map is odd and strictly increasing for ``mu >= 0`` — its derivative
+        is ``1 + mu * eps^2 / (b^2 + eps^2)^{3/2} > 0`` — and satisfies
+        ``phi(b) >= b``, so the root lies in ``[0, |z|]`` and bisection on that
+        bracket is unconditionally reliable.  Unlike the quartic case there is no
+        convenient closed form (the equation is quartic in ``b``), so the solve
+        is a vectorised bisection over all rows and coordinates at once.
+        """
+        mu_array = np.asarray(mu, dtype=float)
+        low = np.zeros_like(z_abs)
+        high = z_abs.copy()
+        for _ in range(inner_steps):
+            mid = 0.5 * (low + high)
+            value = mid + mu_array * mid / np.sqrt(mid * mid + self.epsilon ** 2)
+            positive = value > z_abs
+            high = np.where(positive, mid, high)
+            low = np.where(positive, low, mid)
+        return 0.5 * (low + high)
+
+    def _project_one(self, z: np.ndarray) -> tuple[np.ndarray, float]:
+        """Scalar-``brentq`` reference projection of a single infeasible point."""
+        sign, z_abs = np.sign(z), np.abs(z)
+
+        def gap(mu: float) -> float:
+            b = self._solve_coordinates(z_abs, mu)
+            return float(np.sqrt(b * b + self.epsilon ** 2).sum()) - self.Lambda
+
+        mu_high = 1.0
+        for _ in range(200):
+            if gap(mu_high) <= 0.0:
+                break
+            mu_high *= 2.0
+        else:  # pragma: no cover
+            raise RuntimeError("failed to bracket the projection multiplier mu")
+        mu = brentq(gap, 0.0, mu_high, xtol=1e-14, rtol=8.9e-16, maxiter=300)
+        return sign * self._solve_coordinates(z_abs, mu), float(mu)
+
+    def project(self, z: np.ndarray, n_bisect: int = 80) -> ProjectionOutcome:
+        """Exact Euclidean projection onto ``K`` (never radial scaling)."""
+        z2, squeeze = _as_2d(z)
+        beta = z2.copy()
+        outside = self.constraint_value(z2) > self.Lambda
+        worst_kkt = 0.0
+
+        rows = np.nonzero(outside)[0]
+        if rows.size:
+            z_rows = z2[rows]
+            sign, z_abs = np.sign(z_rows), np.abs(z_rows)
+
+            def gap(mu_column: np.ndarray) -> np.ndarray:
+                b = self._solve_coordinates(z_abs, mu_column)
+                return np.sqrt(b * b + self.epsilon ** 2).sum(axis=1) - self.Lambda
+
+            low = np.zeros(rows.size)
+            high = np.ones(rows.size)
+            for _ in range(200):
+                need = gap(high[:, None]) > 0.0
+                if not need.any():
+                    break
+                high[need] *= 2.0
+            else:  # pragma: no cover
+                raise RuntimeError("failed to bracket the projection multiplier mu")
+
+            for _ in range(n_bisect):
+                mid = 0.5 * (low + high)
+                positive = gap(mid[:, None]) > 0.0
+                low = np.where(positive, mid, low)
+                high = np.where(positive, high, mid)
+            mu = 0.5 * (low + high)
+
+            b = sign * self._solve_coordinates(z_abs, mu[:, None])
+            beta[rows] = b
+            worst_kkt = float(
+                np.abs(b + mu[:, None] * self.grad_g(b) - z_rows).max()
+            )
+        excess = float((self.constraint_value(beta) - self.Lambda).max())
+        out = beta[0] if squeeze else beta
+        return ProjectionOutcome(out, outside, worst_kkt, excess)
+
+    # ---- uniform initialisation ----
+    def sample_uniform(
+        self, rng: np.random.Generator, n: int, max_rounds: int = 10_000
+    ) -> np.ndarray:
+        """Uniform on ``K`` by rejection from the enclosing exact L1 ball.
+
+        Because ``|x| <= sqrt(x^2 + eps^2) <= |x| + eps``,
+
+            {||beta||_1 <= Lambda - d*eps}  subset  K  subset  {||beta||_1 <= Lambda},
+
+        so proposals are drawn uniformly on the **exact** L1 ball of radius
+        ``Lambda`` and kept when ``g(beta) <= Lambda``.  Box rejection, which
+        works for the quartic set, is hopeless here: in nine dimensions an L1
+        ball occupies about ``1e-6`` of its bounding box.
+
+        Uniform draws on the exact L1 ball use the Barthe-Guedon-Mendelson-Naor
+        construction: with ``g_i`` iid Laplace(0,1) and ``E ~ Exp(1)``,
+        ``g / (||g||_1 + E)`` is uniform on the unit L1 ball.
+        """
+        accepted: list[np.ndarray] = []
+        total = kept = 0
+        for _ in range(max_rounds):
+            size = max(n, 512)
+            laplace = rng.laplace(0.0, 1.0, size=(size, self.d))
+            exponential = rng.exponential(1.0, size=size)
+            proposals = (
+                self.Lambda
+                * laplace
+                / (np.abs(laplace).sum(axis=1) + exponential)[:, None]
+            )
+            total += size
+            good = proposals[self.constraint_value(proposals) <= self.Lambda]
+            kept += good.shape[0]
+            if good.size:
+                accepted.append(good)
+            if sum(a.shape[0] for a in accepted) >= n:
+                break
+        else:  # pragma: no cover
+            raise RuntimeError("rejection sampler failed to fill the requested draws")
+        self.last_acceptance_rate = kept / total
+        return np.vstack(accepted)[:n]
