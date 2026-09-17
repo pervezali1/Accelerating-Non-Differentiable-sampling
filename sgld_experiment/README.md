@@ -228,6 +228,28 @@ convergence-limited. At s = 7 the mid-run advantage is larger (t = +4.1 at
 iteration 400) but has evaporated by iteration 1000, because a 32 % projection
 rate costs more than the acceleration is worth.
 
+### Running in Colab
+
+The notebooks import `anchored_sgld.py`, which sits next to them in this
+repository. Uploading only the `.ipynb` to Colab therefore fails with
+`ModuleNotFoundError: No module named 'anchored_sgld'`.
+
+Two fixes:
+
+* **Self-contained versions.** `accuracy_curves_only_colab.ipynb` and
+  `accuracy_curves_l1smooth_colab.ipynb` are identical to their counterparts
+  except for a first cell that writes `anchored_sgld.py` to the working
+  directory with `%%writefile`. Upload one file, run all cells — no upload of
+  the module, no network, nothing to `pip install` (Colab already has NumPy,
+  SciPy, pandas, scikit-learn and Matplotlib). Both were verified by executing
+  them in a directory containing only the notebook.
+* **Or upload the module.** Put `anchored_sgld.py` next to the notebook in the
+  Colab file browser, or fetch it in a cell, and the original notebooks work
+  unchanged.
+
+The `_colab.ipynb` files are generated from the originals, so the embedded
+library is the same text as `anchored_sgld.py` and cannot drift from it.
+
 ### Accuracy-only notebook
 
 `accuracy_curves_only.ipynb` (and `.executed.ipynb` with outputs) is a minimal
