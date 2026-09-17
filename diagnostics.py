@@ -776,3 +776,332 @@ def plot_confusion(predictive: PredictiveSummary, output_dir: str) -> str:
     )
     ax.set_title(f"Confusion matrix (alpha = {predictive.alpha})")
     return _save(fig, output_dir, f"14_confusion_alpha_{predictive.alpha}.png")
+
+
+# ==========================================================================
+# Accuracy and loss curves along the chain
+# ==========================================================================
+# There is no epoch loop in MCMC, so "training curves" mean something specific
+# here.  The loss is the potential itself: U(w) is the negative log posterior
+# (up to a constant), and its likelihood part divided by n is the mean
+# cross-entropy — the quantity an optimiser would call the training loss.  The
+# accuracy is the plug-in accuracy of the state w_k.  Both are recorded at
+# every iteration, so the first panels below are genuine per-iteration curves.
+#
+# A Bayesian run also has a second, more meaningful curve: the test performance
+# of the *posterior-averaged* predictive probability as more draws are
+# accumulated.  That is the curve that actually converges to the reported
+# number, and it is what the right-hand panels show.
+
+#: Two-colour split for train vs test. Validated colourblind-safe
+#: (worst adjacent CVD deltaE 26.2, normal-vision 33.5).  The orange falls below
+#: 3:1 contrast on a light surface, so both series also carry a direct label
+#: and a distinct line style rather than relying on hue alone.
+TRAIN_COLOR = "#0173B2"
+TEST_COLOR = "#DE8F05"
+
+
+def predictive_trace(
+    trace: np.ndarray,
+    X: np.ndarray,
+    y: np.ndarray,
+    stride: int = 1,
+) -> dict[str, np.ndarray]:
+    """Plug-in accuracy and mean cross-entropy at each (strided) state ``w_k``.
+
+    Returns ``iteration``, ``accuracy`` and ``log_loss`` (nats per observation,
+    i.e. the likelihood part of ``U`` divided by ``n``).
+    """
+    from scipy.special import expit
+
+    states = np.asarray(trace, dtype=float)[::stride]
+    linear = states @ X.T                                   # (n_states, n_obs)
+    probability = expit(linear)
+    accuracy = ((probability >= 0.5) == (y[None, :] >= 0.5)).mean(axis=1)
+    log_loss = (np.logaddexp(0.0, linear) - y[None, :] * linear).mean(axis=1)
+    return {
+        "iteration": np.arange(0, states.shape[0] * stride, stride),
+        "accuracy": accuracy,
+        "log_loss": log_loss,
+    }
+
+
+def posterior_averaging_curve(
+    samples: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    n_checkpoints: int = 60,
+) -> dict[str, np.ndarray]:
+    """Test accuracy / log loss of the posterior mean predictive vs draw count.
+
+    Draws are interleaved across chains so that the curve reflects the pooled
+    posterior at every checkpoint rather than one chain at a time.
+    """
+    from scipy.special import expit
+
+    samples = np.asarray(samples, dtype=float)
+    if samples.ndim == 3:                                   # (chain, draw, d)
+        samples = samples.transpose(1, 0, 2).reshape(-1, samples.shape[-1])
+    n_draws = samples.shape[0]
+    # Geometrically spaced: these curves are read on a log x-axis, and linear
+    # spacing would leave the first two decades covered by a single segment.
+    checkpoints = np.unique(
+        np.geomspace(1, n_draws, n_checkpoints).round().astype(int)
+    )
+
+    accumulator = np.zeros(X_test.shape[0])
+    accuracy = np.empty(checkpoints.size)
+    log_loss = np.empty(checkpoints.size)
+    previous = 0
+    for index, checkpoint in enumerate(checkpoints):
+        block = samples[previous:checkpoint]
+        accumulator += expit(block @ X_test.T).sum(axis=0)
+        previous = checkpoint
+        probability_bar = np.clip(accumulator / checkpoint, 1e-12, 1 - 1e-12)
+        accuracy[index] = ((probability_bar >= 0.5) == (y_test >= 0.5)).mean()
+        log_loss[index] = -(
+            y_test * np.log(probability_bar)
+            + (1 - y_test) * np.log1p(-probability_bar)
+        ).mean()
+    return {"n_draws": checkpoints, "accuracy": accuracy, "log_loss": log_loss}
+
+
+def _label_series(
+    ax: plt.Axes,
+    x: np.ndarray,
+    y: np.ndarray,
+    text: str,
+    color: str,
+    fraction: float,
+) -> None:
+    """Direct-label a line at a given fraction along it.
+
+    Train and test curves often sit on top of each other here, so the two
+    labels are placed at different x positions rather than both at the right
+    edge, where they would collide.
+    """
+    index = min(int(fraction * (len(x) - 1)), len(x) - 1)
+    ax.annotate(
+        text,
+        xy=(x[index], y[index]),
+        xytext=(0, 7),
+        textcoords="offset points",
+        color=color,
+        fontsize=9,
+        fontweight="bold",
+        ha="center",
+        bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.75),
+    )
+
+
+def plot_loss_curves(
+    chains_by_alpha: Mapping[float, Sequence[ChainOutput]],
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    burn_in: int,
+    output_dir: str,
+    stride: int = 10,
+) -> str:
+    """Loss curves: the potential U / U0 and the train-vs-test cross-entropy."""
+    alphas = list(chains_by_alpha.keys())
+    colors = _alpha_colors(alphas)
+    baseline = chains_by_alpha[alphas[0]]
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+
+    # (a) U(w_k) for every chain at the baseline alpha: burn-in convergence.
+    for c, chain in enumerate(baseline):
+        series = chain.diagnostics["U"][::stride]
+        axes[0][0].plot(
+            np.arange(series.size) * stride, series, lw=0.8, label=f"chain {c}"
+        )
+    axes[0][0].axvline(burn_in, color="k", ls="--", lw=0.9)
+    # Log x, not log y: the descent finishes within the first ~100 iterations
+    # and is invisible on a linear iteration axis.
+    axes[0][0].set_xscale("log")
+    axes[0][0].set_xlabel("iteration (log scale)")
+    axes[0][0].set_ylabel("U(w)  [negative log posterior]")
+    axes[0][0].set_title(
+        f"Loss along the chain, alpha = {alphas[0]}\n"
+        "Burn-in descent from overdispersed starts (dashed: end of burn-in)",
+        fontsize=10,
+    )
+    axes[0][0].legend(fontsize=8)
+
+    # (b) Post burn-in U by alpha: the stationary level must be identical.
+    for alpha, color in zip(alphas, colors):
+        pooled = np.concatenate(
+            [c.diagnostics["U"][burn_in:] for c in chains_by_alpha[alpha]]
+        )
+        axes[0][1].hist(
+            pooled, bins=70, histtype="step", lw=1.6, color=color,
+            density=True, label=f"alpha={alpha}",
+        )
+    axes[0][1].set_xlabel("U(w), post burn-in")
+    axes[0][1].set_ylabel("density")
+    axes[0][1].set_title(
+        "Stationary distribution of the loss.\n"
+        "Every alpha targets the same posterior, so these must coincide.",
+        fontsize=10,
+    )
+    axes[0][1].legend(fontsize=8)
+
+    # (c) Train vs test cross-entropy along the chain (same units, one axis).
+    train = predictive_trace(baseline[0].trace, X_train, y_train, stride)
+    test = predictive_trace(baseline[0].trace, X_test, y_test, stride)
+    axes[1][0].plot(train["iteration"], train["log_loss"], lw=1.0,
+                    color=TRAIN_COLOR, ls="-", label="train")
+    axes[1][0].plot(test["iteration"], test["log_loss"], lw=1.0,
+                    color=TEST_COLOR, ls="--", label="test")
+    axes[1][0].axvline(burn_in, color="k", ls="--", lw=0.9)
+    axes[1][0].set_xlabel("iteration")
+    axes[1][0].set_ylabel("cross-entropy  [nats / observation]")
+    axes[1][0].set_title(
+        f"Train vs test loss at the state w_k (chain 0, alpha = {alphas[0]})",
+        fontsize=10,
+    )
+    _label_series(axes[1][0], train["iteration"], train["log_loss"],
+                  "train", TRAIN_COLOR, 0.35)
+    _label_series(axes[1][0], test["iteration"], test["log_loss"],
+                  "test", TEST_COLOR, 0.70)
+    axes[1][0].legend(fontsize=8, loc="upper right")
+
+    # (d) Test loss of the posterior-averaged predictive vs number of draws.
+    for alpha, color in zip(alphas, colors):
+        samples = stack_samples(list(chains_by_alpha[alpha]))
+        curve = posterior_averaging_curve(samples, X_test, y_test)
+        axes[1][1].plot(
+            curve["n_draws"], curve["log_loss"], lw=1.6, color=color,
+            label=f"alpha={alpha}",
+        )
+    single_draw_loss = float(
+        np.mean(
+            predictive_trace(
+                baseline[0].trace[burn_in:], X_test, y_test, stride
+            )["log_loss"]
+        )
+    )
+    axes[1][1].axhline(
+        single_draw_loss, color="grey", ls=":", lw=1.4,
+        label="mean single-draw loss",
+    )
+    axes[1][1].set_xscale("log")
+    axes[1][1].set_xlabel("retained posterior draws (pooled over chains)")
+    axes[1][1].set_ylabel("test cross-entropy  [nats / observation]")
+    axes[1][1].set_title(
+        "Posterior-averaged test loss.\n"
+        "Averaging gains over a single draw; alpha only affects how fast\n"
+        "the Monte-Carlo error shrinks, not the limit.", fontsize=10
+    )
+    axes[1][1].legend(fontsize=8)
+    return _save(fig, output_dir, "15_loss_curves.png")
+
+
+def plot_accuracy_curves(
+    chains_by_alpha: Mapping[float, Sequence[ChainOutput]],
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray,
+    y_test: np.ndarray,
+    burn_in: int,
+    output_dir: str,
+    stride: int = 10,
+) -> str:
+    """Accuracy curves: plug-in accuracy at ``w_k`` and the posterior average."""
+    alphas = list(chains_by_alpha.keys())
+    colors = _alpha_colors(alphas)
+    baseline = chains_by_alpha[alphas[0]]
+
+    fig, axes = plt.subplots(2, 2, figsize=(14, 9))
+
+    # (a) Train and test accuracy at w_k (same units -> one axis).
+    train = predictive_trace(baseline[0].trace, X_train, y_train, stride)
+    test = predictive_trace(baseline[0].trace, X_test, y_test, stride)
+    axes[0][0].plot(train["iteration"], train["accuracy"], lw=0.9,
+                    color=TRAIN_COLOR, ls="-", label="train")
+    axes[0][0].plot(test["iteration"], test["accuracy"], lw=0.9,
+                    color=TEST_COLOR, ls="--", label="test")
+    axes[0][0].axvline(burn_in, color="k", ls="--", lw=0.9)
+    axes[0][0].set_xlabel("iteration")
+    axes[0][0].set_ylabel("plug-in accuracy")
+    axes[0][0].set_title(
+        f"Train vs test accuracy at the state w_k (chain 0, alpha = {alphas[0]})",
+        fontsize=10,
+    )
+    _label_series(axes[0][0], train["iteration"], train["accuracy"],
+                  "train", TRAIN_COLOR, 0.35)
+    _label_series(axes[0][0], test["iteration"], test["accuracy"],
+                  "test", TEST_COLOR, 0.70)
+    axes[0][0].legend(fontsize=8, loc="lower right")
+    axes[0][0].set_title(
+        f"Train vs test accuracy at the state w_k (chain 0, alpha = {alphas[0]}).\n"
+        "The two track each other: with n = 2000 and d = 9 there is no overfitting.",
+        fontsize=10,
+    )
+
+    # (b) Post burn-in spread of the plug-in test accuracy, by alpha.
+    spread = []
+    for alpha in alphas:
+        values = np.concatenate(
+            [
+                predictive_trace(c.trace[burn_in:], X_test, y_test, stride)["accuracy"]
+                for c in chains_by_alpha[alpha]
+            ]
+        )
+        spread.append(values)
+    parts = axes[0][1].violinplot(spread, showmedians=True, widths=0.8)
+    for body, color in zip(parts["bodies"], colors):
+        body.set_facecolor(color)
+        body.set_alpha(0.75)
+    for key in ("cmins", "cmaxes", "cbars", "cmedians"):
+        if key in parts:
+            parts[key].set_color("0.35")
+            parts[key].set_linewidth(1.0)
+    axes[0][1].set_xticks(range(1, len(alphas) + 1))
+    axes[0][1].set_xticklabels([str(a) for a in alphas])
+    axes[0][1].set_xlabel("alpha")
+    axes[0][1].set_ylabel("plug-in test accuracy at w_k")
+    axes[0][1].set_title(
+        "Posterior spread of the single-draw test accuracy.\n"
+        "Identical across alpha, as the invariant measure requires.", fontsize=10
+    )
+
+    # (c) Posterior-averaged test accuracy vs number of draws.
+    for alpha, color in zip(alphas, colors):
+        samples = stack_samples(list(chains_by_alpha[alpha]))
+        curve = posterior_averaging_curve(samples, X_test, y_test)
+        axes[1][0].plot(
+            curve["n_draws"], curve["accuracy"], lw=1.6, color=color,
+            label=f"alpha={alpha}",
+        )
+    single_draw_accuracy = float(np.mean(spread[0]))
+    axes[1][0].axhline(
+        single_draw_accuracy, color="grey", ls=":", lw=1.4,
+        label="mean single-draw accuracy",
+    )
+    axes[1][0].set_xscale("log")
+    axes[1][0].set_xlabel("retained posterior draws (pooled over chains)")
+    axes[1][0].set_ylabel("test accuracy of the posterior mean predictive")
+    axes[1][0].set_title(
+        "Posterior-averaged test accuracy.\n"
+        "Accuracy is a blunt metric: averaging buys little here, unlike the\n"
+        "cross-entropy. Spread between alphas is Monte-Carlo noise.", fontsize=10
+    )
+    axes[1][0].legend(fontsize=8)
+
+    # (d) Same, on the training set, for the train/test comparison.
+    for alpha, color in zip(alphas, colors):
+        samples = stack_samples(list(chains_by_alpha[alpha]))
+        curve = posterior_averaging_curve(samples, X_train, y_train)
+        axes[1][1].plot(
+            curve["n_draws"], curve["accuracy"], lw=1.6, color=color,
+            label=f"alpha={alpha}",
+        )
+    axes[1][1].set_xscale("log")
+    axes[1][1].set_xlabel("retained posterior draws (pooled over chains)")
+    axes[1][1].set_ylabel("train accuracy of the posterior mean predictive")
+    axes[1][1].set_title("Posterior-averaged train accuracy", fontsize=10)
+    axes[1][1].legend(fontsize=8)
+    return _save(fig, output_dir, "16_accuracy_curves.png")

@@ -284,6 +284,28 @@ multivariate energy distance falls monotonically, 0.0063 → 0.0044 → 0.0026 a
 discretisation bias, and it vanishes with `h` as it should. `alpha` does not
 affect accuracy, only efficiency — which is exactly the claim being tested.
 
+### Accuracy and loss curves
+
+There is no epoch loop in MCMC, so "training curves" mean something specific
+here. `results/15_loss_curves.png` and `results/16_accuracy_curves.png` show:
+
+* **Loss along the chain.** `U(w_k)` *is* the loss — the negative log posterior.
+  It drops from ~1145 to its stationary level ~1110 within roughly 40
+  iterations, from all four overdispersed starts (plotted on a log iteration
+  axis, or the descent is invisible).
+* **Train vs test cross-entropy** at the state `w_k`, in nats per observation
+  (the likelihood part of `U` divided by `n`). The two track each other
+  closely: with `n = 2000`, `d = 9` and a LASSO prior there is no overfitting.
+* **The stationary distribution of `U`** is identical for every `alpha` — a
+  visual restatement of the fact that the non-reversible term does not change
+  the invariant measure.
+* **Posterior-averaged test performance vs number of retained draws.** This is
+  the curve that actually converges to the reported number. Averaging lowers
+  the test cross-entropy from 0.5431 (mean single draw) to 0.5414; `alpha`
+  changes only how fast the Monte-Carlo error shrinks, not the limit.
+  Accuracy is a blunt metric and barely moves — the gain shows up in the
+  cross-entropy, not in the 0/1 count.
+
 ### Reproducibility
 
 Two independent full runs of `main.py` produced **bit-identical** ESS, R-hat

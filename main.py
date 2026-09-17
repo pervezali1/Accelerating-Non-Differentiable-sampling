@@ -381,6 +381,18 @@ def main(argv: list[str] | None = None) -> int:
         )
         paths.append(dg.plot_pairs(results.samples_by_alpha, cfg.output_dir, names=results.names))
         paths.append(dg.plot_calibration(results.predictives, dataset.y_test, cfg.output_dir))
+        paths.append(
+            dg.plot_loss_curves(
+                results.chains_by_alpha, dataset.X_train, dataset.y_train,
+                dataset.X_test, dataset.y_test, results.burn_in, cfg.output_dir,
+            )
+        )
+        paths.append(
+            dg.plot_accuracy_curves(
+                results.chains_by_alpha, dataset.X_train, dataset.y_train,
+                dataset.X_test, dataset.y_test, results.burn_in, cfg.output_dir,
+            )
+        )
         paths.append(dg.plot_confusion(results.predictives[0], cfg.output_dir))
         if sensitivity is not None:
             paths.append(dg.plot_step_size_sensitivity(sensitivity, cfg.output_dir))
