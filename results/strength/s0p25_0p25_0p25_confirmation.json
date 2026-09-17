@@ -1,0 +1,108 @@
+{
+  "s": [
+    0.25,
+    0.25,
+    0.25
+  ],
+  "h_scan": {
+    "magic": [
+      1e-05,
+      3e-06,
+      1e-06,
+      3e-07,
+      1e-07
+    ],
+    "titanic": [
+      1e-05,
+      3e-06,
+      1e-06,
+      3e-07,
+      1e-07
+    ]
+  },
+  "chosen_h": {
+    "magic_ball": 3e-07,
+    "magic_lp": 3e-06
+  },
+  "search_seed": 3000,
+  "confirm_seed": 4100,
+  "scan_reps": 60,
+  "final_reps": 200,
+  "selection": "paired TRAINING gain only; test labels unused",
+  "confirmation": {
+    "magic_ball": {
+      "h": 3e-07,
+      "s": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "verdict": "no significant difference",
+      "paired": {
+        "dtrain": 4.370399579390338e-05,
+        "dtrain_se": 0.00015858386042896607,
+        "dtest": 0.00013012618296530054,
+        "dtest_se": 0.0001902793949391144,
+        "t_train": 0.27558917834188784,
+        "t_test": 0.683869018013949,
+        "win_train": 0.51,
+        "win_test": 0.485
+      },
+      "ranch": {
+        "train": 0.7478387881177707,
+        "train_sd": 0.016282562797470205,
+        "test": 0.7445162986330179,
+        "test_sd": 0.01708663716974005,
+        "U": 8501.38705796419,
+        "proj": 0.0
+      },
+      "nranch": {
+        "train": 0.7478824921135646,
+        "train_sd": 0.016301400194363748,
+        "test": 0.7446464248159832,
+        "test_sd": 0.017001248696624834,
+        "U": 8499.873110073746,
+        "proj": 0.0
+      },
+      "png": "figures/strength/magic_ball_s0p25_0p25_0p25_anchored.png",
+      "pdf": "figures/strength/magic_ball_s0p25_0p25_0p25_anchored.pdf"
+    },
+    "magic_lp": {
+      "h": 3e-06,
+      "s": [
+        0.25,
+        0.25,
+        0.25
+      ],
+      "verdict": "no significant difference",
+      "paired": {
+        "dtrain": 2.8259726603577227e-05,
+        "dtrain_se": 6.388234889470455e-05,
+        "dtest": 0.0002352786540483731,
+        "dtest_se": 0.000127203140796854,
+        "t_train": 0.44237143894249925,
+        "t_test": 1.8496292825357035,
+        "win_train": 0.46,
+        "win_test": 0.505
+      },
+      "ranch": {
+        "train": 0.780231992639327,
+        "train_sd": 0.00198860949307171,
+        "test": 0.7740996319663512,
+        "test_sd": 0.002641717747515596,
+        "U": 7450.205136247857,
+        "proj": 0.0
+      },
+      "nranch": {
+        "train": 0.7802602523659306,
+        "train_sd": 0.002003784157077819,
+        "test": 0.7743349106203996,
+        "test_sd": 0.0029669726336854266,
+        "U": 7450.678871997108,
+        "proj": 0.0
+      },
+      "png": "figures/strength/magic_lp_s0p25_0p25_0p25_anchored.png",
+      "pdf": "figures/strength/magic_lp_s0p25_0p25_0p25_anchored.pdf"
+    }
+  }
+}

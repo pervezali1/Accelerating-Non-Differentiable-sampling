@@ -38,7 +38,7 @@ from nral import (BATCH_SIZE, CHECKPOINT_EVERY, DIM, METHOD_LABEL, RHO_ANCHORED,
                   make_geometry, make_initial_states, mean_sd, potential_U, run_sampler,
                   sample_unit_ball, stream_seed_for, _wrap)
 
-S5 = (5.0, 5.0, 5.0)
+S5 = (5.0, 5.0, 5.0)          # default; overridden by --s
 SEARCH_SEED = 3000            # the seed the (h, s) search used
 CONFIRM_SEED = 4100           # independent replicates for every reported number
 STYLE = {"ranch":  dict(color="#1f5fbf", linestyle="-", linewidth=2.0),
@@ -133,21 +133,24 @@ def make_figure(spec: ExperimentSpec, ds: Dataset, arms: dict, h: float, n_reps:
                 f"smoothed l_p  g(beta) = sum_i (beta_i^2+eps^2)^(p/2) <= Lambda, p = {spec.p:g}, "
                 f"eps = {spec.eps:g}, Lambda = {spec.Lam:g}")
     cap = (f"{spec.dataset.upper()} -- {geom_txt}.  d = {DIM}, no intercept.  "
-           f"Block strengths s = (5, 5, 5).  Step size h = {h:g} (actually used).  "
+           f"Block strengths s = ({', '.join(f'{v:g}' for v in S5)}).  "
+           f"Step size h = {h:g} (actually used).  "
            f"Mini-batch m = {BATCH_SIZE}.  R = {n_reps} independent replicates on one fixed "
            f"stratified 80/20 split (n_train = {ds.n_train}, n_test = {ds.n_test}).  "
            f"Anchor rho = log 2 = {RHO_ANCHORED:.6f} for both arms.  Bands: mean +- 1 SD "
            f"(ddof = 1) across replicates -- repeat-run variability at a fixed split, not a "
            f"confidence or credible interval.  {note}")
-    fig.suptitle(f"{spec.key}: anchored Langevin, s = 5", fontsize=11, y=0.995)
+    fig.suptitle(f"{spec.key}: anchored Langevin, s = "
+                 f"({', '.join(f'{v:g}' for v in S5)})", fontsize=11, y=0.995)
     fig.text(0.5, -0.09, _wrap(cap), ha="center", va="top", fontsize=7.2)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
-    png = os.path.join(outdir, f"{spec.key}_s5_anchored.png")
-    pdf = os.path.join(outdir, f"{spec.key}_s5_anchored.pdf")
+    stag = "s" + "_".join(f"{v:g}" for v in S5).replace(".", "p")
+    png = os.path.join(outdir, f"{spec.key}_{stag}_anchored.png")
+    pdf = os.path.join(outdir, f"{spec.key}_{stag}_anchored.pdf")
     fig.savefig(png, dpi=300, bbox_inches="tight"); fig.savefig(pdf, bbox_inches="tight")
     plt.close(fig)
     np.savez_compressed(
-        os.path.join(outdir.replace("figures", "results"), f"{spec.key}_s5_anchored.npz"),
+        os.path.join(outdir.replace("figures", "results"), f"{spec.key}_{stag}_anchored.npz"),
         checkpoints=arms["ranch"]["checkpoints"],
         ranch_acc_train=arms["ranch"]["acc_train"], ranch_acc_test=arms["ranch"]["acc_test"],
         nranch_acc_train=arms["nranch"]["acc_train"], nranch_acc_test=arms["nranch"]["acc_test"],
@@ -162,7 +165,30 @@ def main() -> int:
     ap.add_argument("--final-reps", type=int, default=100)
     ap.add_argument("--outdir", default="figures/strength")
     ap.add_argument("--resdir", default="results/strength")
+    ap.add_argument("--s", default="5,5,5",
+                    help="block strengths, e.g. '0.25,0.25,0.25' or a single number")
+    ap.add_argument("--experiments", default="",
+                    help="comma list of experiment keys; empty means all four")
+    ap.add_argument("--h-scan", default="",
+                    help="comma list of step sizes; empty means the built-in per-dataset grid")
+    ap.add_argument("--tag", default="", help="suffix for output file names")
     args = ap.parse_args()
+
+    global S5, H_SCAN, SPECS
+    parts = [float(v) for v in args.s.split(",")]
+    S5 = tuple(parts * 3) if len(parts) == 1 else tuple(parts)
+    assert len(S5) == 3, "need one or three block strengths"
+    if args.h_scan:
+        hs = [float(v) for v in args.h_scan.split(",")]
+        H_SCAN = {k: hs for k in H_SCAN}
+    if args.experiments:
+        keep = set(args.experiments.split(","))
+        SPECS = [sp for sp in SPECS if sp.key in keep]
+        assert SPECS, f"no experiment matched {keep}"
+    SPECS = [dataclasses.replace(sp, block_scales=S5) for sp in SPECS]
+    tag = args.tag or ("s" + "_".join(f"{v:g}" for v in S5).replace(".", "p"))
+    print(f"block strengths s = {S5}   experiments = {[sp.key for sp in SPECS]}   "
+          f"h grid = {sorted({h for v in H_SCAN.values() for h in v})}")
     os.makedirs(args.outdir, exist_ok=True); os.makedirs(args.resdir, exist_ok=True)
     datasets = {"magic": build_magic_dataset(), "titanic": build_titanic_dataset()}
 
@@ -170,7 +196,7 @@ def main() -> int:
     scan_rows, chosen = [], {}
     for spec in SPECS:
         ds = datasets[spec.dataset]
-        print(f"\n=== step-size scan at s = (5,5,5): {spec.key} "
+        print(f"\n=== step-size scan at s = {S5}: {spec.key} "
               f"(R = {args.scan_reps}, search seed {SEARCH_SEED}) ===")
         rows = []
         for h in H_SCAN[spec.dataset]:
@@ -192,7 +218,7 @@ def main() -> int:
         print(f"  -> h chosen on the PAIRED TRAINING gain only: h = {best.h:g} "
               f"({best.paired_dtrain:+.4f} +- {best.paired_dtrain_se:.4f}, t = {best.t_train:.2f})")
     pd.concat(scan_rows, ignore_index=True).to_csv(
-        os.path.join(args.resdir, "s5_step_scan.csv"), index=False)
+        os.path.join(args.resdir, f"{tag}_step_scan.csv"), index=False)
 
     print("\n" + "=" * 92)
     print(f"CONFIRMATION on independent replicates (sampler seed {CONFIRM_SEED}, "
@@ -226,7 +252,7 @@ def main() -> int:
                                proj=arms["nranch"]["projection_rate"]),
                    png=png, pdf=pdf)
         confirm[spec.key] = rec
-        print(f"\n[{spec.key}]  h = {h:g}, s = (5,5,5), R = {args.final_reps}")
+        print(f"\n[{spec.key}]  h = {h:g}, s = {S5}, R = {args.final_reps}")
         print(f"  Reversible      train {rec['ranch']['train']:.4f}+-{rec['ranch']['train_sd']:.4f}"
               f"   test {rec['ranch']['test']:.4f}+-{rec['ranch']['test_sd']:.4f}"
               f"   U={rec['ranch']['U']:.1f}  proj={rec['ranch']['proj']:.3f}")
@@ -239,7 +265,7 @@ def main() -> int:
               f"(t = {st['t_test']:+.2f}, wins {st['win_test']:.0%})")
         print(f"  VERDICT: {verdict}")
 
-    with open(os.path.join(args.resdir, "s5_confirmation.json"), "w") as fh:
+    with open(os.path.join(args.resdir, f"{tag}_confirmation.json"), "w") as fh:
         json.dump(dict(s=list(S5), h_scan=H_SCAN, chosen_h=chosen,
                        search_seed=SEARCH_SEED, confirm_seed=CONFIRM_SEED,
                        scan_reps=args.scan_reps, final_reps=args.final_reps,

@@ -231,3 +231,48 @@ strongest at the original Λ: `Λ = 4` gives `+0.0069 ± 0.0021` train (t = 3.2)
 **Λ is part of the model** (`π_K ∝ e^{−U} 1_K`), not a sampler knob — changing it changes the
 posterior being targeted. `s` is purely algorithmic and leaves the target alone. They overlap in
 what they do to `‖J‖`, so `s` is the right knob for that job.
+
+## Follow-up: `s = 0.25` and `s = 1` on MAGIC
+
+`final_s5.py` is parameterised by `--s`, `--experiments` and `--h-scan`; outputs in
+`results/strength/s*_step_scan.csv` and `s*_confirmation.json`.
+
+How much of the drift `J` actually contributes on MAGIC (median `‖J∇U₀‖ / ‖∇U₀‖`):
+
+| s | ball | smoothed ℓ_p |
+|---|---|---|
+| 0.25 | 0.084 | 0.140 |
+| 1 | 0.335 | 0.559 |
+| 5 | 1.674 | 2.795 |
+
+**`s = 0.25` is safe but inert.** It never does damage — the ball is untouched at every step size
+and the ℓ_p set loses only −0.003 at `h = 1e-4` — but it produces no gain either. Confirmed at
+`R = 200` on independent replicates: `+0.0000 ± 0.0002` (ball, t = 0.3) and `+0.0000 ± 0.0001`
+(ℓ_p, t = 0.4) on training. At `s = 0.25` the rotation is under a fifth of the drift, which is
+too weak to change the trajectory.
+
+Note: the `R = 25` sweep had shown `+0.00049 ± 0.00019` (t = 2.6) for `s = 0.25` on the ℓ_p set at
+`h = 1e-6`. **That did not replicate** — it was the maximum of a grid of noisy tiny estimates.
+This is exactly what the independent-confirmation step exists to catch.
+
+**`s = 1` does win on MAGIC**, at `h = 3e-7`, `R = 200`, independent replicates:
+
+| | reversible | non-reversible | paired Δ |
+|---|---|---|---|
+| ball — train | 0.7478 ± 0.0163 | 0.7491 ± 0.0159 | +0.0013 ± 0.0005 (t = 2.4) |
+| ball — test | 0.7445 ± 0.0171 | 0.7461 ± 0.0162 | +0.0016 ± 0.0006 (t = 2.8) |
+| ℓ_p — train | 0.7552 ± 0.0134 | 0.7583 ± 0.0125 | +0.0032 ± 0.0007 (t = 4.6) |
+| ℓ_p — test | 0.7518 ± 0.0139 | 0.7556 ± 0.0133 | +0.0038 ± 0.0008 (t = 4.9) |
+
+Training loss agrees (8367.5 → 8335.8 on the ℓ_p set). Caveat: the scan at `R = 60` put the ℓ_p
+point estimate at `+0.0007 ± 0.0011`, five times smaller — the effect is small relative to
+run-to-run noise, and the `R = 200` confirmation is the number to trust, not the scan.
+
+**The same caveat as Titanic applies.** At `h = 3e-7` absolute accuracy is 0.745–0.756, well below
+the 0.774 reachable at larger `h`: the win lives in the transient, where the metric still has
+headroom. Run MAGIC to convergence (`h = 1e-5`) and the reversible arm reaches 0.781 train /
+0.774 test against an unconstrained-MLE ceiling of 0.781 / 0.776 — about 0.002 of room left, so
+no sampler can demonstrate more than that on accuracy at that step size.
+
+**Summary of the strength sweet spot:** `s = 5` is far too large for MAGIC (rotation 1.7–2.8×
+the drift), `s = 0.25` far too small (under 0.2×), `s = 1` is where it works (0.3–0.6×).
