@@ -62,10 +62,17 @@ def build_parser() -> argparse.ArgumentParser:
                         "stays at 1 and alpha is the knob")
     p.add_argument("--n-chains", type=int, default=4)
     p.add_argument("--n-chains-sensitivity", type=int, default=2)
+    p.add_argument("--n-iter-sensitivity", type=int, default=None,
+                   help="iterations for the step-size and radius studies; omitted "
+                        "means the same as --n-iter")
     p.add_argument("--n-iter", type=int, default=60_000)
     p.add_argument("--burn-in", type=int, default=10_000)
     p.add_argument("--thin", type=int, default=10)
     p.add_argument("--base-seed", type=int, default=1_000)
+    p.add_argument("--n-jobs", type=int, default=1,
+                   help="run the chains of one alpha in a process pool; -1 uses "
+                        "every CPU.  Results are identical to --n-jobs 1, since a "
+                        "chain's noise depends only on its seed")
 
     p.add_argument("--h", type=float, default=None,
                    help="step size; omitted means h = step_safety / lambda_max")
@@ -76,6 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pilot-quantile", type=float, default=0.999)
     p.add_argument("--pilot-inflation", type=float, default=1.10)
     p.add_argument("--no-figures", action="store_true")
+    p.add_argument("--figures-only", action="store_true",
+                   help="redraw the figures from a finished run's stored samples, "
+                        "without sampling again")
     p.add_argument("--quick", action="store_true",
                    help="tiny chains, for checking the pipeline runs")
     return p
@@ -83,6 +93,16 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.figures_only:
+        from experiment import regenerate_figures
+
+        paths = regenerate_figures(
+            args.out_dir,
+            DataConfig(path=args.data, test_size=args.test_size,
+                       split_seed=args.split_seed),
+        )
+        print(f"redrew {len(paths) // 2} figures in {args.out_dir}/figures")
+        return 0
     if args.quick:
         args.n_iter, args.burn_in, args.thin = 4_000, 1_000, 4
         args.pilot_iter, args.n_chains, args.n_chains_sensitivity = 4_000, 2, 2
@@ -101,7 +121,11 @@ def main(argv: list[str] | None = None) -> int:
     cfg = ExperimentConfig(
         alphas=tuple(args.alphas), n_chains=args.n_chains,
         n_chains_sensitivity=args.n_chains_sensitivity,
+        n_iter_sensitivity=args.n_iter_sensitivity,
+        burn_in_sensitivity=(args.n_iter_sensitivity // 6
+                             if args.n_iter_sensitivity else None),
         base_seed=args.base_seed, h=args.h, step_safety=args.step_safety,
+        n_jobs=args.n_jobs,
         fixed_radius=args.fixed_radius, n_iter=args.n_iter,
         burn_in=args.burn_in, thin=args.thin, out_dir=args.out_dir,
         make_figures=not args.no_figures,

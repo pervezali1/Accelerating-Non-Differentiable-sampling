@@ -165,8 +165,16 @@ class ExperimentConfig:
     burn_in: int = 5_000
     thin: int = 5
     out_dir: str = "outputs"
-    #: sensitivity studies are cheaper: fewer chains, same everything else
+    #: chains are independent, so they can be run in a process pool; results do
+    #: not depend on this (each chain's noise is a function of its seed alone).
+    #: -1 means "one worker per CPU"
+    n_jobs: int = 1
+    #: sensitivity studies are cheaper: fewer chains and, optionally, shorter.
+    #: They ask whether the *answer* moves with h or R, which needs far less
+    #: effective sample size than the efficiency comparison between alphas.
     n_chains_sensitivity: int = 2
+    n_iter_sensitivity: int | None = None
+    burn_in_sensitivity: int | None = None
     make_figures: bool = True
 
 

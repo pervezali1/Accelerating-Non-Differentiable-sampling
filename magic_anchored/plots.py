@@ -95,6 +95,7 @@ def make_all_figures(
     out_dir: str,
     pair_coefficients: tuple[int, int, int] = (1, 2, 9),
     max_lag: int = 200,
+    alpha_star: float | None = None,
 ) -> list[str]:
     """Produce the ten requested figures and return every path written."""
     alphas = sorted(chains)
@@ -201,21 +202,34 @@ def make_all_figures(
         (axes[1], "min_ess", "minimum ESS over coefficients"),
         (axes[2], "mean_squared_jump", "mean squared jumping distance"),
     ):
-        _style(ax)
+        _style(ax, grid_axis="both")
         values = [getattr(diags[a], key) for a in alphas]
-        ax.plot(alphas, values, "-o", color="#2B5FD9", markersize=7,
-                markeredgecolor="white", markeredgewidth=1.2)
+        ax.plot(alphas, values, marker="o", color="#2B5FD9", markersize=7,
+                markeredgecolor="white", markeredgewidth=1.2, zorder=4)
+        # alpha spans three decades, so a linear axis crushes every value the
+        # specification named into the left edge; symlog keeps alpha = 0 on it
+        ax.set_xscale("symlog", linthresh=0.25, linscale=0.4)
+        ax.set_xticks(alphas)
+        ax.set_xticklabels([f"{a:g}" for a in alphas], fontsize=8)
+        ax.minorticks_off()
         base = values[0]
-        for a, v in zip(alphas, values):
+        for i, (a, v) in enumerate(zip(alphas, values)):
             ax.annotate(f"{v / base:.2f}x" if base else "--", xy=(a, v),
-                        xytext=(0, 9), textcoords="offset points",
+                        xytext=(0, 11 if i % 2 == 0 else -15),
+                        textcoords="offset points",
                         ha="center", fontsize=8, color=MUTED)
-        ax.set_xlabel(r"$\alpha$", color=INK, fontsize=10)
+        if alpha_star is not None:
+            ax.axvline(alpha_star, color="#C2410C", lw=1.1, ls=(0, (4, 3)),
+                       zorder=2)
+        ax.set_xlabel(r"$\alpha$   (symlog)", color=INK, fontsize=10)
         ax.set_ylabel(label, color=INK, fontsize=9.5)
     axes[0].set_title("Throughput against the reversible baseline",
                       fontsize=11.5, color=INK)
-    fig.suptitle("Efficiency versus the non-reversible strength $\\alpha$ "
-                 "(labels are ratios to $\\alpha = 0$)", fontsize=12, color=INK)
+    note = ("labels are ratios to $\\alpha = 0$"
+            + (rf"; the dashed line is $\alpha^* = {alpha_star:.1f}$, where the "
+               r"rotation matches the gradient" if alpha_star else ""))
+    fig.suptitle("Efficiency versus the non-reversible strength $\\alpha$\n" + note,
+                 fontsize=12, color=INK)
     written += save(fig, out_dir, "05_efficiency_vs_alpha")
 
     # 7. radius against iteration, and 8. its histogram
@@ -227,7 +241,7 @@ def make_all_figures(
         step = max(1, r.radius_trace.size // 4000)
         kw = _line_kwargs(a, colours)
         ax.plot(np.arange(0, r.radius_trace.size, step),
-                r.radius_trace[::step], lw=0.7, **kw)
+                r.radius_trace[::step], lw=0.5, alpha=0.75, **kw)
     ax.axhline(radius, color="#C2410C", lw=1.3, ls=(0, (5, 3)),
                label=f"constraint $R = {radius:.4f}$")
     ax.axvline(chains[alphas[0]][0].burn_in, color=MUTED, lw=0.9, ls=":",
@@ -235,7 +249,8 @@ def make_all_figures(
     ax.set_xlabel("iteration", color=INK, fontsize=10)
     ax.set_ylabel(r"$\|w_k - w_{\mathrm{center}}\|_2$", color=INK, fontsize=10)
     ax.set_title("Distance from the constraint centre", fontsize=11.5, color=INK)
-    ax.legend(frameon=False, fontsize=8, ncols=2, loc="lower right")
+    ax.legend(frameon=False, fontsize=7.5, ncols=5, loc="upper center",
+              bbox_to_anchor=(0.5, -0.14))
     _style(bx)
     for a in alphas:
         pooled = np.concatenate([r.radius_trace[r.burn_in :] for r in chains[a]])
@@ -310,8 +325,8 @@ def make_all_figures(
                 continue
             sc = scores[a]
             kw = _line_kwargs(a, colours)
-            ax.plot(sc.calibration_predicted, sc.calibration_observed, "-o",
-                    markersize=5, lw=1.2, markeredgecolor="white",
+            ax.plot(sc.calibration_predicted, sc.calibration_observed,
+                    marker="o", markersize=5, lw=1.2, markeredgecolor="white",
                     markeredgewidth=0.8, **kw)
         ax.set_xlabel("mean predicted probability", color=INK, fontsize=10)
         ax.set_ylabel("observed frequency", color=INK, fontsize=10)

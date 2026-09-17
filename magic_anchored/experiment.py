@@ -21,12 +21,14 @@ Step 3 happening exactly once is validation checks 8 and 9.
 
 from __future__ import annotations
 
+import glob
 import json
 import os
 import platform
 import sys
 import time
 import warnings
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass, field, replace
 
 import numpy as np
@@ -70,7 +72,13 @@ from sampler import (
 )
 from target import LogisticTarget, anchor_bounds, check_anchor_bounds
 
-__all__ = ["ExperimentOutput", "run_experiment", "run_validation_checks"]
+__all__ = [
+    "ExperimentOutput",
+    "run_experiment",
+    "run_validation_checks",
+    "load_chains",
+    "regenerate_figures",
+]
 
 
 @dataclass
@@ -97,6 +105,14 @@ def _log(message: str) -> None:
     print(message, flush=True)
 
 
+def _one_chain(
+    args: tuple[LogisticTarget, ConstraintSpec, SamplerConfig, FieldConfig | None]
+) -> SamplerResult:
+    """Module-level so that it can be pickled for a process pool."""
+    target, constraint, sampler_cfg, field_cfg = args
+    return run_constrained_sampler(target, constraint, sampler_cfg, field_cfg)
+
+
 def _run_alpha_group(
     target: LogisticTarget,
     constraint: ConstraintSpec,
@@ -108,22 +124,37 @@ def _run_alpha_group(
     burn_in: int | None = None,
     field_cfg: FieldConfig | None = None,
 ) -> list[SamplerResult]:
-    """``n_chains`` chains at one ``alpha``, seeded ``base_seed + c``."""
-    out = []
-    for c in range(n_chains):
-        sampler_cfg = SamplerConfig(
-            alpha=alpha,
-            h=h,
-            n_iter=n_iter if n_iter is not None else cfg.n_iter,
-            burn_in=burn_in if burn_in is not None else cfg.burn_in,
-            thin=cfg.thin,
-            seed=cfg.base_seed + c,
-            project=True,
+    """``n_chains`` chains at one ``alpha``, seeded ``base_seed + c``.
+
+    The chains are independent -- each carries its own seed and its own RNG
+    stream -- so they are run in a process pool when ``cfg.n_jobs != 1``.  The
+    results do not depend on ``n_jobs``: a chain's noise is a function of its
+    seed alone, never of the order in which chains were scheduled.
+    """
+    jobs = [
+        (
+            target,
+            constraint,
+            SamplerConfig(
+                alpha=alpha,
+                h=h,
+                n_iter=n_iter if n_iter is not None else cfg.n_iter,
+                burn_in=burn_in if burn_in is not None else cfg.burn_in,
+                thin=cfg.thin,
+                seed=cfg.base_seed + c,
+                project=True,
+            ),
+            field_cfg,
         )
-        out.append(
-            run_constrained_sampler(target, constraint, sampler_cfg, field_cfg)
-        )
-    return out
+        for c in range(n_chains)
+    ]
+    if cfg.n_jobs == 1 or n_chains == 1:
+        return [_one_chain(job) for job in jobs]
+    workers = (
+        os.cpu_count() or 1 if cfg.n_jobs < 0 else min(cfg.n_jobs, n_chains)
+    )
+    with ProcessPoolExecutor(max_workers=max(1, workers)) as pool:
+        return list(pool.map(_one_chain, jobs))
 
 
 def run_experiment(
@@ -251,10 +282,12 @@ def run_experiment(
              f"AUC {scores[alpha].roc_auc:.5f}")
 
     step_rows = []
+    base_iter = cfg.n_iter_sensitivity or cfg.n_iter
+    base_burn = cfg.burn_in_sensitivity or cfg.burn_in
     for factor in cfg.step_size_factors:
         # hold the simulated time fixed: a smaller step needs more iterations
-        n_iter = int(round(cfg.n_iter / factor))
-        burn_in = int(round(cfg.burn_in / factor))
+        n_iter = int(round(base_iter / factor))
+        burn_in = int(round(base_burn / factor))
         for alpha in (0.0, max(cfg.alphas)):
             group = _run_alpha_group(
                 target, constraint, float(alpha), h * factor, cfg,
@@ -302,7 +335,7 @@ def run_experiment(
         for alpha in (0.0, max(cfg.alphas)):
             group = _run_alpha_group(
                 target, scaled, float(alpha), h, cfg, cfg.n_chains_sensitivity,
-                field_cfg=field_cfg,
+                n_iter=base_iter, burn_in=base_burn, field_cfg=field_cfg,
             )
             with warnings.catch_warnings(record=True):
                 warnings.simplefilter("always")
@@ -350,7 +383,7 @@ def run_experiment(
         figures = make_all_figures(
             chains, diagnostics, scores, dataset.param_names,
             np.asarray(constraint.center), constraint.radius,
-            os.path.join(out_dir, "figures"),
+            os.path.join(out_dir, "figures"), alpha_star=alpha_star,
         )
 
     _write_outputs(
@@ -376,6 +409,91 @@ def run_experiment(
         validation=validation,
         figures=figures,
         out_dir=out_dir,
+    )
+
+
+def load_chains(out_dir: str) -> tuple[dict[float, list[SamplerResult]], ConstraintSpec,
+                                       tuple[str, ...]]:
+    """Rebuild the chains of a finished run from its NPZ files.
+
+    Enough of each :class:`~sampler.SamplerResult` is stored to recompute every
+    diagnostic and redraw every figure, so the plots can be revised without
+    re-sampling.  Runtimes and gradient counts come back from ``chains.csv``.
+    """
+    sample_dir = os.path.join(out_dir, "samples")
+    with open(os.path.join(out_dir, "constraint.json")) as fh:
+        spec = ConstraintSpec(**json.load(fh))
+    costs = {}
+    chains_csv = os.path.join(out_dir, "chains.csv")
+    if os.path.exists(chains_csv):
+        table = pd.read_csv(chains_csv)
+        for _, row in table.iterrows():
+            costs[(float(row["alpha"]), int(row["chain"]))] = (
+                float(row["runtime_seconds"]), int(row["n_grad_evaluations"])
+            )
+    chains: dict[float, list[SamplerResult]] = {}
+    names: tuple[str, ...] = ()
+    for path in sorted(glob.glob(os.path.join(sample_dir, "alpha_*.npz"))):
+        blob = np.load(path, allow_pickle=False)
+        names = tuple(str(v) for v in blob["param_names"])
+        alpha = float(os.path.basename(path)[len("alpha_") : -len(".npz")])
+        group = []
+        for c in range(blob["samples"].shape[0]):
+            runtime, n_grad = costs.get((alpha, c), (float("nan"), 0))
+            group.append(
+                SamplerResult(
+                    alpha=alpha,
+                    h=float("nan"),
+                    seed=int(blob["seeds"][c]),
+                    n_iter=int(blob["log_a"].shape[1]),
+                    burn_in=int(blob["trajectory"].shape[1] - 1
+                               - blob["samples"].shape[1] * 1),
+                    thin=1,
+                    s=1.0,
+                    center=np.asarray(blob["center"], dtype=np.float64),
+                    radius=float(blob["radius"][0]),
+                    projected_flag=True,
+                    trajectory=blob["trajectory"][c],
+                    samples=blob["samples"][c],
+                    log_a=blob["log_a"][c],
+                    a=blob["a"][c],
+                    radius_trace=blob["radius_trace"][c],
+                    drift_norm=blob["drift_norm"][c],
+                    reversible_drift_norm=blob["reversible_drift_norm"][c],
+                    nonreversible_drift_norm=blob["nonreversible_drift_norm"][c],
+                    projection_occurred=blob["projection_occurred"][c],
+                    runtime_seconds=runtime,
+                    n_grad_evaluations=n_grad,
+                    n_numerical_warnings=0,
+                )
+            )
+        chains[alpha] = group
+    if not chains:
+        raise FileNotFoundError(f"no alpha_*.npz under {sample_dir!r}")
+    return chains, spec, names
+
+
+def regenerate_figures(out_dir: str, data_cfg: DataConfig | None = None) -> list[str]:
+    """Redraw every figure from a finished run's stored samples, without sampling."""
+    from plots import make_all_figures
+
+    chains, spec, names = load_chains(out_dir)
+    dataset = load_and_preprocess(data_cfg or DataConfig())
+    diags, scores = {}, {}
+    for alpha, group in chains.items():
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            diags[alpha] = calculate_chain_diagnostics(group, names)
+        pooled = np.concatenate([r.samples for r in group], axis=0)
+        p_bar = posterior_predictive_probabilities(pooled, dataset.X_test)
+        scores[alpha] = evaluate_predictive_performance(
+            dataset.y_test, p_bar, alpha=alpha, n_samples=pooled.shape[0]
+        )
+    triples = generate_cyclic_triples(len(spec.center))
+    return make_all_figures(
+        chains, diags, scores, names, np.asarray(spec.center), spec.radius,
+        os.path.join(out_dir, "figures"),
+        alpha_star=natural_alpha_scale(spec.radius, len(triples), 1.0),
     )
 
 
