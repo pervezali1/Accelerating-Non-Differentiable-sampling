@@ -1,4 +1,4 @@
-"""lambda_lasso = 0: the anchor is vacuous, so this isolates the effect of J.
+"""Anchored vs non-reversible anchored Langevin at a chosen ``lambda_lasso``.
 
 At ``lambda_lasso = 0`` the non-differentiable part ``g = lambda * sum|w_j|``
 vanishes, ``U = f`` is smooth, ``a(w) = exp(U - U0) == 1`` identically, and the
@@ -60,13 +60,16 @@ def figure(runs, cfg, geometry, tag, quick):
         ax.set_xlabel("Iterations"); ax.set_ylabel("Accuracy")
         ax.set_title(title, fontsize=11); ax.grid(alpha=0.3)
     axes[0].legend(fontsize=9, loc="lower right")
-    fig.suptitle(f"lambda_lasso = 0 (anchor vacuous, a == 1) — {geometry.name}"
+    fig.suptitle(f"lambda_lasso = {cfg.lambda_lasso:g} — {geometry.name}"
                  + ("  [QUICK MODE]" if quick else ""), fontsize=13)
     fig.tight_layout(rect=(0, 0.13, 1, 0.95))
     fig.text(0.5, 0.015,
         f"d = {cfg.d} (intercept + 8 slopes);  constraint: {geometry.name}, threshold "
-        f"{geometry.threshold:.4g};  lambda_lasso = 0 so U = f is SMOOTH and a(w) = 1 "
-        f"identically -- the update is plain projected Langevin;\n"
+        f"{geometry.threshold:.4g};  lambda_lasso = {cfg.lambda_lasso:g}"
+        + (" so U = f is SMOOTH and a(w) = 1 identically -- the update is plain projected "
+           "Langevin;\n" if cfg.lambda_lasso == 0 else
+           f" with anchor delta = {cfg.delta_anchor}, so a(w) in "
+           f"[{np.exp(-(cfg.d-1)*cfg.lambda_lasso*cfg.delta_anchor):.4f}, 1];\n") +
         f"EXACT gradient;  eta = {cfg.eta:g};  R = {cfg.n_repeats};  iterations = "
         f"{cfg.n_iterations};  block strengths s = "
         f"{tuple(float(x) for x in cfg.scales)};  alpha = 0 vs 1.\n"
@@ -76,7 +79,7 @@ def figure(runs, cfg, geometry, tag, quick):
         ha="center", fontsize=7.3)
     paths = []
     for ext, kw in ((".png", {"dpi": 300}), (".pdf", {})):
-        path = os.path.join(OUTPUT_DIR, f"accuracy_{tag}{ext}")
+        path = os.path.join(globals()["OUTPUT_DIR"], f"accuracy_{tag}{ext}")
         fig.savefig(path, bbox_inches="tight", **kw); paths.append(path)
     plt.close(fig)
     return paths
@@ -85,22 +88,26 @@ def figure(runs, cfg, geometry, tag, quick):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--lambda-lasso", dest="lambda_lasso", type=float, default=0.0,
+                        help="0 makes the anchor vacuous; larger values make it bite")
     args = parser.parse_args()
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_dir = f"results_lambda{args.lambda_lasso:g}".replace(".", "p")
+    globals()["OUTPUT_DIR"] = output_dir
+    os.makedirs(output_dir, exist_ok=True)
 
     base = lasso.LassoConfig(
-        lambda_lasso=0.0,
+        lambda_lasso=args.lambda_lasso,
         n_repeats=20 if args.quick else 100,
         n_iterations=300 if args.quick else 1000,
         block_scales=(3.0,) * 3,
     )
     dataset = lasso.make_dataset(base)
-    target = lasso.LassoTarget(dataset.X_train, dataset.y_train, 0.0,
+    target = lasso.LassoTarget(dataset.X_train, dataset.y_train, args.lambda_lasso,
                                base.sigma_intercept, base.delta_anchor)
     ball = nral.BallGeometry(base.d)
     l1 = nral.L1SmoothBallGeometry(base.d, base.epsilon, base.l1_radius)
 
-    # --- the degenerate-limit identity, asserted rather than assumed ---
+    # --- anchor diagnostics: how much work is the anchor actually doing? ---
     streams = lasso.make_streams(base, l1)
     anchored = lasso.run_chain(dataset, target, l1, streams, base,
                                method="anchored", alpha=0.0)
@@ -109,11 +116,23 @@ def main() -> int:
         w = l1.project(w - base.eta * target.grad_f(w)
                        + np.sqrt(2 * base.eta) * streams.noise[:, k, :]).beta
     identity_gap = float(np.abs(anchored.w[-1] - w).max())
-    print(f"anchor vacuous: max |anchored chain - plain projected Langevin| = "
-          f"{identity_gap:.3e}")
-    print(f"a(w) identically 1: {bool((target.a(anchored.w[-1]) == 1.0).all())}")
-    assert identity_gap == 0.0
-    assert float(np.abs(target.U(anchored.w[-1]) - target.U0(anchored.w[-1])).max()) == 0.0
+    states = anchored.w[BURN_CHECKPOINTS:].reshape(-1, base.d)[::37]
+    a_values = target.a(states)
+    print(f"lambda_lasso = {args.lambda_lasso:g}")
+    print(f"  a bounds [exp(-8*lambda*delta), 1]     = [{target.a_lower_bound:.6f}, 1]")
+    print(f"  a observed along the chain             = "
+          f"[{a_values.min():.6f}, {a_values.max():.6f}]")
+    print(f"  max |U - U0| along the chain           = "
+          f"{float(np.abs(target.U(states) - target.U0(states)).max()):.6f}")
+    print(f"  Lipschitz bound L                      = {target.lipschitz_constant():.1f}"
+          f"   (eta*L = {base.eta*target.lipschitz_constant():.4f})")
+    print(f"  max |chain - plain projected Langevin| = {identity_gap:.3e}   "
+          f"{'(anchor vacuous)' if args.lambda_lasso == 0 else '(anchor active)'}")
+    if args.lambda_lasso == 0.0:
+        assert identity_gap == 0.0, "at lambda = 0 the anchor must disappear exactly"
+        assert float(np.abs(target.U(states) - target.U0(states)).max()) == 0.0
+    else:
+        assert identity_gap > 0.0, "a non-zero lambda must change the chain"
 
     s_grid = (1.0, 3.0, 10.0) if args.quick else (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 7.0, 10.0)
     rows, figure_paths = [], []
@@ -138,7 +157,11 @@ def main() -> int:
                                        "ball" if geometry is ball else "l1", args.quick)
     sweep = pd.DataFrame(rows)
 
-    summary = {"lambda_lasso": 0.0, "anchor_identity_gap": identity_gap}
+    summary = {"lambda_lasso": args.lambda_lasso,
+               "anchor_identity_gap": identity_gap,
+               "a_lower_bound": target.a_lower_bound,
+               "a_observed_min": float(a_values.min()),
+               "lipschitz": target.lipschitz_constant()}
     held_rows = []
     for geometry in (l1, ball):
         sub = sweep[sweep.geometry == geometry.name]
@@ -164,12 +187,12 @@ def main() -> int:
               f"({100*(1-np.mean(ratios)):.1f}% reduction); "
               f"all below 1: {all(x < 1 for x in ratios)}")
 
-    sweep.to_csv(os.path.join(OUTPUT_DIR, "sweep.csv"), index=False)
-    pd.DataFrame(held_rows).to_csv(os.path.join(OUTPUT_DIR, "held_out.csv"), index=False)
+    sweep.to_csv(os.path.join(output_dir, "sweep.csv"), index=False)
+    pd.DataFrame(held_rows).to_csv(os.path.join(output_dir, "held_out.csv"), index=False)
     summary["figures"] = figure_paths
-    with open(os.path.join(OUTPUT_DIR, "summary.json"), "w") as handle:
+    with open(os.path.join(output_dir, "summary.json"), "w") as handle:
         json.dump(summary, handle, indent=2)
-    print("\nwrote:", *sorted(os.listdir(OUTPUT_DIR)), sep="\n  ")
+    print("\nwrote:", *sorted(os.listdir(output_dir)), sep="\n  ")
     return 0
 
 

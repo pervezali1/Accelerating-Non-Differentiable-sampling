@@ -1,0 +1,25 @@
+{
+  "lambda_lasso": 0.9,
+  "anchor_identity_gap": 0.002437114738224111,
+  "a_lower_bound": 0.865887748059205,
+  "a_observed_min": 0.9814427019231792,
+  "lipschitz": 939.3573464133452,
+  "L1-smooth ball": {
+    "selected_s": 3.0,
+    "held_out_mean_ratio": 0.5303812469632453,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 46.96187530367547
+  },
+  "unit ball": {
+    "selected_s": 7.0,
+    "held_out_mean_ratio": 0.5330402638480665,
+    "held_out_all_below_one": true,
+    "variance_reduction_percent": 46.69597361519335
+  },
+  "figures": [
+    "results_lambda0p9/accuracy_ball.png",
+    "results_lambda0p9/accuracy_ball.pdf",
+    "results_lambda0p9/accuracy_l1.png",
+    "results_lambda0p9/accuracy_l1.pdf"
+  ]
+}

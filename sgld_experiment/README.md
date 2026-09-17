@@ -297,7 +297,7 @@ within noise — direct confirmation that the damage was J amplifying the gradie
 *error*. What survives at large s on the l^p ball is the separate deterministic
 mechanism, an oversized `alpha J grad_U0` step.
 
-### lambda_lasso = 0: the anchor-free control
+### Varying lambda_lasso: the anchor-free control and beyond
 
 `lambda_zero_experiment.py` -> `results_lambda0/`. At `lambda_lasso = 0` the
 non-differentiable part vanishes, `U = f` is smooth, `a(w) = 1` identically, and
@@ -308,13 +308,27 @@ run on the same streams (max difference exactly 0.0), and `U - U0 == 0`.
 So this run isolates J with no anchoring at all. Comparing it against
 lambda = 10 answers "is the benefit from J or from the anchor?":
 
-| | lambda = 10 (anchored) | lambda = 0 (no anchor) |
-|---|---|---|
-| L1-smooth ball | 0.529 (47.1%) at s = 3 | 0.531 (46.9%) at s = 3 |
-| unit ball | 0.537 (46.3%) at s = 10 | 0.533 (46.7%) at s = 7 |
+`lambda_experiment.py --lambda-lasso X` runs any value. Held-out ergodic-variance
+ratios (four fresh seeds each, all below 1 in every cell):
 
-**Identical within noise.** The whole variance reduction comes from J; the anchor
-contributes none of it. That is the expected division of labour - the anchor
+| | lambda = 0 | lambda = 0.9 | lambda = 10 |
+|---|---|---|---|
+| L1-smooth ball | 0.531 (46.9%) at s = 3 | 0.530 (47.0%) at s = 3 | 0.529 (47.1%) at s = 3 |
+| unit ball | 0.533 (46.7%) at s = 7 | 0.533 (46.7%) at s = 7 | 0.537 (46.3%) at s = 10 |
+
+**Identical within noise across two orders of magnitude of lambda.** The whole
+variance reduction comes from J; the anchor contributes none of it.
+
+How hard the anchor is working, for reference:
+
+| lambda | a bound | a observed | max abs(U - U0) | L | differs from plain Langevin by |
+|---|---|---|---|---|---|
+| 0 | [1, 1] | [1, 1] | 0 | 894 | 0 (exactly) |
+| 0.9 | [0.866, 1] | [0.981, 0.994] | 0.019 | 939 | 2.4e-3 |
+| 10 | [0.202, 1] | [0.775, 1] | 0.255 | 1394 | - |
+
+At lambda = 0.9 the anchor is active but barely: `a` stays within 2% of 1. It only
+becomes genuinely load-bearing near lambda = 10. That is the expected division of labour - the anchor
 exists to handle non-differentiability, not to accelerate - but it is worth
 having measured rather than assumed.
 
