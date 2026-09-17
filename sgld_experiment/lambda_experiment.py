@@ -90,13 +90,24 @@ def main() -> int:
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--lambda-lasso", dest="lambda_lasso", type=float, default=0.0,
                         help="0 makes the anchor vacuous; larger values make it bite")
+    parser.add_argument("--delta-anchor", dest="delta_anchor", type=float, default=None,
+                        help="anchor smoothing; the bound on a is exp(-(d-1)*lambda*delta), "
+                             "while the anchor curvature is lambda/delta, so the two pull "
+                             "against each other")
     args = parser.parse_args()
-    output_dir = f"results_lambda{args.lambda_lasso:g}".replace(".", "p")
+    default_delta = lasso.LassoConfig().delta_anchor
+    if args.delta_anchor is None:
+        args.delta_anchor = default_delta
+    output_dir = f"results_lambda{args.lambda_lasso:g}"
+    if args.delta_anchor != default_delta:
+        output_dir += f"_delta{args.delta_anchor:g}"
+    output_dir = output_dir.replace(".", "p")
     globals()["OUTPUT_DIR"] = output_dir
     os.makedirs(output_dir, exist_ok=True)
 
     base = lasso.LassoConfig(
         lambda_lasso=args.lambda_lasso,
+        delta_anchor=args.delta_anchor,
         n_repeats=20 if args.quick else 100,
         n_iterations=300 if args.quick else 1000,
         block_scales=(3.0,) * 3,
@@ -104,6 +115,9 @@ def main() -> int:
     dataset = lasso.make_dataset(base)
     target = lasso.LassoTarget(dataset.X_train, dataset.y_train, args.lambda_lasso,
                                base.sigma_intercept, base.delta_anchor)
+    print(f"delta_anchor = {base.delta_anchor:g};  lambda*delta = "
+          f"{args.lambda_lasso*base.delta_anchor:.4f} (controls the bound on a);  "
+          f"lambda/delta = {args.lambda_lasso/base.delta_anchor:.0f} (anchor curvature)")
     ball = nral.BallGeometry(base.d)
     l1 = nral.L1SmoothBallGeometry(base.d, base.epsilon, base.l1_radius)
 
@@ -172,8 +186,11 @@ def main() -> int:
                          "nr_test_acc": nr.test_accuracy[-1].mean(),
                          "paired_accuracy_diff": diff, "accuracy_t": t,
                          "projection_rate": nr.projection_rate})
+            rows[-1]["n_nonfinite_rev"] = rev.n_nonfinite
+            rows[-1]["n_nonfinite_nr"] = nr.n_nonfinite
+            flag = "  <-- NON-FINITE STATES" if (rev.n_nonfinite or nr.n_nonfinite) else ""
             print(f"{s:5.1f} {geometry.name:<18} {rows[-1]['ergodic_variance_ratio']:11.4f} "
-                  f"{diff:+11.5f} {t:6.2f} {nr.projection_rate:6.3f}", flush=True)
+                  f"{diff:+11.5f} {t:6.2f} {nr.projection_rate:6.3f}{flag}", flush=True)
             if s == base.scales[0]:
                 figure_paths += figure(runs, base, geometry,
                                        "ball" if geometry is ball else "l1", args.quick)
@@ -212,6 +229,8 @@ def main() -> int:
 
     sweep.to_csv(os.path.join(output_dir, "sweep.csv"), index=False)
     pd.DataFrame(held_rows).to_csv(os.path.join(output_dir, "held_out.csv"), index=False)
+    summary["delta_anchor"] = base.delta_anchor
+    summary["eta_times_L"] = base.eta * target.lipschitz_constant()
     summary["figures"] = figure_paths
     with open(os.path.join(output_dir, "summary.json"), "w") as handle:
         json.dump(summary, handle, indent=2)

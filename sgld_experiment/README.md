@@ -340,11 +340,33 @@ reduction, worse than the ~47% at lambda <= 30**. `lambda_experiment.py` now
 checks convergence and prints a warning rather than reporting such a number
 silently.
 
-The controlling quantity is the product `lambda * delta`: the anchor bound is
-`exp(-(d-1) * lambda * delta)`. Holding `delta = 0.02` while raising `lambda`
-drives `a` to zero. Keeping `a` usable at `lambda = 100` needs `delta ~ 0.002`,
-which pushes the anchor curvature `lambda/delta` to 50 000 and forces a much
-smaller step - a real trade-off, not a free fix.
+Two different products govern the anchor, and they pull against each other:
+
+* `lambda * delta` sets the bound on `a`, via `exp(-(d-1) * lambda * delta)`;
+* `lambda / delta` is the anchor curvature, and so sets the largest usable step.
+
+Shrinking `delta` at fixed `lambda` therefore buys a better approximation of the
+kinked `g` and an `a` close to 1, at the cost of stiffness. Measured directly at
+`lambda = 30` (`lambda_experiment.py --lambda-lasso 30 --delta-anchor 0.002`):
+
+| | delta = 0.02 | delta = 0.002 |
+|---|---|---|
+| a bound / observed | [0.008, 1] / [0.390, 0.768] | [0.619, 1] / **[0.942, 0.997]** |
+| max abs(U - U0) | 0.941 | **0.060** |
+| anchor curvature lambda/delta | 1 500 | 15 000 |
+| L, eta*L | 2 394, 0.239 | 15 894, **1.589** |
+| variance ratio, L1 ball | **0.532 (46.8%)** at s = 3 | 0.547 (45.3%) at s = 3 |
+| variance ratio, unit ball | **0.541 (45.9%)** at s = 10 | 0.575 (42.5%) at s = 7 |
+
+`delta = 0.002` does what it is supposed to: `U0` tracks `U` fifteen times more
+closely and `a` stays within 6% of 1. But `eta*L` rises to 1.59 against a
+stability limit of 2, leaving almost no step-size headroom, and the usable range
+of `s` shrinks with it - on the unit ball the ratio at `s = 10` degrades from
+0.527 to 0.748. The chain stays finite and converges, but the margin is thin.
+
+Net: the variance reduction is slightly *worse*, so tightening `delta` is not a
+way to improve mixing. It is a way to approximate the non-differentiable target
+more faithfully, paid for in step size.
 
 At lambda = 0.9 the anchor is active but barely — `a` stays within 2% of 1. Only
 by lambda = 30 is it strongly load-bearing, with `a` down to 0.39 and the chain
