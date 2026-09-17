@@ -125,20 +125,44 @@ the `O(h)` discretisation bias as whatever the curves plateau at above it.
 
 ![W1 and TV vs time](figures/wasserstein-tv/01-w1-tv-vs-time.png)
 
-Speed-up in the time for the law to reach a fixed multiple of the finite-sample floor, `alpha = 4`:
+### Designing the constant axis
 
-| target | metric | `J_a` | `J_s` |
-|---|---|---|---|
-| A — elliptical | `W1` | **2.01–2.05x** | 1.08–1.15x |
-| A — elliptical | TV | **1.60–1.94x** | 1.14–1.16x |
-| B — l1 | `W1` | 1.66–1.76x | **1.83–2.12x** |
-| B — l1 | TV | 1.31–1.62x | **1.88–1.99x** |
+A constant skew in 3-D is `J_a v = u x v`, so the only freedom is the axis. Linearising with
+`S = Cov_pi^-1`, and using `tr(J S) = 0` for skew `J` and symmetric `S`, the three eigenvalues of
+`(I + alpha J) S` always sum to `tr(S)`, so
 
-The ordering flips between the two targets. `J_a` roughly doubles the rate on the elliptical target
-while `J_s` barely moves it; `J_s` is the better of the two on the `l1` target in both metrics. That
-matches the degeneracy above: the `J_s` drift vanishes on the principal axes, which for target A are
-the slow directions dominating the distance, whereas target B's degenerate set is a per-orthant ray
-the slow mode does not lie along.
+```
+min Re spec( (I + alpha J) S )  <=  tr(S)/3
+```
+
+for **every** skew `J` and every `alpha` — a hard ceiling, attained when the perturbation equalises the
+three relaxation rates. That ceiling is 15.3x the reversible gap on target A and 10x on target B, while
+the ad-hoc axis `u = (1,1,1)/sqrt(3)` saturates at 2.6x and 2.3x. `nald.optimal_axis` returns the axis
+attaining the ceiling; `alpha` is then chosen by measurement, as the value minimising the worst-mode
+`tau` subject to the stationarity drift staying within 4%.
+
+Speed-up in the time for the law to reach a fixed multiple of the finite-sample floor:
+
+| target | metric | `J_a` ad-hoc axis | `J_a` designed axis | `J_s` |
+|---|---|---|---|---|
+| A — elliptical | `W1` | 1.96–2.07x | **10.70–11.86x** | 1.09–1.13x |
+| A — elliptical | TV | 1.59–1.92x | **12.18–13.05x** | 1.12–1.16x |
+| B — l1 | `W1` | 1.72–1.87x | **5.76–6.14x** | 1.97–2.08x |
+| B — l1 | TV | 1.32–1.69x | **4.21–5.69x** | 1.88–2.00x |
+
+The designed axis costs nothing in accuracy — its measured bias is no worse than the ad-hoc one,
+because `alpha` does not have to grow to compensate for a poor direction.
+
+`J_s` is left exactly as specified, and trails on the elliptical target by construction: its drift
+`(alpha s a grad U0) x x` vanishes wherever `x` is parallel to `grad U0` — the principal axes, which is
+the slow manifold — and only the product `alpha s` is free, so no tuning removes that null set. It
+accelerates the fast coordinates strongly and the slow one weakly, and overall convergence is governed
+by the slowest mode.
+
+Two negative results are recorded in the notebook rather than dropped: Leimkuhler-Matthews integration
+buys nothing here (its superconvergence needs additive noise, while NALD has the state-dependent
+diffusion `sqrt(2 a(x))`), and pushing `alpha` higher saturates, exactly as the `tr(S)/3` ceiling
+predicts.
 
 ## Running
 
