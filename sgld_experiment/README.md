@@ -297,6 +297,31 @@ within noise — direct confirmation that the damage was J amplifying the gradie
 *error*. What survives at large s on the l^p ball is the separate deterministic
 mechanism, an oversized `alpha J grad_U0` step.
 
+### lambda_lasso = 0: the anchor-free control
+
+`lambda_zero_experiment.py` -> `results_lambda0/`. At `lambda_lasso = 0` the
+non-differentiable part vanishes, `U = f` is smooth, `a(w) = 1` identically, and
+the update collapses to plain projected Langevin. That is asserted, not assumed:
+the reversible chain is **bitwise identical** to `x - eta*grad_f + sqrt(2 eta) xi`
+run on the same streams (max difference exactly 0.0), and `U - U0 == 0`.
+
+So this run isolates J with no anchoring at all. Comparing it against
+lambda = 10 answers "is the benefit from J or from the anchor?":
+
+| | lambda = 10 (anchored) | lambda = 0 (no anchor) |
+|---|---|---|
+| L1-smooth ball | 0.529 (47.1%) at s = 3 | 0.531 (46.9%) at s = 3 |
+| unit ball | 0.537 (46.3%) at s = 10 | 0.533 (46.7%) at s = 7 |
+
+**Identical within noise.** The whole variance reduction comes from J; the anchor
+contributes none of it. That is the expected division of labour - the anchor
+exists to handle non-differentiability, not to accelerate - but it is worth
+having measured rather than assumed.
+
+Accuracy stays indistinguishable through the useful range of s (|t| <= 1.6 up to
+s = 4 on both geometries) and then degrades on the L1 ball exactly as before
+(s = 5 gives t = -12.7, s = 7 drives the projection rate to 0.50).
+
 ### Running in Colab
 
 The notebooks import `anchored_sgld.py`, which sits next to them in this
