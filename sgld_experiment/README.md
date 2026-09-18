@@ -575,7 +575,7 @@ prediction.
 
 ### Results (`nonreversible_beats_reversible.py`, `results_beat/`)
 
-L1-smooth ball — test accuracy, search seed, `R = 100`:
+L1-smooth ball — test accuracy, search seed, `R = 100`, 750 iterations:
 
 | iteration | reversible | non-reversible | paired diff | t |
 |---|---|---|---|---|
@@ -586,9 +586,7 @@ L1-smooth ball — test accuracy, search seed, `R = 100`:
 | 300 | 0.6654 | 0.7548 | +0.0895 | +11.7 |
 | 400 | 0.7075 | 0.7657 | +0.0582 | +10.4 |
 | 600 | 0.7594 | 0.7839 | +0.0244 | +8.1 |
-| 1000 | 0.7964 | 0.7992 | +0.0027 | +1.5 |
-| 1500 | 0.8065 | 0.8089 | +0.0023 | +2.0 |
-| 2000 | 0.8099 | 0.8095 | -0.0004 | -0.5 |
+| 750 | 0.7813 | 0.7916 | +0.0103 | +4.2 |
 
 unit ball:
 
@@ -601,9 +599,7 @@ unit ball:
 | 300 | 0.6456 | 0.7014 | +0.0558 | +13.0 |
 | 400 | 0.6764 | 0.7069 | +0.0304 | +10.3 |
 | 600 | 0.7063 | 0.7185 | +0.0121 | +7.2 |
-| 1000 | 0.7233 | 0.7232 | -0.0000 | -0.0 |
-| 1500 | 0.7267 | 0.7258 | -0.0009 | -0.9 |
-| 3000 | 0.7269 | 0.7273 | +0.0004 | +0.5 |
+| 750 | 0.7168 | 0.7213 | +0.0044 | +3.7 |
 
 Held-out sampler seeds at the evaluation iteration (100 on the L1
 ball, 90 on the unit ball), `R = 100` per seed:
@@ -662,7 +658,8 @@ map and the seven held-out confirmations — is in `results_beat/search/` as the
 ### Honest scope
 
 * It is a **convergence-speed** effect.  Both chains reach the same plateau
-  (final paired difference 0 +- 0.003) and the win is confined to the transient
+  (in 2000-iteration runs the final paired difference is 0 +- 0.003; the shipped
+  figures stop at 750 iterations, where the gap is still +0.010 / +0.004) and the win is confined to the transient
   `0.15 <~ eta a lambda_slow k <~ 1.5`; with `eta = 7e-6` that is iterations 30–600.
 * It is a **designed regime**: a low-variance, signal-carrying feature direction
   lying in the plane the block rotation sweeps, with strongly unequal feature scales

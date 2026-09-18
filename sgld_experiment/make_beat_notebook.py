@@ -125,7 +125,7 @@ for tag, (cfg, dataset, target, geometry) in setups.items():
 TABLE = '''rows = []
 for tag, (cfg, dataset, target, geometry) in setups.items():
     rev = results[tag]["Reversible anchored Langevin"]; nr = results[tag]["Non-reversible anchored Langevin"]
-    for k in (50, 100, 150, 200, 400, 600, 1000, cfg.n_iterations):
+    for k in sorted({k for k in (50, 100, 150, 200, 400, 600) if k < cfg.n_iterations} | {cfg.n_iterations}):
         i = int(np.argmin(np.abs(rev.checkpoints - k)))
         m, se, t = lasso.paired_difference(nr.test_accuracy[i], rev.test_accuracy[i])
         rows.append({"geometry": geometry.name, "iteration": int(rev.checkpoints[i]),
