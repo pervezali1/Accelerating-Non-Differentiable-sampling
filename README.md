@@ -634,3 +634,20 @@ coordinate, ×2.7–5.5 on the best, ×1.56 summed) and asymptotic variance of p
 sample the same law. Anyone wanting posterior functionals — credible intervals, predictive
 variances, expectations — should use the non-reversible arm. Anyone wanting a point prediction
 gains nothing from it.
+
+## Figures for the mixing win
+
+`mixing_figures.py` → `figures/mixing/` (300-dpi PNG + vector PDF each). All but the
+autocorrelation panel are rebuilt from the saved probe outputs; the ACF panel re-runs two short
+coupled chains. Palette: reversible `#1f5fbf` (circle), non-reversible `#1a9850` (square) —
+two categorical slots, validated (OKLab ΔE 27.0 normal / 25.6 deutan, both inside the lightness
+band, both ≥ 3:1 on the surface); marker shape is a secondary encoding so identity never rests
+on colour alone.
+
+| figure | what it shows |
+|---|---|
+| `mixing_ess_iact` | The headline. Per test function: IACT (lower better) and ESS per second (higher better), as paired dumbbells, with the speed-up direct-labelled. Eleven of twelve functions improve; `‖w‖²` is the one that does not. |
+| `mixing_acf` | The mechanism. Autocorrelation functions for the largest gain (`w₄`), the worst case (`w₇`) and the backfire (`‖w‖²`). `w₄` *oscillates* under the non-reversible dynamics — the rotation makes the chain circulate rather than diffuse — and crosses zero within ~50 iterations instead of decaying over ~300. |
+| `mixing_forest_w7` | The honesty panel. Eight measurements of the same quantity for the worst-case coordinate: six Geyer estimates across four seeds and two burn-ins, their pooled value (×1.23), and a truncation-free estimator whose bootstrap 95% interval **includes 1**. |
+| `mixing_bias_frontier` | The fairness panel. ESS/s against discretisation bias, both arms free to pick their own η. Read vertically at any bias level the green curve sits above the blue one — comparing points at *different* bias is not a fair comparison. |
+| `mixing_rmse_budget` | The caveat. RMSE of the posterior mean against compute budget, both arms re-optimised at each budget. Non-reversible is ×1.33 ahead at short budgets; the curves cross near T = 10 and the reversible arm wins beyond it. |
