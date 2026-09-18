@@ -1,9 +1,9 @@
 """Build ``simple_nonreversible_vs_reversible.ipynb`` -- a self-contained, explained notebook.
 
-Everything (data, U = f + g, U_0 = f + g_0, a(w), J_s, the update, the figures) is
-defined in the notebook itself; the only thing imported from the repository is the
-constraint set (uniform sampling on K and the Euclidean projection onto K).  The
-Colab variant additionally writes ``anchored_sgld.py`` next to itself.
+Everything (data, U = f + g, U_0 = f + g_0, a(w), the constraint sets with their
+projections, J_s, the update, the figures) is defined in the notebook itself; nothing
+is imported from the repository, so it runs anywhere (Colab included) with only
+numpy, scipy, scikit-learn, pandas and matplotlib.
 
     python make_simple_notebook.py
     jupyter nbconvert --execute --to notebook --ExecutePreprocessor.timeout=-1 \
@@ -36,9 +36,10 @@ held-out seed in a few seconds; the numbers then differ.
 **How to read this notebook.** Every ingredient is written out in its own cell:
 the data (1), the target $U=f+g$ (2), the anchor $U_0=f+g_0$ and $a(w)=e^{U-U_0}$ (3),
 the constraint sets and $J_s$ (4), the update rule (5), the runs (6), the figures (7),
-the numbers (8) and the explanation (9). The only thing imported from the repository is
-the constraint set: uniform sampling on $K$ and the Euclidean projection onto $K$
-(`anchored_sgld.BallGeometry`, `anchored_sgld.L1SmoothBallGeometry`).
+the numbers (8) and the explanation (9). Nothing is imported from the repository — the
+constraint sets, their uniform samplers and the Euclidean projections are written out in
+section 4 — so the notebook runs anywhere (Colab included) with numpy, scipy,
+scikit-learn, pandas and matplotlib.
 
 Notation: $d=9$ parameters, $w=(w_0,w_1,\dots,w_8)$ with $w_0$ the intercept;
 $x_j\in\mathbb R^9$ has a leading 1; $R$ replicate chains run in parallel as the rows of a
@@ -50,12 +51,6 @@ import matplotlib.pyplot as plt
 from IPython.display import display, Image
 from scipy.special import expit
 from sklearn.model_selection import train_test_split
-
-if not os.path.exists("anchored_sgld.py"):
-    raise FileNotFoundError("start the kernel in sgld_experiment/ (the folder containing anchored_sgld.py), "
-                            "or use the _colab notebook, which writes that file first")
-sys.path.insert(0, os.path.abspath("."))
-import anchored_sgld as nral          # ONLY for the constraint sets: sample_uniform(K) and project(K)
 
 QUICK           = os.environ.get("NRAL_QUICK", "0") == "1"
 R               = 20 if QUICK else 100        # replicate chains
@@ -209,9 +204,12 @@ M.append(("markdown", r"""## 4. The constraint sets and the skew-symmetric matri
 Two constraint sets $K$: the **unit ball** $\{\|w\|_2\le1\}$ and the **smoothed $L_1$ ball**
 $\{\sum_{i=0}^{8}\sqrt{w_i^2+\varepsilon^2}\le\Lambda\}$ with $\Lambda=9\varepsilon+r$ and
 $r=\|\beta_{\rm true}\|_1+1=5.6$, so $K$ is essentially the $L_1$ ball of radius $r$ with smoothed
-corners. After every step the chain is projected back onto $K$ (Euclidean projection; for the
-$L_1$ ball the KKT multiplier is found by bisection inside `anchored_sgld`, 80 steps, well
-below floating-point noise). Chains start uniformly distributed on $K$.
+corners. After every step the chain is projected back onto $K$ — the Euclidean projection,
+which for the $L_1$ ball is solved from its KKT conditions ($w_i=\mathrm{sign}(z_i)\,b_i$ with
+$b_i+\mu\,b_i/\sqrt{b_i^2+\varepsilon^2}=|z_i|$ and the multiplier $\mu\ge0$ found by bisection, 80
+steps, well below floating-point noise). Chains start uniformly distributed on $K$ (on the
+$L_1$ ball by rejection from the exact $L_1$ ball, whose uniform draws are
+$g/(\|g\|_1+E)$ with $g_i$ i.i.d. Laplace and $E$ exponential).
 
 $J_s(w)$ is block diagonal on the coordinate triples $I\in\{(0,1,2),(3,4,5),(6,7,8)\}$ and
 each block is a **cross-product matrix** $[v_I]_\times$, i.e. $(J_s\,u)_I=v_I\times u_I$, with
@@ -219,17 +217,66 @@ each block is a **cross-product matrix** $[v_I]_\times$, i.e. $(J_s\,u)_I=v_I\ti
 $$v_I=s\,w_I\ \ (\text{ball}),\qquad v_I=-s\,\nabla_I\,\Bigl(\textstyle\sum_i\sqrt{w_i^2+\varepsilon^2}\Bigr)=-s\,\frac{w_I}{\sqrt{w_I^2+\varepsilon^2}}\ \ (L_1\text{ ball}).$$
 
 (The sign of $s$ only fixes the sense of rotation; $-s$ for the $L_1$ ball is the convention of
-`anchored_sgld`.) Properties: $[v]_\times$ is skew-symmetric; $\nabla\!\cdot J=0$ (each block is
+the repository's `anchored_sgld.py`, kept here so the two implementations agree.) Properties: $[v]_\times$ is skew-symmetric; $\nabla\!\cdot J=0$ (each block is
 $[v_I(w_I)]_\times$ with $v_I$ a gradient, and the divergence of the cross-product matrix of a
 gradient vanishes), so no divergence correction is needed and $e^{-U}$ stays invariant; and
 $J_s n=0$, where $n$ is the outward normal of $\partial K$, because block by block $v_I\parallel n_I$,
 so the rotation is tangential to $\partial K$. The strength $s$ is the one tunable knob of the
 non-reversible method."""))
 
-M.append(("code", '''GEOMETRY = {
-    "l1":   nral.L1SmoothBallGeometry(9, EPSILON, float(np.abs(DATA["l1"]["beta"]).sum() + 1.0)),   # radius r = |beta|_1 + 1
-    "ball": nral.BallGeometry(9),
-}
+M.append(("code", '''class Ball:
+    """K = { |w|_2 <= 1 }."""
+    name = "unit ball"
+    def feasible(self, w):        return np.linalg.norm(w) <= 1.0 + 1e-9
+    def normal(self, w):          return w                                     # outward normal direction of the level sets
+    def sample_uniform(self, rng, n):                                          # Z * V^(1/d) / |Z|
+        Z = rng.standard_normal((n, 9)); radius = rng.random(n) ** (1.0 / 9)
+        return Z * (radius / np.linalg.norm(Z, axis=1))[:, None]
+    def project(self, z):                                                      # z if |z| <= 1 else z / |z|
+        norm = np.linalg.norm(z, axis=1); outside = norm > 1.0
+        w = z.copy(); w[outside] = z[outside] / norm[outside, None]
+        return w, outside
+
+class L1Ball:
+    """K = { sum_i sqrt(w_i^2 + eps^2) <= Lambda },  Lambda = 9 eps + r: the L1 ball of radius r with smoothed corners."""
+    name = "L1-smooth ball"
+    def __init__(self, r):        self.Lambda = 9 * EPSILON + r
+    def value(self, w):           return np.sqrt(w * w + EPSILON ** 2).sum(axis=-1)
+    def feasible(self, w):        return self.value(w) <= self.Lambda + 1e-9
+    def normal(self, w):          return w / np.sqrt(w * w + EPSILON ** 2)      # grad of the constraint function (soft-sign)
+    def sample_uniform(self, rng, n):
+        accepted, kept = [], 0                       # uniform on the exact L1 ball of radius Lambda, then reject to K
+        while kept < n:
+            size = max(n, 512)
+            lap = rng.laplace(0.0, 1.0, size=(size, 9)); ex = rng.exponential(1.0, size=size)
+            prop = self.Lambda * lap / (np.abs(lap).sum(axis=1) + ex)[:, None]
+            good = prop[self.value(prop) <= self.Lambda]; accepted.append(good); kept += len(good)
+        return np.vstack(accepted)[:n]
+    def _solve(self, z_abs, mu):                     # b + mu b / sqrt(b^2 + eps^2) = |z|,  b >= 0, by bisection on [0, |z|]
+        low, high = np.zeros_like(z_abs), z_abs.copy()
+        for _ in range(60):
+            mid = 0.5 * (low + high)
+            positive = mid + mu * mid / np.sqrt(mid * mid + EPSILON ** 2) > z_abs
+            high = np.where(positive, mid, high); low = np.where(positive, low, mid)
+        return 0.5 * (low + high)
+    def project(self, z):                            # Euclidean projection through the KKT system
+        outside = self.value(z) > self.Lambda; w = z.copy(); rows = np.nonzero(outside)[0]
+        if rows.size:
+            zr = z[rows]; sign, z_abs = np.sign(zr), np.abs(zr)
+            gap = lambda mu: self.value(self._solve(z_abs, mu[:, None])) - self.Lambda    # > 0 while mu is too small
+            low, high = np.zeros(rows.size), np.ones(rows.size)
+            for _ in range(200):                     # bracket the multiplier
+                need = gap(high) > 0.0
+                if not need.any(): break
+                high[need] *= 2.0
+            for _ in range(80):                      # bisect it
+                mid = 0.5 * (low + high); positive = gap(mid) > 0.0
+                low = np.where(positive, mid, low); high = np.where(positive, high, mid)
+            w[rows] = sign * self._solve(z_abs, (0.5 * (low + high))[:, None])
+        return w, outside
+
+GEOMETRY = {"l1": L1Ball(r=float(np.abs(DATA["l1"]["beta"]).sum() + 1.0)),     # r = |beta|_1 + 1
+            "ball": Ball()}
 for tag, geom in GEOMETRY.items():
     print(f"{tag:5s} -> {geom.name:<16} beta_true feasible: {bool(geom.feasible(DATA[tag]['beta']))}")
 
@@ -242,12 +289,17 @@ def apply_J(w, u, geometry, s):
     """Matrix-free J_s(w) u: block-wise cross products v_I x u_I.  w, u: (R, d)."""
     return np.cross(block_axes(w, geometry, s), u.reshape(u.shape[0], 3, 3)).reshape(u.shape)
 
-# checks: agrees with the repository's apply_J, and u . J u = 0 (skew-symmetry)
+# checks: u . J u = 0 (skew-symmetry), J n = 0 (the rotation is tangential to the constraint surface),
+# and the projection lands on K and is idempotent
 rng_J = np.random.default_rng(8)                                   # independent of the sanity-check cell
 wp, up = rng_J.normal(size=(50, 9)) * 0.3, rng_J.normal(size=(50, 9))
 for tag, geom in GEOMETRY.items():
-    mine, lib = apply_J(wp, up, geom, 3.0), nral.apply_J(wp, up, geom, np.array([3.0, 3.0, 3.0]))
-    print(f"{tag:5s} |apply_J - anchored_sgld.apply_J| = {np.abs(mine - lib).max():.1e};   max |u . J u| = {np.abs((up * mine).sum(axis=1)).max():.1e}")'''))
+    Ju = apply_J(wp, up, geom, 3.0)
+    z = rng_J.normal(size=(50, 9)) * 3.0                           # mostly outside K
+    w1, outside = geom.project(z); w2, _ = geom.project(w1)
+    excess = (np.linalg.norm(w1, axis=1) - 1.0).max() if tag == "ball" else (geom.value(w1) - geom.Lambda).max()
+    print(f"{tag:5s} max|u.Ju| = {np.abs((up * Ju).sum(axis=1)).max():.1e}   max|J n| = {np.abs(apply_J(wp, geom.normal(wp), geom, 3.0)).max():.1e}   "
+          f"projected {int(outside.sum())}/50 points: max constraint excess {excess:.1e}, idempotent to {np.abs(w2 - w1).max():.1e}")'''))
 
 M.append(("markdown", r"""## 5. The update
 
@@ -285,8 +337,8 @@ def run_chain(alpha, data, geometry, s, eta, streams):
         if alpha != 0.0:
             drift = drift + eta * alpha * ak * apply_J(w, grad, geometry, s)
         proposal = w + drift + np.sqrt(2.0 * eta * ak) * noise[:, k, :]
-        outcome = geometry.project(proposal)                       # back onto K
-        w = outcome.beta; n_projected += int(outcome.projected.sum())
+        w, projected = geometry.project(proposal)                  # back onto K
+        n_projected += int(projected.sum())
         if (k + 1) % CHECKPOINT == 0:
             checkpoints.append(k + 1); train.append(accuracy(w, X, y)); test.append(accuracy(w, Xt, yt))
     return dict(checkpoints=np.array(checkpoints), train=np.array(train), test=np.array(test),
@@ -443,15 +495,10 @@ plane). Both chains reach the same plateau; the effect is the transient between 
 start on $K$ and that plateau."""))
 
 
-def build(colab: bool) -> nbf.NotebookNode:
+def build() -> nbf.NotebookNode:
     nb = nbf.v4.new_notebook()
     cells = []
-    for i, (kind, src) in enumerate(M):
-        if colab and i == 1:
-            cells.append(nbf.v4.new_markdown_cell(
-                "## Colab bootstrap\n\n`anchored_sgld.py` (the constraint sets) is written next to the notebook so it runs anywhere."))
-            with open("anchored_sgld.py") as handle:
-                cells.append(nbf.v4.new_code_cell("%%writefile anchored_sgld.py\n" + handle.read()))
+    for kind, src in M:
         cells.append(nbf.v4.new_markdown_cell(src) if kind == "markdown" else nbf.v4.new_code_cell(src))
     nb.cells = cells
     nb.metadata["kernelspec"] = {"name": "python3", "display_name": "Python 3", "language": "python"}
@@ -459,7 +506,6 @@ def build(colab: bool) -> nbf.NotebookNode:
 
 
 if __name__ == "__main__":
-    for colab in (False, True):
-        nb = build(colab); nbf.validate(nb)
-        path = "simple_nonreversible_vs_reversible_colab.ipynb" if colab else "simple_nonreversible_vs_reversible.ipynb"
-        nbf.write(nb, path); print("wrote", path, f"({len(nb.cells)} cells)")
+    nb = build(); nbf.validate(nb)
+    nbf.write(nb, "simple_nonreversible_vs_reversible.ipynb")
+    print("wrote simple_nonreversible_vs_reversible.ipynb", f"({len(nb.cells)} cells)")

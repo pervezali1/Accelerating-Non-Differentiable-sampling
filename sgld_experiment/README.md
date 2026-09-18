@@ -680,12 +680,13 @@ map and the seven held-out confirmations — is in `results_beat/search/` as the
 
 ### A self-contained, explained notebook
 
-`simple_nonreversible_vs_reversible.ipynb` (executed copy and Colab variant alongside)
-defines everything in its own cells — the data, `U = f + g`, `U_0 = f + g_0` and
-`a(w)`, the constraint sets and `J_s`, the update, the runs, the figures and the
-paired/held-out numbers — importing only the constraint sets (uniform sampling on `K`
-and the projection) from `anchored_sgld`.  Its inline sampler reproduces the numbers
-of `nonreversible_beats_reversible.py` to the last digit (same seeds, same streams).
+`simple_nonreversible_vs_reversible.ipynb` (executed copy alongside) defines
+everything in its own cells — the data, `U = f + g`, `U_0 = f + g_0` and `a(w)`, the
+constraint sets with their uniform samplers and Euclidean projections, `J_s`, the
+update, the runs, the figures and the paired/held-out numbers.  It imports nothing
+from the repository, so it runs anywhere (Colab included) with numpy, scipy,
+scikit-learn, pandas and matplotlib.  Its inline sampler reproduces the numbers of
+`nonreversible_beats_reversible.py` to the last digit (same seeds, same streams).
 
 ### Reproduce
 
