@@ -1,0 +1,31 @@
+{
+  "unit ball": {
+    "pooled_diff": 0.0014874999999999988,
+    "pooled_se": 0.0005186081252991143,
+    "pooled_t": 2.8682543281443245,
+    "all_positive": true,
+    "confirmed": true
+  },
+  "L1-smooth ball": {
+    "pooled_diff": 0.0036937499999999948,
+    "pooled_se": 0.000577774173514884,
+    "pooled_t": 6.393068727058359,
+    "all_positive": true,
+    "confirmed": true
+  },
+  "config": {
+    "spread": 10.0,
+    "lambda_lasso": 2.0,
+    "s": 5.0,
+    "eta": 7.87e-06,
+    "evaluate_at": 1000,
+    "n_repeats": 100,
+    "n_iterations": 2000
+  },
+  "figures": [
+    "results_win/accuracy_ball.png",
+    "results_win/accuracy_ball.pdf",
+    "results_win/accuracy_l1.png",
+    "results_win/accuracy_l1.pdf"
+  ]
+}

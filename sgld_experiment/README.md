@@ -389,6 +389,54 @@ Accuracy stays indistinguishable through the useful range of s (|t| <= 1.6 up to
 s = 4 on both geometries) and then degrades on the L1 ball exactly as before
 (s = 5 gives t = -12.7, s = 7 drives the projection rate to 0.50).
 
+### Beating the reversible baseline on accuracy
+
+`nonreversible_win.py` -> `results_win/`. **Confirmed on both constraint sets.**
+
+Every earlier accuracy attempt failed for a structural reason, not a tuning one.
+`J` is block diagonal on the coordinate triples (0,1,2), (3,4,5), (6,7,8),
+because it is built from the *constraint* geometry. A non-reversible
+perturbation accelerates convergence by coupling the slow and fast directions of
+the *target*. If the target's slow directions span blocks - as under an
+isotropic or an AR(1) design - `J` simply cannot reach them.
+
+The linearised per-iteration rate `-log rho(I - eta a (I - alpha J) H)`, with `H`
+the Hessian of `U0` at the mode, makes that quantitative:
+
+| design | best speed-up |
+|---|---|
+| isotropic X ~ N(0, 2I) | 1.10x |
+| AR(1) rho_x = 0.99 | 2.24x |
+| **block-anisotropic (inside each triple)** | **4.86x** |
+
+So align the target's anisotropy with `J`'s block structure, and run where
+convergence rather than the Bayes ceiling limits accuracy. Two conditions must
+hold together: `eta` small enough that the reversible chain is still converging
+at the evaluation point, and `s` large enough to matter but small enough that the
+projection stays inactive. (The first attempt at the theory-optimal `s` failed
+badly - projection rate 0.996 - because the linearisation sees local stability
+but not step size relative to the domain.)
+
+Configuration: block-anisotropic design with `Sigma_X` eigenvalues (10, 1, 0.1)
+inside each triple, `lambda = 2`, `s = 5`, `eta = 7.87e-6`, exact gradient,
+R = 100, evaluated at iteration 1000.
+
+| | REV | NR | pooled held-out diff | t | all positive |
+|---|---|---|---|---|---|
+| **L1-smooth ball** | 0.6921 | 0.6951 | **+0.00369** (SE 0.00058) | **+6.39** | yes |
+| unit ball | 0.6912 | 0.6939 | **+0.00149** (SE 0.00052) | **+2.87** | yes |
+
+Four held-out sampler seeds each, every one positive, projection rate 0.0000 and
+no non-finite states. The trajectory has the signature of a convergence-rate
+effect: on the L1 ball the gap peaks mid-run (t = +6.0 at iteration 400, +5.5 at
+600) and closes by iteration 1500 as the reversible chain catches up.
+
+**Scope.** This is a convergence-rate advantage at a fixed iteration budget, not
+a better fixed point - both methods target the same posterior, and the gap closes
+if you run long enough. It required choosing the design so that `J` can reach the
+target's slow directions; on the originally specified isotropic design no
+configuration achieves it, and this README does not claim otherwise.
+
 ### Running in Colab
 
 The notebooks import `anchored_sgld.py`, which sits next to them in this

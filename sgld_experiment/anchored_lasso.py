@@ -565,3 +565,49 @@ def run_both(dataset: Dataset, target: LassoTarget, geometry: Geometry,
                   f"proj {run.projection_rate:.3f}  ||aJg||/||g|| {run.drift_ratio:.2f}  "
                   f"nonfinite {run.n_nonfinite}  {run.runtime:5.1f}s", flush=True)
     return results
+
+
+def make_block_anisotropic_dataset(
+    cfg: LassoConfig,
+    eigenvalues: tuple[float, ...] = (100.0, 1.0, 0.01),
+    seed: int | None = None,
+) -> Dataset:
+    """Design whose anisotropy lives INSIDE each coordinate triple.
+
+    ``Sigma_X`` is block diagonal on the slope coordinates, matching the block
+    structure of ``J``, with each 3x3 block a random rotation of
+    ``diag(eigenvalues)``.
+
+    Why this matters.  ``J`` is built from the *constraint* geometry and is block
+    diagonal on the triples ``(0,1,2), (3,4,5), (6,7,8)``, so it can only rotate
+    *within* a triple.  A non-reversible perturbation accelerates convergence by
+    coupling slow and fast directions of the target; if the target's slow
+    directions span blocks (as under an AR(1) design) ``J`` cannot reach them.
+    Putting the anisotropy inside the blocks aligns the two structures.  The
+    linearised per-iteration rate ``-log rho(I - eta a (I - alpha J) H)`` rises
+    from a 1.1x speed-up on the isotropic design and 2.2x under AR(1) to over 5x
+    here.
+    """
+    rng = np.random.default_rng(cfg.data_seed if seed is None else seed)
+    n_features = cfg.d - 1
+    values = np.asarray(eigenvalues, dtype=float)
+    Sigma = np.zeros((n_features, n_features))
+    for start in range(0, n_features - n_features % 3, 3):
+        rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+        Sigma[start:start + 3, start:start + 3] = (
+            rotation @ np.diag(values) @ rotation.T)
+    remainder = n_features % 3
+    if remainder:
+        rotation, _ = np.linalg.qr(rng.normal(size=(remainder, remainder)))
+        Sigma[-remainder:, -remainder:] = (
+            rotation @ np.diag(values[:remainder]) @ rotation.T)
+
+    Z = rng.multivariate_normal(np.zeros(n_features), Sigma, size=cfg.n_total)
+    X = np.hstack([np.ones((cfg.n_total, 1)), Z])
+    beta_true = cfg.beta_true()
+    y = (rng.uniform(size=cfg.n_total) <= expit(X @ beta_true)).astype(float)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=cfg.test_fraction, random_state=cfg.split_seed,
+        stratify=y, shuffle=True)
+    return Dataset(np.ascontiguousarray(X_train), y_train,
+                   np.ascontiguousarray(X_test), y_test, beta_true)
