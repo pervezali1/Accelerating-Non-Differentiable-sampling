@@ -60,9 +60,9 @@ Y_LIMITS = (0.40, 0.90)      # fixed, un-windowed: initialisation ~0.50, Bayes c
 # and its design variances quadrupled (identical logits, 4x the curvature).
 CONFIGS = {
     "l1":   dict(v_axis=1.0, v_fast=64.0, v_slow=2.0, b=1.5, e=0.25, b1=0.3, block_1_variance=1.0,
-                 s=4.0, eta=7e-6, epsilon=0.2, n_iterations=750, evaluate_at=100),
+                 s=4.0, eta=7e-6, epsilon=0.2, n_iterations=1000, evaluate_at=100),
     "ball": dict(v_axis=4.0, v_fast=256.0, v_slow=4.0, b=0.5, e=0.125, b1=0.15, block_1_variance=4.0,
-                 s=16.0, eta=2e-6, epsilon=0.2, n_iterations=750, evaluate_at=90),
+                 s=16.0, eta=2e-6, epsilon=0.2, n_iterations=1000, evaluate_at=90),
 }
 
 
