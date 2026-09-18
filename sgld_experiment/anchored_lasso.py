@@ -611,3 +611,175 @@ def make_block_anisotropic_dataset(
         stratify=y, shuffle=True)
     return Dataset(np.ascontiguousarray(X_train), y_train,
                    np.ascontiguousarray(X_test), y_test, beta_true)
+
+
+def make_aligned_design_dataset(
+    cfg: LassoConfig,
+    kappa: float = 100.0,
+    base_variance: float = 2.0,
+    seed: int | None = None,
+) -> Dataset:
+    """Design chosen from the theory of the block cross-product ``J``.
+
+    Within a coordinate triple ``J_I = s [v]_x`` rotates in the plane
+    perpendicular to ``v`` (``v = w*_I`` on the ball).  With block-Hessian
+    eigenpairs ``(lambda_1 >= lambda_2 >= lambda_3)``, the rotation only helps the
+    directions it touches: if the slow direction ``q_3`` is perpendicular to
+    ``v`` its rate is replaced, for ``s|v| >= (lambda_2-lambda_3)/(2 sqrt(lambda_2
+    lambda_3))``, by the arithmetic mean ``(lambda_2+lambda_3)/2`` -- a speed-up of
+    ``(kappa+1)/2`` with ``kappa = lambda_2/lambda_3``.  If instead ``q_3`` is the
+    rotation axis it is untouched and there is no gain.
+
+    So the design puts, in every triple, ONE low-variance feature direction
+    (variance ``base_variance/kappa``) perpendicular to ``beta_true_I``, and keeps
+    the rest isotropic at ``base_variance``.  The slow posterior mode is then
+    exactly the direction ``J`` rotates.  Keeping ``beta`` in the high-variance
+    plane also keeps the linear predictor on the O(1) scale, so ``p(1-p)`` does not
+    collapse and the Fisher curvature stays where the theory assumes it is.
+
+    Block 1 holds the intercept (constant column), so its slow direction lives in
+    the 2-d slope sub-block and is the unique direction perpendicular to
+    ``(beta_1, beta_2)`` there.
+    """
+    rng = np.random.default_rng(cfg.data_seed if seed is None else seed)
+    beta_true = cfg.beta_true()
+    n_slopes = cfg.d - 1
+    Sigma = base_variance * np.eye(n_slopes)
+
+    def perpendicular(vector: np.ndarray) -> np.ndarray:
+        """A deterministic unit vector perpendicular to ``vector``."""
+        vector = vector / np.linalg.norm(vector)
+        probe = np.zeros_like(vector)
+        probe[int(np.argmin(np.abs(vector)))] = 1.0
+        q = probe - (probe @ vector) * vector
+        return q / np.linalg.norm(q)
+
+    # Slope coordinates are 1..8 (0 is the intercept).  Blocks on ALL coordinates
+    # are (0,1,2), (3,4,5), (6,7,8); in slope indexing: (0,1), (2,3,4), (5,6,7).
+    blocks_in_slope_index = [(0, 1), (2, 3, 4), (5, 6, 7)]
+    for block in blocks_in_slope_index:
+        idx = np.asarray(block)
+        beta_block = beta_true[idx + 1]
+        q_slow = perpendicular(beta_block)
+        Sigma[np.ix_(idx, idx)] -= (base_variance - base_variance / kappa) * np.outer(q_slow, q_slow)
+
+    Z = rng.multivariate_normal(np.zeros(n_slopes), Sigma, size=cfg.n_total)
+    X = np.hstack([np.ones((cfg.n_total, 1)), Z])
+    y = (rng.uniform(size=cfg.n_total) <= expit(X @ beta_true)).astype(float)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=cfg.test_fraction, random_state=cfg.split_seed,
+        stratify=y, shuffle=True)
+    return Dataset(np.ascontiguousarray(X_train), y_train,
+                   np.ascontiguousarray(X_test), y_test, beta_true)
+
+
+def inplane_design(
+    v_axis: float, v_fast: float, v_slow: float, b: float, e: float,
+    b1: float = 0.3, block_1_variance: float = 1.0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Slope covariance and ``beta`` that put the slow direction where ``J`` rotates.
+
+    In each slope triple ``(3,4,5)`` and ``(6,7,8)`` the covariance is
+    ``v_axis q1 q1' + v_fast q2 q2' + v_slow q3 q3'`` with ``q1 = (1,1,1)/sqrt3``
+    (the L1 rotation axis when the three coefficients are positive), ``q2 =
+    (0,1,-1)/sqrt2`` (fast partner, ``q2 . beta = 0`` so it carries no signal)
+    and ``q3 = (2,-1,-1)/sqrt6`` (slow, perpendicular to the axis, and
+    signal-carrying because ``beta_triple = (b, e, e)`` with ``b > e``).  Block 1
+    (intercept + slopes 1, 2) is isotropic with variance ``block_1_variance`` and
+    coefficients ``(0, b1, b1)``.  Returns ``(Sigma_8x8, beta_9)``.
+    """
+    q1 = np.ones(3) / np.sqrt(3.0)
+    q2 = np.array([0.0, 1.0, -1.0]) / np.sqrt(2.0)
+    q3 = np.array([2.0, -1.0, -1.0]) / np.sqrt(6.0)
+    block = v_axis * np.outer(q1, q1) + v_fast * np.outer(q2, q2) + v_slow * np.outer(q3, q3)
+    Sigma = block_1_variance * np.eye(8)
+    Sigma[2:5, 2:5] = block
+    Sigma[5:8, 5:8] = block
+    beta = np.array([0.0, b1, b1, b, e, e, b, e, e])
+    return Sigma, beta
+
+
+def make_scaled_dataset(
+    cfg: LassoConfig,
+    variances: tuple[float, ...],
+    beta: tuple[float, ...],
+    seed: int | None = None,
+) -> Dataset:
+    """Independent slope features with UNEQUAL scales and an explicit ``beta``.
+
+    ``Z_j ~ N(0, variances[j])`` for the eight slopes (or ``Z ~ N(0, Sigma)``
+    when ``variances`` is a full 8x8 covariance), a column of ones for the
+    intercept, and ``beta`` the full 9-vector (intercept first).  This is the
+    "unstandardised covariates" situation.  The Hessian of ``U0`` at the mode is
+    ``X^T W X`` and inherits the feature scales, so a low-variance coordinate is a
+    SLOW posterior direction that still carries whatever signal its coefficient
+    gives it -- unlike the random-rotation and aligned designs, where the slow
+    direction was either randomly placed or deliberately signal-free.
+
+    The block cross-product ``J`` rotates within the triples ``(0,1,2), (3,4,5),
+    (6,7,8)`` about the axis ``v_I = s w_I`` (ball) or ``v_I = -s grad g(w_I)``,
+    i.e. a soft-sign of ``w_I`` (L1).  On the ball the axis at the mode is the
+    mode itself, so the rotation never touches the direction of ``w*_I``; under
+    the L1 geometry the axis is the (nearly) democratic sign vector, so every
+    coordinate axis keeps a component of size ``sqrt(2/3)`` in the rotated plane.
+    """
+    rng = np.random.default_rng(cfg.data_seed if seed is None else seed)
+    n_slopes = cfg.d - 1
+    variances = np.asarray(variances, dtype=float)
+    beta_true = np.asarray(beta, dtype=float)
+    if beta_true.shape != (cfg.d,):
+        raise ValueError("beta needs d entries")
+    if variances.shape == (n_slopes,):
+        Z = rng.normal(size=(cfg.n_total, n_slopes)) * np.sqrt(variances)
+    elif variances.shape == (n_slopes, n_slopes):
+        # a full slope covariance: lets a block's slow direction be any unit
+        # vector (e.g. one perpendicular to the sign vector of beta_I)
+        Z = rng.multivariate_normal(np.zeros(n_slopes), variances, size=cfg.n_total)
+    else:
+        raise ValueError("variances needs d-1 entries or a (d-1)x(d-1) covariance")
+    X = np.hstack([np.ones((cfg.n_total, 1)), Z])
+    y = (rng.uniform(size=cfg.n_total) <= expit(X @ beta_true)).astype(float)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=cfg.test_fraction, random_state=cfg.split_seed,
+        stratify=y, shuffle=True)
+    return Dataset(np.ascontiguousarray(X_train), y_train,
+                   np.ascontiguousarray(X_test), y_test, beta_true)
+
+
+def hessian_U0(target: LassoTarget, w: np.ndarray) -> np.ndarray:
+    """Hessian of the smooth anchor at ``w`` (data curvature + priors + anchor)."""
+    p = expit(target.X @ w)
+    weights = p * (1.0 - p)
+    H = (target.X * weights[:, None]).T @ target.X
+    H[0, 0] += 1.0 / target.sigma_intercept ** 2
+    slopes = np.arange(1, target.d)
+    H[slopes, slopes] += (target.lambda_lasso * target.delta_anchor ** 2
+                          / (w[1:] ** 2 + target.delta_anchor ** 2) ** 1.5)
+    return H
+
+
+def linearised_rates(target: LassoTarget, geometry: Geometry, w: np.ndarray,
+                     scales: np.ndarray, eta: float) -> dict[str, float]:
+    """Per-iteration convergence rates ``-log rho(I - eta a M)`` at the mode.
+
+    ``M = H`` for the reversible chain and ``(I - J) H`` for the non-reversible
+    one (sign convention of the sampler).  Returns both rates, the speed-up, and
+    the implied number of iterations to relax by one e-fold.
+    """
+    H = hessian_U0(target, w)
+    a = float(target.a(w))
+    J = build_J(w, geometry, scales)
+    d = H.shape[0]
+
+    def rate(M):
+        rho = np.abs(np.linalg.eigvals(np.eye(d) - eta * a * M)).max()
+        return float(-np.log(rho)) if rho < 1.0 else float("-inf")
+
+    r_rev, r_nr = rate(H), rate((np.eye(d) - J) @ H)
+    eig = np.linalg.eigvalsh(H)
+    return {"rate_rev": r_rev, "rate_nr": r_nr,
+            "speed_up": (r_nr / r_rev if r_rev > 0 else float("nan")),
+            "relax_rev": (1.0 / r_rev if r_rev > 0 else float("inf")),
+            "relax_nr": (1.0 / r_nr if r_nr > 0 else float("inf")),
+            "lambda_min": float(eig.min()), "lambda_max": float(eig.max()),
+            "a_at_mode": a, "stable_rev": np.isfinite(r_rev), "stable_nr": np.isfinite(r_nr)}

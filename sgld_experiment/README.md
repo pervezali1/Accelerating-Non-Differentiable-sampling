@@ -505,3 +505,181 @@ effect is real but small and geometry-dependent.
 * It is a paired, held-out-confirmed result, not a single lucky configuration —
   but it is one data set, one split, and one constraint set (the unit ball).
 * Accuracy still says nothing about posterior fidelity; see the limitations above.
+
+## Beating the reversible baseline by a wide margin: put the slow direction where `J` rotates
+
+Everything above found at most a +0.004 accuracy gain, and the previous turn ended
+with a "ceiling" argument: slow posterior directions are low-Fisher directions, so
+they barely affect predictions.  That argument is incomplete.  It assumed the slow
+direction was placed *randomly* (block-anisotropic design) or *signal-free*
+(`aligned` design).  The theory of the block cross-product `J` says exactly where a
+slow direction has to be for the rotation to help, and once it is put there — and
+made to carry signal — the non-reversible sampler wins by **+0.16 to +0.20 in test
+accuracy**, visible on an un-windowed axis, confirmed on held-out seeds with
+`R = 100`, on both constraint sets.
+
+![L1](results_beat/accuracy_l1.png)
+![ball](results_beat/accuracy_ball.png)
+
+### The theory that locates the win
+
+Within a coordinate triple `I`, `J_I = [v_I]_x` rotates only in the plane
+**perpendicular to its axis** `v_I` (`v_I = s w_I` on the ball, `v_I = -s grad_I
+g_eps(w)` — a soft-sign of `w_I` — under the smoothed L1 ball).  Linearising the drift
+`-eta a (I - J) H` at the mode, with block-Hessian eigenpairs
+`lambda_1 >= lambda_2 >= lambda_3`:
+
+* **In-plane slow direction.**  If the slow eigenvector `q_3` lies in the rotated
+  plane with partner `q_2`, the two continuous-time rates become
+  `(lambda_2 + lambda_3)/2 +- sqrt((lambda_2 - lambda_3)^2/4 - sigma^2 lambda_2 lambda_3)`,
+  `sigma = s|v_I|`.  For `sigma >= sigma* = (lambda_2 - lambda_3)/(2 sqrt(lambda_2 lambda_3))`
+  the slow rate is replaced by the arithmetic mean: a speed-up of `(kappa + 1)/2`,
+  `kappa = lambda_2/lambda_3`.  In discrete time the rate is largest exactly at
+  `sigma*` and the pair is stable while
+  `sigma^2 < (lambda_2 + lambda_3)/(eta a lambda_2 lambda_3) - 1`.
+* **Axis theorem.**  A slow direction *along* the axis is untouched for every `s`;
+  an oblique one (angle `theta` to the axis) is capped at a speed-up of about
+  `1/cos^2(theta)`, and then the binding stability limit is the *fast* pair,
+  `s |v_I| cos(theta) < sqrt(2/(eta a lambda_fast) - 1)`.  On the ball the axis at the
+  mode is `w*_I` itself, so the ball can never accelerate the direction of the
+  block's dominant coefficient — this is why the `aligned` design and every ball
+  attempt with signal on the slow coordinate gave nothing.  Under L1 the axis is
+  the soft-sign, `~(1,1,1)/sqrt3` when the three coefficients are positive, so a
+  direction such as `(2,-1,-1)/sqrt6` is *in the plane* and still carries signal.
+* **Accuracy gap.**  A residual `Delta_j` along a direction with feature variance
+  `v_j` perturbs the test logits by `sqrt(v_j)|Delta_j|`; near the optimum the
+  accuracy loss is `~f(0) delta^2/4` (`f` the density of the true logit at 0),
+  saturating at `delta ~ 1`.  The gap is large when a slow direction carries an
+  O(1) share of the logit variance *and* an O(1) initial residual, and it is a
+  transient: both chains reach the same plateau.
+
+So the design (`anchored_lasso.inplane_design`, "unstandardised covariates") gives each
+slope triple the covariance `v_axis q1 q1' + v_fast q2 q2' + v_slow q3 q3'` with
+`q1 = (1,1,1)/sqrt3` (axis), `q2 = (0,1,-1)/sqrt2` (fast, `q2 . beta = 0`, no signal)
+and `q3 = (2,-1,-1)/sqrt6` (slow, in the rotated plane, signal-carrying because
+`beta_I = (b, e, e)` with `b > e`).  Headline configuration: `v = (1, 64, 2)`,
+`beta_I = (1.5, 0.25, 0.25)`, `lambda = 2`, `delta = 0.02`, `eps = 0.2`, `s = 4`,
+`eta = 7e-6`, `R = 100`, uniform initialisation on `K`; on the unit ball `beta` is
+halved and the variances quadrupled (`s = 16`, `eta = 2e-6`).
+
+Three independent theory agents re-derived and attacked these claims (linear
+algebra, an exactly solvable toy model, and an adversary).  All three confirmed the
+`sigma*` / `(lambda_2 + lambda_3)/2` algebra and the axis theorem, and supplied the
+corrections now folded in above: the exact `-1` in the stability edge, the fact that
+the discrete-time speed-up peaks *at* `sigma*`, the oblique-axis cap and the
+fast-pair limit, the observation that what matters is `v_j Delta_j(0)^2` (the
+initial residual can come from the initialisation rather than from `beta`), and the
+fact that with uniform initialisation the L1 axis starts out fully democratic
+(`|w_i(0)| > eps`) which makes the early transient *better* than the mode-linearised
+prediction.
+
+### Results (`nonreversible_beats_reversible.py`, `results_beat/`)
+
+L1-smooth ball — test accuracy, search seed, `R = 100`:
+
+| iteration | reversible | non-reversible | paired diff | t |
+|---|---|---|---|---|
+| 50 | 0.5276 | 0.6130 | +0.0854 | +6.3 |
+| 100 | 0.5568 | 0.7220 | +0.1652 | +14.8 |
+| 150 | 0.5846 | 0.7354 | +0.1508 | +14.6 |
+| 200 | 0.6120 | 0.7433 | +0.1313 | +13.2 |
+| 300 | 0.6654 | 0.7548 | +0.0895 | +11.7 |
+| 400 | 0.7075 | 0.7657 | +0.0582 | +10.4 |
+| 600 | 0.7594 | 0.7839 | +0.0244 | +8.1 |
+| 1000 | 0.7964 | 0.7992 | +0.0027 | +1.5 |
+| 1500 | 0.8065 | 0.8089 | +0.0023 | +2.0 |
+| 2000 | 0.8099 | 0.8095 | -0.0004 | -0.5 |
+
+unit ball:
+
+| iteration | reversible | non-reversible | paired diff | t |
+|---|---|---|---|---|
+| 50 | 0.5299 | 0.6316 | +0.1017 | +10.7 |
+| 100 | 0.5558 | 0.6759 | +0.1200 | +15.2 |
+| 150 | 0.5813 | 0.6839 | +0.1027 | +14.4 |
+| 200 | 0.6035 | 0.6905 | +0.0870 | +13.7 |
+| 300 | 0.6456 | 0.7014 | +0.0558 | +13.0 |
+| 400 | 0.6764 | 0.7069 | +0.0304 | +10.3 |
+| 600 | 0.7063 | 0.7185 | +0.0121 | +7.2 |
+| 1000 | 0.7233 | 0.7232 | -0.0000 | -0.0 |
+| 1500 | 0.7267 | 0.7258 | -0.0009 | -0.9 |
+| 3000 | 0.7269 | 0.7273 | +0.0004 | +0.5 |
+
+Held-out sampler seeds at the evaluation iteration (100 on the L1
+ball, 90 on the unit ball), `R = 100` per seed:
+
+L1-smooth ball:
+
+| seed offset | reversible | non-reversible | paired diff | t |
+|---|---|---|---|---|
+| 101 | 0.5579 | 0.7070 | +0.1490 | +14.4 |
+| 202 | 0.5492 | 0.7189 | +0.1697 | +13.7 |
+| 303 | 0.5501 | 0.7107 | +0.1606 | +15.0 |
+| 404 | 0.5307 | 0.7071 | +0.1764 | +15.2 |
+| **pooled** | | | **+0.1639** (SE 0.0056) | **+29.1** |
+
+unit ball:
+
+| seed offset | reversible | non-reversible | paired diff | t |
+|---|---|---|---|---|
+| 101 | 0.5373 | 0.6784 | +0.1410 | +15.3 |
+| 202 | 0.5458 | 0.6744 | +0.1286 | +15.5 |
+| 303 | 0.5430 | 0.6656 | +0.1225 | +14.6 |
+| 404 | 0.5417 | 0.6730 | +0.1313 | +13.0 |
+| **pooled** | | | **+0.1309** (SE 0.0045) | **+29.0** |
+
+Projection rate of the non-reversible chain: 0.0000 (L1),
+0.0054 (ball); no non-finite iterates.  Bayes ceiling on
+the test set: 0.8156 (L1 design), 0.7366
+(ball design).
+
+### The parameter range (`results_beat/parameter_map.md`, `build_parameter_map.py`)
+
+A one-factor-at-a-time map around the L1 configuration, `R = 60`, 1500 iterations,
+paired differences with shared noise.  "Wins" = peak gap `>= 0.03` with `t >= 3`.
+
+| factor | wins | ties | loses / unstable |
+|---|---|---|---|
+| anisotropy `kappa = v_fast/v_slow` | `kappa >= 4`; the gap grows with `kappa` (+0.05 at 4, +0.09 at 8, +0.13 at 16, +0.18 at 32) and saturates for `kappa >= 32` | `kappa <= 2` | — |
+| block strength `s` | `0.5 <= s <= 12` (peak gap +0.03 at 0.5, +0.14 at 2, +0.18 at 4, +0.21 at 12) | `s = 0` | `s >= 16`: projection fires on 33% of steps, late deficit |
+| step size `eta` | `2e-6 <= eta <= 6e-5`; the peak iteration scales as `1/eta` (340 at 2e-6, 10 at 6e-5), the peak height does not | — | `eta = 1e-4`: `eta a lambda_max > 2`, projection rate 0.61 |
+| `lambda_lasso`, `delta` | every value tried (`lambda` in [0, 30], `delta` in [0.002, 0.1]): +0.17 to +0.18 | — | — |
+| sample size `n_total` | 250 to 8000, all +0.15 to +0.18; the peak iteration scales as `1/n` | — | — |
+| initialisation | uniform on `K` (+0.18); antipodal `-beta` (+0.65: the reversible chain is stuck predicting the wrong sign) | origin (+0.01: the residual is then a shrinkage of the signal, which barely changes predictions) | — |
+| slow-direction coefficient `b` | `b >= 0.5` (+0.06 at 0.5, +0.15 at 1, +0.18 at 1.5) | `b = 0.25` (+0.02) | — |
+| axis variance `v_axis` | 0.25 to 4 (+0.15 to +0.18); 16 halves the gap (saturated logits) | — | — |
+| smoothing `eps`, L1 radius | every value tried (`eps` in [0.01, 0.5]; radius from `|beta|_1 - 1` to `+6`) | — | — |
+| geometry | L1 (`q3` in the rotated plane); ball needs `kappa >= 64`, `s >= 8`, `eta <= 5e-6` (+0.10 to +0.13, held-out `t = 24`–`29`) | — | ball with the slow direction along `w*_I` (axis theorem) |
+| where the slow direction points | in the plane perpendicular to the axis (this design) | isotropic (`kappa = 1`); signal-free slow direction (`aligned`) | on a coordinate axis, oblique to the L1 axis (round 1, 288 configs): at most +0.06, and a late deficit for `s >= 4` |
+| evaluation iteration | `0.15 <~ eta a lambda_slow k <~ 1.5` | later: both chains converged, gap 0 +- 0.003 | — |
+
+The raw search behind the map — 288 oblique-axis configurations (round 1), 384
+in-plane configurations (round 2), 30 ball configurations (round 3), the 64-point
+map and the seven held-out confirmations — is in `results_beat/search/` as the
+`hunt_helper.py` configs and outputs, and `parameter_sweep.py` re-runs any of them
+(`python parameter_sweep.py results_beat/search/round2_configs.json out.jsonl`).
+
+### Honest scope
+
+* It is a **convergence-speed** effect.  Both chains reach the same plateau
+  (final paired difference 0 +- 0.003) and the win is confined to the transient
+  `0.15 <~ eta a lambda_slow k <~ 1.5`; with `eta = 7e-6` that is iterations 30–600.
+* It is a **designed regime**: a low-variance, signal-carrying feature direction
+  lying in the plane the block rotation sweeps, with strongly unequal feature scales
+  (`kappa >= 4`).  On the isotropic design of the original specification nothing
+  changes; on the random-rotation block-anisotropic design the gain is +0.004.
+* Beyond the stability edge (`s >= 16` here, or `eta = 1e-4`) the non-reversible
+  chain is worse: the rotation overshoots, the projection fires, and a stationary
+  deficit appears.  The window is wide (`s` from 0.5 to 12 at `eta = 7e-6`) but it is
+  a window.
+* The antipodal-initialisation number (+0.65) is a curiosity, not a claim: starting at
+  `-beta` is not a fair start.
+
+### Reproduce
+
+```
+python nonreversible_beats_reversible.py            # figures, trajectory, held-out, summary (about 7 min)
+python make_beat_notebook.py                        # accuracy_curves_beat.ipynb and the Colab variant
+python build_parameter_map.py                       # tables from results_beat/search
+python parameter_sweep.py results_beat/search/map_configs.json map.jsonl --workers 3
+```
