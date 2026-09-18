@@ -105,6 +105,16 @@ from scipy import stats as sp_stats
 
 import arviz as az
 
+# Exact multivariate optimal transport is optional: the script degrades
+# gracefully to sliced Wasserstein (which needs nothing beyond NumPy) when the
+# POT package is absent.
+try:
+    import ot as pot  # POT: Python Optimal Transport
+
+    HAS_POT = True
+except ImportError:  # pragma: no cover
+    HAS_POT = False
+
 
 # =============================================================================
 # 1. CONFIGURATION SECTION  (all tunable parameters live here)
@@ -149,6 +159,16 @@ class Config:
 
     # --- reference sample (exact truncated Laplace, for bias assessment) ---
     n_reference: int = 200_000
+
+    # --- Wasserstein accuracy diagnostics ---
+    n_wasserstein: int = 20_000     # draws used per configuration; kept IDENTICAL
+                                    # across configurations because empirical
+                                    # Wasserstein distances shrink with n.
+    n_sliced_projections: int = 200  # random directions for sliced W_p in R^3
+    n_wasserstein_grid: int = 1_000  # quantile grid for the 1-D projections
+    n_ot_exact: int = 3_000          # subsample size for exact (POT) W_2
+    n_floor_reps: int = 5            # repetitions when estimating the MC floor
+    wasserstein_seed: int = 777
 
     # --- I/O ---
     outdir: str = "pnral_outputs"
@@ -528,8 +548,14 @@ def to_inference_data(draws: np.ndarray) -> az.InferenceData:
 
 
 def summarize_run(run: Dict[str, object], cfg: Config,
-                  reference: np.ndarray | None = None) -> Dict[str, float]:
-    """ESS, ESS/s, R-hat, integrated autocorrelation time, accuracy vs reference."""
+                  reference: np.ndarray | None = None,
+                  wref: Dict[str, object] | None = None) -> Dict[str, float]:
+    """ESS, ESS/s, R-hat, integrated autocorrelation time, accuracy vs reference.
+
+    `wref` (built by `build_wasserstein_reference`) switches on the Wasserstein
+    block: fixed-size comparison against a frozen reference subsample plus the
+    ESS-matched Monte-Carlo floor.
+    """
     draws = run["draws"]
     idata = to_inference_data(draws)
     ess = az.ess(idata)
@@ -582,6 +608,40 @@ def summarize_run(run: Dict[str, object], cfg: Config,
         row["bias_mean_abs_x1"] = row["mean_abs_x1"] - float(np.abs(reference[:, 0]).mean())
         row["bias_mean_radius"] = row["mean_radius"] - float(
             np.linalg.norm(reference, axis=1).mean())
+
+    if wref is not None:
+        # Same n_w for every configuration, and the same frozen reference
+        # subsample, so the numbers are directly comparable across alpha and h.
+        rng = np.random.default_rng(cfg.wasserstein_seed)
+        n_w = int(wref["n_w"])
+        n_chains = draws.shape[0]
+        n_per_chain = n_w // n_chains
+
+        # Balanced subsample: the SAME number of draws from every chain, so the
+        # pooled cloud is exactly the union of the per-chain clouds below.
+        per_chain_samples = [
+            draws[c][rng.choice(draws.shape[1], n_per_chain, replace=False)]
+            for c in range(n_chains)
+        ]
+        sub = np.concatenate(per_chain_samples, axis=0)
+        row.update(wasserstein_block(sub, wref["ref_sub"], cfg, rng, exact=True))
+
+        # Bias-vs-noise diagnostic across INDEPENDENT chains (see the note at
+        # the top of this section on why disjoint quarters of one pooled sample
+        # would not work here).  Pooling n_chains independent replicates cuts
+        # Monte-Carlo error by ~sqrt(n_chains) but leaves bias untouched:
+        #   ratio ~ measured i.i.d. floor ratio -> the number is Monte-Carlo noise;
+        #   ratio ~ 1.0                         -> the number is real bias.
+        cstats = [wasserstein_block(cs, wref["ref_sub"], cfg, rng, exact=False)
+                  for cs in per_chain_samples]
+        for key in ["w1_x1", "w1_coord_mean", "w1_r", "sw1", "sw2"]:
+            vals = np.array([cs[key] for cs in cstats])
+            row[f"{key}_chain"] = float(vals.mean())
+            row[f"{key}_chain_sd"] = float(vals.std(ddof=1))
+            row[f"{key}_ratio"] = float(row[key] / vals.mean()) if vals.mean() > 0 else np.nan
+        row["n_wasserstein"] = n_w
+        row["n_wasserstein_per_chain"] = n_per_chain
+
     if row["rhat_max"] > 1.01:
         warn(f"[alpha={run['alpha']}, h={run['h']}] R-hat = {row['rhat_max']:.4f} > 1.01: "
              "chains may not have mixed.")
@@ -604,6 +664,16 @@ def reference_sample(cfg: Config, seed: int = 99) -> np.ndarray:
     return np.vstack(out)[: cfg.n_reference]
 
 
+def build_wasserstein_reference(ref: np.ndarray, cfg: Config, n_w: int
+                                ) -> Dict[str, object]:
+    """Freeze a reference subsample plus a DISJOINT pool used for the floors."""
+    rng = np.random.default_rng(cfg.wasserstein_seed + 1)
+    perm = rng.permutation(len(ref))
+    ref_sub = ref[perm[:n_w]]                 # the fixed comparison target
+    ref_pool = ref[perm[n_w:]]                # disjoint: used for floor draws
+    return dict(ref_sub=ref_sub, ref_pool=ref_pool, n_w=n_w)
+
+
 def autocorr_curves(draws: np.ndarray, max_lag: int) -> Dict[str, np.ndarray]:
     """Chain-averaged ACF of each coordinate and of the radius."""
     series = {"x1": draws[:, :, 0], "x2": draws[:, :, 1], "x3": draws[:, :, 2],
@@ -614,6 +684,145 @@ def autocorr_curves(draws: np.ndarray, max_lag: int) -> Dict[str, np.ndarray]:
                       axis=0)
         out[name] = acf
     return out
+
+
+# =============================================================================
+# 5b. WASSERSTEIN ACCURACY DIAGNOSTICS
+# =============================================================================
+# Why Wasserstein in addition to Kolmogorov-Smirnov: KS is the sup-norm gap
+# between CDFs, so it saturates -- it cannot tell "slightly misplaced" from
+# "catastrophically misplaced" mass.  W_p measures the *transport cost*, i.e.
+# how far probability mass must be moved, in the units of the state space.
+# That is exactly the failure mode of this algorithm at large alpha, where the
+# Euler chord approximation to the tangential rotation inflates ||x|| and piles
+# mass onto the sphere.
+#
+# Two confounds are handled explicitly:
+#   (a) Empirical W_p is biased upward and the bias depends on the sample size,
+#       so every configuration is compared using the SAME number of draws n_w
+#       against the SAME fixed reference subsample.
+#   (b) W(empirical, exact) mixes genuine bias with finite-sample Monte-Carlo
+#       error, and both are positive.  They are separated WITHOUT any modelling
+#       assumption by re-computing the distance CHAIN BY CHAIN.  The Monte-Carlo
+#       part shrinks as the sample grows while the bias does not, so the ratio
+#       W(pooled n_w) / mean_c W(chain c) separates them.
+#
+#       The chains must be INDEPENDENT replicates for this to work.  Splitting
+#       one pooled subsample into disjoint quarters looks equivalent but is not:
+#       every quarter inherits the same parent chain's deviation from pi, that
+#       common component does not cancel, and the ratio is driven to 1 whatever
+#       the error actually is -- the split then measures only sub-sampling
+#       noise.  The chains here are run from independent seeds, so pooling four
+#       of them genuinely averages four independent deviations.
+#
+#       The ratio expected under pure noise is NOT 1/2: the reference side of
+#       the comparison keeps its size m = n_w while only the sampler side is
+#       reduced, and E[W_1(F_n, G_m)] ~ sqrt(1/n + 1/m), giving sqrt(2/5) ~ 0.63
+#       rather than sqrt(1/4) = 0.5.  Rather than rely on that algebra, the
+#       reference value is MEASURED: the same ratio is computed for exact i.i.d.
+#       samples (the floors), which calibrates the diagnostic for whatever
+#       estimator and sizes are actually in use.  A configuration whose ratio
+#       sits at the measured floor ratio is reporting noise; one at ~1.0 is
+#       reporting bias.  The spread across chains is a genuine across-replicate
+#       uncertainty estimate.
+#
+# Note on what is NOT used: matching an MCMC sample to an i.i.d. sample of size
+# ESS is a poor floor for distributional distances.  ESS quantifies the error of
+# a *mean*; W depends on how well the empirical measure covers the space, and
+# n_w correlated draws cover it far better than ESS independent ones.  Measured
+# on this problem that heuristic overshoots badly (it makes the "excess"
+# negative), so the per-chain diagnostic above is used instead.
+#
+# A caveat that no correction removes: in dimension d, E[W_p(empirical_n, mu)]
+# decays only like n^{-1/d}, so the exact 3-D W_2 has little power to separate
+# configurations at attainable n.  The 1-D marginal / radius distances and the
+# sliced distances are the discriminating statistics; exact W_2 is reported for
+# completeness with its floor alongside.
+
+
+def wasserstein_1d(u: np.ndarray, v: np.ndarray) -> float:
+    """Exact 1-D W_1 between two empirical measures (handles unequal sizes)."""
+    return float(sp_stats.wasserstein_distance(u, v))
+
+
+def sliced_wasserstein(X: np.ndarray, Y: np.ndarray, n_proj: int,
+                       rng: np.random.Generator, p: int = 1,
+                       n_grid: int = 1_000) -> float:
+    """Sliced Wasserstein SW_p between two point clouds in R^d.
+
+    SW_p^p(mu, nu) = E_theta [ W_p^p(theta#mu, theta#nu) ]  over uniform
+    directions theta on the unit sphere.  Each 1-D W_p is computed from the
+    quantile functions (evaluated on a common grid, so the two clouds need not
+    have the same size).  SW_p is a genuine metric on probability measures and
+    is an O(n log n) surrogate for the full d-dimensional transport problem.
+    """
+    d = X.shape[1]
+    theta = rng.normal(size=(d, n_proj))
+    theta /= np.linalg.norm(theta, axis=0, keepdims=True)
+    q = (np.arange(n_grid) + 0.5) / n_grid          # midpoint quantile grid
+    QX = np.quantile(X @ theta, q, axis=0)          # (n_grid, n_proj)
+    QY = np.quantile(Y @ theta, q, axis=0)
+    diff = np.abs(QX - QY)
+    if p == 1:
+        return float(diff.mean())
+    return float(np.sqrt((diff ** 2).mean()))
+
+
+def exact_wasserstein2(X: np.ndarray, Y: np.ndarray, rng: np.random.Generator,
+                       n_max: int = 3_000) -> float:
+    """Exact 3-D W_2 by linear programming (POT), on equal-size subsamples.
+
+    Returns NaN when POT is unavailable -- the sliced distances then carry the
+    multivariate information on their own.
+    """
+    if not HAS_POT:
+        return float("nan")
+    n = min(n_max, len(X), len(Y))
+    Xs = X[rng.choice(len(X), n, replace=False)]
+    Ys = Y[rng.choice(len(Y), n, replace=False)]
+    M = pot.dist(Xs, Ys)                      # squared Euclidean cost matrix
+    w2sq = pot.emd2([], [], M, numItermax=1_000_000)   # uniform marginals
+    return float(np.sqrt(max(w2sq, 0.0)))
+
+
+def wasserstein_block(sample: np.ndarray, ref_sub: np.ndarray, cfg: Config,
+                      rng: np.random.Generator, exact: bool = True
+                      ) -> Dict[str, float]:
+    """All Wasserstein statistics for one point cloud against the reference."""
+    out = {
+        "w1_x1": wasserstein_1d(sample[:, 0], ref_sub[:, 0]),
+        "w1_x2": wasserstein_1d(sample[:, 1], ref_sub[:, 1]),
+        "w1_x3": wasserstein_1d(sample[:, 2], ref_sub[:, 2]),
+        "w1_r": wasserstein_1d(np.linalg.norm(sample, axis=1),
+                               np.linalg.norm(ref_sub, axis=1)),
+        "sw1": sliced_wasserstein(sample, ref_sub, cfg.n_sliced_projections,
+                                  rng, p=1, n_grid=cfg.n_wasserstein_grid),
+        "sw2": sliced_wasserstein(sample, ref_sub, cfg.n_sliced_projections,
+                                  rng, p=2, n_grid=cfg.n_wasserstein_grid),
+    }
+    out["w1_coord_mean"] = float(np.mean([out["w1_x1"], out["w1_x2"], out["w1_x3"]]))
+    out["w2_exact"] = (exact_wasserstein2(sample, ref_sub, rng, cfg.n_ot_exact)
+                       if exact else float("nan"))
+    return out
+
+
+def wasserstein_floor(ref_pool: np.ndarray, ref_sub: np.ndarray, n_eff: int,
+                      cfg: Config, rng: np.random.Generator,
+                      n_rep: int | None = None, exact: bool = False
+                      ) -> Dict[str, float]:
+    """Distance produced by an EXACT i.i.d. sample of size `n_eff`.
+
+    This is the unimprovable floor: no sampler, however perfect, scores below it
+    with `n_eff` draws.  `ref_pool` is disjoint from `ref_sub`, so no point
+    appears on both sides (which would drag the distance artificially to zero).
+    """
+    n_rep = cfg.n_floor_reps if n_rep is None else n_rep
+    n_eff = int(max(2, min(n_eff, len(ref_pool))))
+    reps = []
+    for _ in range(n_rep):
+        draw = ref_pool[rng.choice(len(ref_pool), n_eff, replace=False)]
+        reps.append(wasserstein_block(draw, ref_sub, cfg, rng, exact=exact))
+    return {f"{k}_floor": float(np.mean([r[k] for r in reps])) for k in reps[0]}
 
 
 # =============================================================================
@@ -781,6 +990,99 @@ def plot_alpha_summaries(summary: pd.DataFrame, cfg: Config, outdir: Path) -> No
     _save(fig, outdir / "ess_vs_alpha.png", cfg.dpi)
 
 
+def plot_wasserstein(summary: pd.DataFrame, step_summary: pd.DataFrame,
+                     floors: Dict[str, Dict[str, float]], cfg: Config,
+                     outdir: Path) -> None:
+    """Wasserstein accuracy vs alpha and vs step size, with i.i.d. floors."""
+    df = summary.sort_values("alpha")
+    f_full, f_chain = floors["full"], floors["per_chain"]
+    n_w = int(df["n_wasserstein"].iloc[0])
+    fig, axes = plt.subplots(2, 3, figsize=(16.5, 9))
+
+    # (a) raw distances vs alpha, against the unimprovable i.i.d. floor
+    ax = axes[0, 0]
+    for col, lab, c in [("w1_coord_mean", "W1 (coord. mean)", "tab:blue"),
+                        ("w1_r", "W1 (radius)", "tab:orange"),
+                        ("sw1", "sliced W1 (3-D)", "tab:green")]:
+        # error bar: across-chain spread, halved since pooling 4 chains
+        ax.errorbar(df["alpha"], df[col], yerr=df[f"{col}_chain_sd"] / 2,
+                    fmt="o-", color=c, capsize=3, label=lab)
+        ax.axhline(f_full[col], ls=":", color=c, lw=1.2)
+    ax.set_xlabel("alpha"); ax.set_ylabel("Wasserstein distance")
+    ax.set_title(f"W vs alpha at n_w = {n_w}\n(dotted = i.i.d. floor at n_w)")
+    ax.legend(fontsize=7)
+
+    # (b) pooled-vs-per-chain: is the number bias or Monte-Carlo noise?
+    ax = axes[0, 1]
+    for col, lab in [("w1_coord_mean", "W1 (coord. mean)"), ("w1_r", "W1 (radius)"),
+                     ("sw1", "sliced W1")]:
+        ax.plot(df["alpha"], df[f"{col}_ratio"], "o-", label=lab)
+    # Reference for "pure noise" measured on exact i.i.d. samples, not assumed.
+    noise_ref = float(np.mean([f_full[k] / f_chain[k]
+                               for k in ["w1_coord_mean", "w1_r", "sw1"]]))
+    ax.axhline(noise_ref, color="k", ls="--", lw=1)
+    ax.axhline(1.0, color="k", ls="-.", lw=1)
+    ax.text(df["alpha"].max(), noise_ref + 0.01,
+            f"pure Monte-Carlo noise (measured: {noise_ref:.2f})", fontsize=7, ha="right")
+    ax.text(df["alpha"].max(), 1.01, "pure bias", fontsize=7, ha="right")
+    ax.set_xlabel("alpha"); ax.set_ylabel("W(pooled) / mean W(per chain)")
+    ax.set_title("Bias vs noise: pooled / per-chain"); ax.legend(fontsize=7)
+
+    # (c) exact 3-D W2 (POT) vs the sliced surrogate, both with floors
+    ax = axes[0, 2]
+    if df["w2_exact"].notna().any():
+        ax.plot(df["alpha"], df["w2_exact"], "o-", color="tab:red",
+                label=f"exact W2 (LP, n={cfg.n_ot_exact})")
+        ax.axhline(f_full["w2_exact"], ls=":", color="tab:red", lw=1.2,
+                   label="exact W2 floor")
+    ax.plot(df["alpha"], df["sw2"], "s-", color="tab:purple", label="sliced W2")
+    ax.axhline(f_full["sw2"], ls=":", color="tab:purple", lw=1.2, label="sliced W2 floor")
+    ax.set_xlabel("alpha"); ax.set_ylabel("W2")
+    ax.set_title("Exact vs sliced W2\n(exact W2 is low-power: E[W2] ~ n^(-1/3))")
+    ax.legend(fontsize=7)
+
+    # (d) Wasserstein vs KS: do they rank the configurations the same way?
+    ax = axes[1, 0]
+    ax.plot(df["ks_x1"], df["w1_x1"], "o-")
+    for _, r in df.iterrows():
+        ax.annotate(f"a={r['alpha']:g}", (r["ks_x1"], r["w1_x1"]),
+                    fontsize=7, xytext=(3, 3), textcoords="offset points")
+    ax.set_xlabel("KS distance (x1)"); ax.set_ylabel("W1 (x1)")
+    ax.set_title("Wasserstein vs Kolmogorov–Smirnov")
+
+    # (e) step-size study at equal simulated time
+    ax = axes[1, 1]
+    for alpha, grp in step_summary.groupby("alpha"):
+        grp = grp.sort_values("h")
+        ax.errorbar(grp["h"], grp["w1_coord_mean"],
+                    yerr=grp["w1_coord_mean_chain_sd"] / 2, fmt="o-", capsize=3,
+                    label=f"W1 coord, alpha={alpha:g}")
+        ax.plot(grp["h"], grp["w1_r"], "s--", label=f"W1 radius, alpha={alpha:g}")
+    ax.axhline(f_full["w1_coord_mean"], ls=":", color="k", lw=1.2, label="i.i.d. floor")
+    ax.set_xscale("log"); ax.set_xlabel("h"); ax.set_ylabel("Wasserstein distance")
+    ax.set_title("W vs step size (equal simulated time)"); ax.legend(fontsize=7)
+
+    # (f) floor-subtracted step-size trend: expected to scale like O(h)
+    ax = axes[1, 2]
+    for alpha, grp in step_summary.groupby("alpha"):
+        grp = grp.sort_values("h")
+        ax.plot(grp["h"], grp["w1_coord_mean"] - f_full["w1_coord_mean"], "o-",
+                label=f"alpha={alpha:g}")
+    hh = np.array(sorted(step_summary["h"].unique()))
+    top = float((step_summary["w1_coord_mean"] - f_full["w1_coord_mean"]).max())
+    ax.plot(hh, hh / hh.max() * max(top, 1e-9), "k:", lw=1, label="O(h) reference")
+    ax.axhline(0, color="k", lw=0.8)
+    ax.set_xscale("log"); ax.set_xlabel("h")
+    ax.set_ylabel("W1 (coord. mean) − i.i.d. floor")
+    ax.set_title("Floor-subtracted W vs h"); ax.legend(fontsize=7)
+
+    fig.suptitle(f"Wasserstein accuracy diagnostics — n_w = {n_w} draws per "
+                 f"configuration; i.i.d. floors at n_w: W1(coord) = "
+                 f"{f_full['w1_coord_mean']:.4f}, per chain: "
+                 f"{f_chain['w1_coord_mean']:.4f}")
+    _save(fig, outdir / "wasserstein.png", cfg.dpi)
+
+
 def plot_stepsize_study(step_summary: pd.DataFrame, cfg: Config, outdir: Path) -> None:
     """Step-size sensitivity: ESS, ESS/s, projection rate and bias vs h."""
     fig, axes = plt.subplots(1, 4, figsize=(18, 4))
@@ -882,18 +1184,50 @@ def main(argv: Sequence[str] | None = None) -> int:
           f"E||x|| = {np.linalg.norm(ref,axis=1).mean():.4f}, "
           f"P(||x||>0.95R) = {np.mean(np.linalg.norm(ref,axis=1)>0.95*cfg.R):.4f}")
 
+    # Every configuration is scored on the SAME number of draws: empirical
+    # Wasserstein distances shrink with n, so unequal n would be unfair.
+    base_draws = cfg.n_chains * len(range(cfg.burn_in, cfg.n_iter, cfg.thin))
+    n_w = int(min(cfg.n_wasserstein, base_draws, len(ref) // 2))
+    wref = build_wasserstein_reference(ref, cfg, n_w)
+    wrng = np.random.default_rng(cfg.wasserstein_seed + 2)
+    # Unimprovable floors at both sample sizes used below.
+    floors = {}
+    for tag, nn in [("full", n_w), ("per_chain", n_w // cfg.n_chains)]:
+        fl = wasserstein_floor(wref["ref_pool"], wref["ref_sub"], n_eff=nn,
+                               cfg=cfg, rng=wrng, exact=True)
+        floors[tag] = {k.replace("_floor", ""): v for k, v in fl.items()}
+    global_floor = floors["full"]
+    print(f"  Wasserstein setup: n_w = {n_w} draws per configuration, "
+          f"{cfg.n_sliced_projections} slicing directions, "
+          f"exact W2 {'via POT' if HAS_POT else 'UNAVAILABLE (POT not installed)'}")
+    print(f"  i.i.d. floor at n_w   (exact vs exact): "
+          f"W1(coord) = {global_floor['w1_coord_mean']:.5f}, "
+          f"W1(radius) = {global_floor['w1_r']:.5f}, "
+          f"SW1 = {global_floor['sw1']:.5f}, W2(exact) = {global_floor['w2_exact']:.5f}")
+    print(f"  i.i.d. floor per chain (exact vs exact): "
+          f"W1(coord) = {floors['per_chain']['w1_coord_mean']:.5f}, "
+          f"W1(radius) = {floors['per_chain']['w1_r']:.5f}, "
+          f"SW1 = {floors['per_chain']['sw1']:.5f}")
+    noise_ref = float(np.mean([global_floor[k] / floors["per_chain"][k]
+                               for k in ["w1_coord_mean", "w1_r", "sw1"]]))
+    print(f"  measured 'pure noise' ratio (exact i.i.d. samples): {noise_ref:.3f} "
+          f"— the reference side keeps size n_w, so E[W] ~ sqrt(1/n + 1/m) puts this"
+          f" near sqrt(2/5) = 0.63, not 0.5")
+
     # ------------------------------------------------------------ alpha sweep
     print(f"\n[4] alpha sweep at h = {cfg.h} (s = {cfg.s} fixed; only alpha*s matters)")
     runs, rows, diag_frames, meta_frames = [], [], [], []
     for alpha in cfg.alphas:
         run = run_chains(cfg, alpha=alpha, h=cfg.h)
-        row = summarize_run(run, cfg, reference=ref)
+        row = summarize_run(run, cfg, reference=ref, wref=wref)
         runs.append(run); rows.append(row)
         diag_frames.append(run["diag"]); meta_frames.append(run["meta"])
         print(f"  alpha={alpha:5g}  runtime={row['runtime_s']:6.2f}s  "
               f"ESS(min)={row['ess_min']:8.1f}  ESS/s={row['ess_per_sec_min']:7.2f}  "
               f"Rhat={row['rhat_max']:.4f}  proj={100*row['projection_fraction']:5.2f}%  "
-              f"KS(x1)={row['ks_x1']:.4f}")
+              f"KS(x1)={row['ks_x1']:.4f}  W1={row['w1_coord_mean']:.4f}  "
+              f"W1(r)={row['w1_r']:.4f}  SW1={row['sw1']:.4f}  "
+              f"ratio={row['w1_coord_mean_ratio']:.2f}")
     summary = pd.DataFrame(rows)
     summary.to_csv(outdir / "summary_alpha.csv", index=False)
 
@@ -911,6 +1245,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             "ess_per_sec_mean", "iact_mean", "rhat_max", "projection_fraction",
             "max_norm", "a_min", "a_max", "ks_x1", "bias_mean_abs_x1"]
     print(summary[cols].to_string(index=False, float_format=lambda v: f"{v:.5g}"))
+
+    print("\n[5b] Wasserstein accuracy (n_w = %d draws per configuration)" % n_w)
+    wcols = ["alpha", "w1_x1", "w1_coord_mean", "w1_coord_mean_chain_sd",
+             "w1_coord_mean_ratio", "w1_r", "w1_r_ratio", "sw1", "sw1_ratio",
+             "sw2", "w2_exact"]
+    print(summary[wcols].to_string(index=False, float_format=lambda v: f"{v:.5g}"))
+    print(f"  i.i.d. floor at this n_w: W1(coord) = {global_floor['w1_coord_mean']:.5f}, "
+          f"W1(radius) = {global_floor['w1_r']:.5f}, SW1 = {global_floor['sw1']:.5f}, "
+          f"W2(exact) = {global_floor['w2_exact']:.5f}")
+    print("  '_chain_sd' = spread over the independent chains (across-replicate "
+          "uncertainty);")
+    print(f"  '_ratio' = W(pooled) / mean W(per chain): ~{noise_ref:.2f} (the "
+          f"measured i.i.d. value) means Monte-Carlo noise, ~1.0 means genuine bias.")
     base = summary.loc[summary["alpha"] == 0.0, "ess_per_sec_min"].iloc[0]
     print(f"\n  Best alpha by ESS/s: {best_alpha:g} "
           f"(speed-up over alpha=0: "
@@ -931,13 +1278,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             scale = int(round(1.0 / f)) if cfg.step_size_match_simulated_time else 1
             r = run_chains(cfg, alpha=alpha, h=hh,
                            n_iter=cfg.n_iter * scale, burn_in=cfg.burn_in * scale)
-            row = summarize_run(r, cfg, reference=ref)
+            row = summarize_run(r, cfg, reference=ref, wref=wref)
             step_rows.append(row)
             print(f"  alpha={alpha:4g} h={hh:7.5f} n_iter={row['n_iter_per_chain']:7d} "
                   f"T={row['sim_time']:6.1f}  ESS={row['ess_mean']:8.1f}  "
                   f"ESS/s={row['ess_per_sec_mean']:7.2f}  "
                   f"proj={100*row['projection_fraction']:5.2f}%  "
-                  f"KS(x1)={row['ks_x1']:.4f}  bias E|x1|={row['bias_mean_abs_x1']:+.4f}")
+                  f"KS(x1)={row['ks_x1']:.4f}  W1={row['w1_coord_mean']:.4f}  "
+                  f"W1(r)={row['w1_r']:.4f}  ratio={row['w1_coord_mean_ratio']:.2f}")
     step_summary = pd.DataFrame(step_rows)
     step_summary.to_csv(outdir / "summary_step_size.csv", index=False)
 
@@ -954,6 +1302,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     show3d = [runs[0]] + ([runs[cfg.alphas.index(best_alpha)]] if best_alpha != 0.0 else [])
     plot_3d_with_sphere(show3d if len(show3d) > 1 else runs[:2], cfg, outdir)
     plot_alpha_summaries(summary, cfg, outdir)
+    plot_wasserstein(summary, step_summary, floors, cfg, outdir)
     plot_stepsize_study(step_summary, cfg, outdir)
     plot_drift_decomposition(runs, cfg, outdir)
 
