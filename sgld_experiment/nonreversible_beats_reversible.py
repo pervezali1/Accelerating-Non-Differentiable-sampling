@@ -57,7 +57,9 @@ STYLE = {"Reversible anchored Langevin":     {"color": "#0173B2", "ls": "--", "l
 Y_LIMITS = (0.40, 0.90)      # fixed, un-windowed: initialisation ~0.50, Bayes ceiling ~0.82
 
 # The two headline configurations.  The ball has radius 1, so its beta is halved
-# and its design variances quadrupled (identical logits, 4x the curvature).
+# and v_axis, v_fast and the block-1 variance quadrupled while v_slow is only doubled
+# (2 -> 4): a more anisotropic design (v_fast/v_slow = 64), smaller logits (Bayes ceiling
+# 0.74 vs 0.82) and about five times the curvature, hence the smaller eta.
 CONFIGS = {
     "l1":   dict(v_axis=1.0, v_fast=64.0, v_slow=2.0, b=1.5, e=0.25, b1=0.3, block_1_variance=1.0,
                  s=4.0, eta=7e-6, epsilon=0.2, n_iterations=1000, evaluate_at=100),

@@ -529,8 +529,12 @@ g_eps(w)` — a soft-sign of `w_I` — under the smoothed L1 ball).  Linearising
 `-eta a (I - J) H` at the mode, with block-Hessian eigenpairs
 `lambda_1 >= lambda_2 >= lambda_3`:
 
-* **In-plane slow direction.**  If the slow eigenvector `q_3` lies in the rotated
-  plane with partner `q_2`, the two continuous-time rates become
+* **In-plane slow direction.**  Let `lambda_2 >= lambda_3` be the curvatures of the
+  two directions in the rotated plane (in the headline design about 14,000 along
+  `q_2` and 340 along `q_3` at the mode, `kappa ~ 40`; the axis direction `q_1` is
+  slower still, about 160, but `J` cannot touch it and both chains pay that cost
+  equally).  With `q_3` the slow in-plane direction and `q_2` its partner, the two
+  continuous-time rates become
   `(lambda_2 + lambda_3)/2 +- sqrt((lambda_2 - lambda_3)^2/4 - sigma^2 lambda_2 lambda_3)`,
   `sigma = s|v_I|`.  For `sigma >= sigma* = (lambda_2 - lambda_3)/(2 sqrt(lambda_2 lambda_3))`
   the slow rate is replaced by the arithmetic mean: a speed-up of `(kappa + 1)/2`,
@@ -560,7 +564,9 @@ and `q3 = (2,-1,-1)/sqrt6` (slow, in the rotated plane, signal-carrying because
 `beta_I = (b, e, e)` with `b > e`).  Headline configuration: `v = (1, 64, 2)`,
 `beta_I = (1.5, 0.25, 0.25)`, `lambda = 2`, `delta = 0.02`, `eps = 0.2`, `s = 4`,
 `eta = 7e-6`, `R = 100`, uniform initialisation on `K`; on the unit ball `beta` is
-halved and the variances quadrupled (`s = 16`, `eta = 2e-6`).
+halved, `v_axis`, `v_fast` and the block-1 variance quadrupled and `v_slow` doubled
+(`s = 16`, `eta = 2e-6`; a more anisotropic design with smaller logits, Bayes ceiling
+0.74 vs 0.82, and about five times the curvature).
 
 Three independent theory agents re-derived and attacked these claims (linear
 algebra, an exactly solvable toy model, and an adversary).  All three confirmed the
@@ -665,10 +671,10 @@ map and the seven held-out confirmations — is in `results_beat/search/` as the
   lying in the plane the block rotation sweeps, with strongly unequal feature scales
   (`kappa >= 4`).  On the isotropic design of the original specification nothing
   changes; on the random-rotation block-anisotropic design the gain is +0.004.
-* Beyond the stability edge (`s >= 16` here, or `eta = 1e-4`) the non-reversible
-  chain is worse: the rotation overshoots, the projection fires, and a stationary
-  deficit appears.  The window is wide (`s` from 0.5 to 12 at `eta = 7e-6`) but it is
-  a window.
+* Beyond the stability edge (`s >= 16` here, or `eta = 1e-4`) the rotation overshoots
+  and the projection fires on 33% / 61% of the steps; the non-reversible chain still
+  wins the transient by about 0.2 but ends 0.007-0.009 below the reversible one.  The
+  window is wide (`s` from 0.5 to 12 at `eta = 7e-6`) but it is a window.
 * The antipodal-initialisation number (+0.65) is a curiosity, not a claim: starting at
   `-beta` is not a fair start.
 

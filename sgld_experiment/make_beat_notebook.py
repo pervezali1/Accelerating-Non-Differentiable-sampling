@@ -197,8 +197,9 @@ def build(colab: bool) -> nbf.NotebookNode:
     cells += [
         nbf.v4.new_code_cell(SETUP),
         nbf.v4.new_markdown_cell("## Data, target and the two constraint sets\n\nThe ball has radius 1, so its "
-                                 "`beta` is halved and its design variances quadrupled relative to the $L_1$ "
-                                 "configuration: identical logits, four times the curvature, hence the smaller `eta`."),
+                                 "`beta` is halved and `v_axis`, `v_fast` and the block-1 variance quadrupled while "
+                                 "`v_slow` is only doubled: a more anisotropic design (`v_fast/v_slow = 64`), smaller "
+                                 "logits (Bayes ceiling 0.74 vs 0.82) and about five times the curvature, hence the smaller `eta`."),
         nbf.v4.new_code_cell(DATA),
         nbf.v4.new_markdown_cell("## Run both methods on both constraint sets"),
         nbf.v4.new_code_cell(RUN),
