@@ -1,0 +1,60 @@
+
+=== STAGE 'best': TRAINING-ONLY eta search for EACH arm separately (seed 7001, R=60) ===
+  [titanic_ball] rev  eta=3e-05    train_ll=0.511820
+  [titanic_ball] nrev eta=3e-05    s=2     train_ll=0.510415 (3s)
+  [titanic_ball] nrev eta=3e-05    s=5     train_ll=0.509722 (4s)
+  [titanic_ball] nrev eta=3e-05    s=10    train_ll=0.509609 (6s)
+  [titanic_ball] rev  eta=0.0001   train_ll=0.508379
+  [titanic_ball] nrev eta=0.0001   s=2     train_ll=0.508275 (8s)
+  [titanic_ball] nrev eta=0.0001   s=5     train_ll=0.508254 (10s)
+  [titanic_ball] nrev eta=0.0001   s=10    train_ll=0.508856 (11s)
+  [titanic_ball] rev  eta=0.0003   train_ll=0.507679
+  [titanic_ball] nrev eta=0.0003   s=2     train_ll=0.507730 (14s)
+  [titanic_ball] nrev eta=0.0003   s=5     train_ll=0.508215 (15s)
+  [titanic_ball] nrev eta=0.0003   s=10    train_ll=0.535935 (17s)
+  [titanic_ball] rev  eta=0.001    train_ll=0.507178
+  [titanic_ball] nrev eta=0.001    s=2     train_ll=0.507455 (19s)
+  [titanic_ball] nrev eta=0.001    s=5     train_ll=0.523668 (21s)
+  [titanic_ball] nrev eta=0.001    s=10    train_ll=0.612087 (22s)
+  -> titanic_ball: rev best eta=0.001; nrev best eta=0.001, s=2
+  [titanic_lp] rev  eta=3e-05    train_ll=0.487860
+  [titanic_lp] nrev eta=3e-05    s=2     train_ll=0.485958 (31s)
+  [titanic_lp] nrev eta=3e-05    s=5     train_ll=0.485445 (35s)
+  [titanic_lp] nrev eta=3e-05    s=10    train_ll=0.492146 (41s)
+  [titanic_lp] rev  eta=0.0001   train_ll=0.483236
+  [titanic_lp] nrev eta=0.0001   s=2     train_ll=0.483109 (54s)
+  [titanic_lp] nrev eta=0.0001   s=5     train_ll=0.490891 (61s)
+  [titanic_lp] nrev eta=0.0001   s=10    train_ll=0.629588 (70s)
+  [titanic_lp] rev  eta=0.0003   train_ll=0.482543
+  [titanic_lp] nrev eta=0.0003   s=2     train_ll=0.483094 (85s)
+  [titanic_lp] nrev eta=0.0003   s=5     train_ll=0.597261 (93s)
+  [titanic_lp] nrev eta=0.0003   s=10    train_ll=0.671974 (101s)
+  [titanic_lp] rev  eta=0.001    train_ll=0.482070
+  [titanic_lp] nrev eta=0.001    s=2     train_ll=0.522427 (117s)
+  [titanic_lp] nrev eta=0.001    s=5     train_ll=0.651691 (125s)
+  [titanic_lp] nrev eta=0.001    s=10    train_ll=0.682778 (135s)
+  -> titanic_lp: rev best eta=0.001; nrev best eta=0.0003, s=2
+
+=== STAGE 'best': CONFIRMATION best-vs-best (independent seed 9101, R=300) ===
+
+[titanic_ball] BEST-vs-BEST  rev(eta=0.001)  vs  nrev(eta=0.001, s=2)   R=300
+   train_logloss          rev=0.507152 nrev=0.507400 diff=+2.478e-04 se=1.16e-05 t=+21.30 win=88%
+   test_logloss           rev=0.488360 nrev=0.488686 diff=+3.259e-04 se=2.79e-05 t=+11.68 win=76%
+   train_brier            rev=0.163336 nrev=0.163432 diff=+9.605e-05 se=4.47e-06 t=+21.47 win=89%
+   test_brier             rev=0.155339 nrev=0.155469 diff=+1.297e-04 se=1.38e-05 t=+9.40 win=74%
+   train_acc              rev=0.811400 nrev=0.811428 diff=+2.809e-05 se=8.39e-05 t=+0.33 win=30%
+   test_acc               rev=0.825903 nrev=0.826182 diff=+2.793e-04 se=1.37e-04 t=+2.03 win=11%
+   last_iterate_test_acc  rev=0.805158 nrev=0.805661 diff=+5.028e-04 se=7.63e-04 t=+0.66 win=44%
+   pooled coord var ratio rev/nrev = 1.429  prob var ratio = 1.520
+
+[titanic_lp] BEST-vs-BEST  rev(eta=0.001)  vs  nrev(eta=0.0003, s=2)   R=300
+   train_logloss          rev=0.481993 nrev=0.482901 diff=+9.073e-04 se=3.30e-05 t=+27.48 win=96%
+   test_logloss           rev=0.458740 nrev=0.460194 diff=+1.454e-03 se=5.57e-05 t=+26.12 win=96%
+   train_brier            rev=0.153470 nrev=0.153824 diff=+3.540e-04 se=1.25e-05 t=+28.42 win=97%
+   test_brier             rev=0.144292 nrev=0.144878 diff=+5.863e-04 se=2.40e-05 t=+24.41 win=95%
+   train_acc              rev=0.815234 nrev=0.815098 diff=-1.358e-04 se=1.37e-04 t=-0.99 win=37%
+   test_acc               rev=0.805270 nrev=0.805661 diff=+3.911e-04 se=4.09e-04 t=+0.96 win=21%
+   last_iterate_test_acc  rev=0.801695 nrev=0.802700 diff=+1.006e-03 se=8.09e-04 t=+1.24 win=44%
+   pooled coord var ratio rev/nrev = 0.540  prob var ratio = 0.604
+
+total 183.8s

@@ -1,0 +1,4 @@
+[seed 4100] eta=1e-08 s=40 R=60  rev_train=0.5700 nrev_train=0.7434 d_train=+0.1733 (t=+11.40)  |  rev_test=0.5780 nrev_test=0.7402 d_test=+0.1622 (t=+10.79)
+           wall: rev 5.68s  nrev 5.77s  proj rev 0.000 nrev 0.190
+confirm total 11s -> confirm_magic_within100.json
+CDONE

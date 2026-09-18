@@ -1,0 +1,97 @@
+# Titanic ball  n_train=712 n_test=179 lam=7.120 delta=0.01082 a_lower=0.500
+
+## reference: eta=1e-05 n_iter=20000 R=160 burn=0.34
+  rev        27.8s  proj=0.1024  E||w||^2=1.93754+-0.00069  E[w]=[-0.3141 -0.1652 -0.146  -0.0086  0.3238  1.0908 -0.0138 -0.5666  0.0044
+ -0.2798]
+  nrev_s2    31.4s  proj=0.1038  E||w||^2=1.93759+-0.00070  E[w]=[-0.3143 -0.1656 -0.1469 -0.0071  0.3268  1.0893 -0.012  -0.5679  0.0037
+ -0.2778]
+  invariant-law check (rev vs nrev reference, both eta=1e-5):
+    max |dE[w_i]| / se = 0.79   max |dE[sigma]| / se = 1.30
+    dE||w||^2 = +0.00004 (se 0.00098)
+  REFERENCE posterior-mean predictive on test: logloss=0.489340 brier=0.155712 auc=0.874045
+
+## search  seed=5101 R=64 n_iter=3000   criterion = MSE of ergodic E[sigma(x_train_sub . w)] vs reference  (NO test labels)
+  eta= 3.0e-05 s= 0.00 rev  MSE_sig=3.062e-04 (bias2=7.090e-06 var=3.039e-04) MSE_w=4.012e-03 proj=0.1464
+  eta= 3.0e-05 s= 0.30 nrev MSE_sig=3.026e-04 (bias2=6.753e-06 var=3.005e-04) MSE_w=3.949e-03 proj=0.1473
+  eta= 3.0e-05 s= 1.00 nrev MSE_sig=2.562e-04 (bias2=6.936e-06 var=2.532e-04) MSE_w=3.276e-03 proj=0.1489
+  eta= 3.0e-05 s= 2.00 nrev MSE_sig=2.045e-04 (bias2=6.806e-06 var=2.008e-04) MSE_w=2.632e-03 proj=0.1497
+  eta= 3.0e-05 s= 5.00 nrev MSE_sig=1.533e-04 (bias2=5.929e-06 var=1.497e-04) MSE_w=2.033e-03 proj=0.1516
+  eta= 3.0e-05 s= 7.00 nrev MSE_sig=1.419e-04 (bias2=5.742e-06 var=1.383e-04) MSE_w=1.917e-03 proj=0.1519
+  eta= 3.0e-05 s=10.00 nrev MSE_sig=1.363e-04 (bias2=6.221e-06 var=1.322e-04) MSE_w=1.864e-03 proj=0.1534
+  eta= 1.0e-04 s= 0.00 rev  MSE_sig=9.935e-05 (bias2=1.854e-06 var=9.904e-05) MSE_w=1.238e-03 proj=0.3019
+  eta= 1.0e-04 s= 0.30 nrev MSE_sig=9.592e-05 (bias2=1.930e-06 var=9.548e-05) MSE_w=1.209e-03 proj=0.3024
+  eta= 1.0e-04 s= 1.00 nrev MSE_sig=7.861e-05 (bias2=2.159e-06 var=7.766e-05) MSE_w=1.000e-03 proj=0.3031
+  eta= 1.0e-04 s= 2.00 nrev MSE_sig=6.303e-05 (bias2=2.182e-06 var=6.181e-05) MSE_w=7.857e-04 proj=0.3031
+  eta= 1.0e-04 s= 5.00 nrev MSE_sig=4.888e-05 (bias2=2.130e-06 var=4.750e-05) MSE_w=5.980e-04 proj=0.3056
+  eta= 1.0e-04 s= 7.00 nrev MSE_sig=4.480e-05 (bias2=1.940e-06 var=4.354e-05) MSE_w=5.694e-04 proj=0.3077
+  eta= 1.0e-04 s=10.00 nrev MSE_sig=4.282e-05 (bias2=3.222e-06 var=4.023e-05) MSE_w=5.680e-04 proj=0.3151
+  eta= 3.0e-04 s= 0.00 rev  MSE_sig=3.693e-05 (bias2=2.113e-06 var=3.537e-05) MSE_w=4.718e-04 proj=0.4890
+  eta= 3.0e-04 s= 0.30 nrev MSE_sig=3.543e-05 (bias2=2.081e-06 var=3.388e-05) MSE_w=4.583e-04 proj=0.4890
+  eta= 3.0e-04 s= 1.00 nrev MSE_sig=2.903e-05 (bias2=2.133e-06 var=2.733e-05) MSE_w=3.742e-04 proj=0.4896
+  eta= 3.0e-04 s= 2.00 nrev MSE_sig=2.332e-05 (bias2=2.160e-06 var=2.150e-05) MSE_w=2.956e-04 proj=0.4905
+  eta= 3.0e-04 s= 5.00 nrev MSE_sig=1.760e-05 (bias2=1.925e-06 var=1.592e-05) MSE_w=2.223e-04 proj=0.4993
+  eta= 3.0e-04 s= 7.00 nrev MSE_sig=2.400e-05 (bias2=9.473e-06 var=1.476e-05) MSE_w=3.186e-04 proj=0.5218
+  eta= 3.0e-04 s=10.00 nrev MSE_sig=1.701e-03 (bias2=1.688e-03 var=1.405e-05) MSE_w=1.833e-02 proj=0.7525
+  eta= 1.0e-03 s= 0.00 rev  MSE_sig=1.403e-05 (bias2=3.149e-06 var=1.106e-05) MSE_w=1.661e-04 proj=0.7309
+  eta= 1.0e-03 s= 0.30 nrev MSE_sig=1.359e-05 (bias2=3.111e-06 var=1.065e-05) MSE_w=1.617e-04 proj=0.7308
+  eta= 1.0e-03 s= 1.00 nrev MSE_sig=1.145e-05 (bias2=2.945e-06 var=8.637e-06) MSE_w=1.350e-04 proj=0.7316
+  eta= 1.0e-03 s= 2.00 nrev MSE_sig=9.062e-06 (bias2=2.434e-06 var=6.733e-06) MSE_w=1.046e-04 proj=0.7347
+  eta= 1.0e-03 s= 5.00 nrev MSE_sig=6.499e-04 (bias2=6.446e-04 var=5.452e-06) MSE_w=7.452e-03 proj=0.8647
+  eta= 1.0e-03 s= 7.00 nrev MSE_sig=6.692e-03 (bias2=6.689e-03 var=3.385e-06) MSE_w=5.363e-02 proj=0.9931
+  eta= 1.0e-03 s=10.00 nrev MSE_sig=1.585e-02 (bias2=1.585e-02 var=2.862e-06) MSE_w=1.035e-01 proj=0.9993
+  eta= 3.0e-03 s= 0.00 rev  MSE_sig=8.598e-06 (bias2=3.616e-06 var=5.060e-06) MSE_w=8.647e-05 proj=0.9149
+  eta= 3.0e-03 s= 0.30 nrev MSE_sig=8.397e-06 (bias2=3.550e-06 var=4.923e-06) MSE_w=8.416e-05 proj=0.9151
+  eta= 3.0e-03 s= 1.00 nrev MSE_sig=7.099e-06 (bias2=2.875e-06 var=4.290e-06) MSE_w=6.897e-05 proj=0.9165
+  eta= 3.0e-03 s= 2.00 nrev MSE_sig=9.942e-06 (bias2=6.215e-06 var=3.786e-06) MSE_w=1.047e-04 proj=0.9254
+  eta= 3.0e-03 s= 5.00 nrev MSE_sig=1.033e-02 (bias2=1.033e-02 var=2.188e-06) MSE_w=6.810e-02 proj=0.9997
+  eta= 3.0e-03 s= 7.00 nrev MSE_sig=1.717e-02 (bias2=1.717e-02 var=1.376e-06) MSE_w=1.010e-01 proj=0.9999
+  eta= 3.0e-03 s=10.00 nrev MSE_sig=2.322e-02 (bias2=2.322e-02 var=1.022e-06) MSE_w=1.276e-01 proj=1.0000
+  eta= 1.0e-02 s= 0.00 rev  MSE_sig=8.606e-02 (bias2=5.115e-02 var=3.547e-02) MSE_w=1.037e-01 proj=0.9955
+  eta= 1.0e-02 s= 0.30 nrev MSE_sig=8.261e-02 (bias2=5.199e-02 var=3.111e-02) MSE_w=9.737e-02 proj=0.9937
+  eta= 1.0e-02 s= 1.00 nrev MSE_sig=4.675e-02 (bias2=1.907e-02 var=2.811e-02) MSE_w=7.052e-02 proj=0.9987
+  eta= 1.0e-02 s= 2.00 nrev MSE_sig=2.749e-03 (bias2=2.729e-03 var=2.033e-05) MSE_w=1.839e-02 proj=1.0000
+  eta= 1.0e-02 s= 5.00 nrev MSE_sig=1.691e-02 (bias2=1.690e-02 var=2.459e-06) MSE_w=9.763e-02 proj=1.0000
+  eta= 1.0e-02 s= 7.00 nrev MSE_sig=2.157e-02 (bias2=2.156e-02 var=3.261e-06) MSE_w=1.175e-01 proj=1.0000
+  eta= 1.0e-02 s=10.00 nrev MSE_sig=2.612e-02 (bias2=2.611e-02 var=1.575e-05) MSE_w=1.351e-01 proj=1.0000
+  eta= 3.0e-02 s= 0.00 rev  MSE_sig=1.836e-01 (bias2=1.048e-01 var=8.001e-02) MSE_w=2.648e-01 proj=1.0000
+  eta= 3.0e-02 s= 0.30 nrev MSE_sig=1.801e-01 (bias2=9.783e-02 var=8.361e-02) MSE_w=2.590e-01 proj=1.0000
+  eta= 3.0e-02 s= 1.00 nrev MSE_sig=1.466e-01 (bias2=8.026e-02 var=6.739e-02) MSE_w=2.259e-01 proj=1.0000
+  eta= 3.0e-02 s= 2.00 nrev MSE_sig=1.774e-02 (bias2=8.232e-03 var=9.655e-03) MSE_w=9.831e-02 proj=1.0000
+  eta= 3.0e-02 s= 5.00 nrev MSE_sig=4.718e-02 (bias2=2.100e-02 var=2.660e-02) MSE_w=2.839e-01 proj=1.0000
+  eta= 3.0e-02 s= 7.00 nrev MSE_sig=5.158e-02 (bias2=2.321e-02 var=2.882e-02) MSE_w=3.052e-01 proj=1.0000
+  eta= 3.0e-02 s=10.00 nrev MSE_sig=5.630e-02 (bias2=2.718e-02 var=2.958e-02) MSE_w=3.175e-01 proj=1.0000
+
+  best NREV (train-only): eta=0.003 s=1 MSE_sig=7.099e-06
+  best REV  (train-only): eta=0.003  MSE_sig=8.598e-06
+
+## confirmation  seed=7717 (independent) R=240 n_iter=3000
+   matched-eta pair at eta=0.003: rev(alpha=0) vs nrev(alpha=1,s=1), same W0 and same noise stream
+
+  PAIRED (positive diff = non-reversible better):
+    se_sig_test  nrev=8.09256e-06  rev=9.66259e-06  diff=+1.57e-06 se=1.06e-07 t=+14.85 win=0.88
+    se_sig_tr    nrev=7.42265e-06  rev=8.82935e-06  diff=+1.407e-06 se=8.77e-08 t=+16.05 win=0.90
+    se_w         nrev=7.61268e-05  rev=9.31477e-05  diff=+1.702e-05 se=1.13e-06 t=+15.01 win=0.90
+    se_n2        nrev=0.00294515  rev=0.00292625  diff=-1.89e-05 se=3.07e-06 t= -6.15 win=0.35
+    ll           nrev=0.488444  rev=0.488162  diff=-0.0002819 se=8.51e-06 t=-33.15 win=0.02
+    br           nrev=0.155367  rev=0.155249  diff=-0.0001174 se=3.98e-06 t=-29.48 win=0.04
+    auc          nrev=0.87392  rev=0.874067  diff=-0.0001466 se=2.66e-05 t= -5.52 win=0.29
+    acc          nrev=0.826397  rev=0.82642  diff=-2.328e-05 se=0.000126 t= -0.19 win=0.06
+    ll_last      nrev=0.492238  rev=0.491745  diff=-0.0004939 se=0.000222 t= -2.23 win=0.43
+    br_last      nrev=0.157418  rev=0.157167  diff=-0.0002518 se=9.87e-05 t= -2.55 win=0.41
+    auc_last     nrev=0.86755  rev=0.868379  diff=-0.0008289 se=0.000314 t= -2.64 win=0.41
+    acc_last     nrev=0.803073  rev=0.803073  diff=+1.85e-18 se=0.000763 t= +0.00 win=0.38
+
+    bias^2/var split, E[sigma] on test: nrev bias2=2.861e-06 var=5.253e-06 | rev bias2=3.573e-06 var=6.116e-06
+    bias^2/var split, E[w]:              nrev bias2=3.015e-05 var=4.617e-05 | rev bias2=3.809e-05 var=5.529e-05
+
+  WHY log loss moves the other way -- log loss of the REPLICATE-AVERAGED predictive:
+    reference (long chain)      logloss=0.489340
+    nrev averaged predictive   logloss=0.488435 auc=0.873386 mean|p-p_ref|=1.41e-03
+    rev  averaged predictive   logloss=0.488151 auc=0.873518 mean|p-p_ref|=1.63e-03
+    -> if the reference's own log loss is the WORST of the three, estimation noise is
+       moving predictions AWAY from the posterior mean in a direction that happens to
+       lower test log loss, so 'less sampling error' shows up as 'slightly worse log loss'.
+
+## best-vs-best: reversible's own best eta EQUALS eta*=0.003; the matched-eta paired comparison already IS best-vs-best.
+
+# total wallclock 190.0s

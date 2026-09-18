@@ -1,0 +1,19 @@
+
+=== ADDENDUM 3: compute-matched at each cost model c(R), eta=1e-5, seed=4100 ===
+  [titanic_ball_s5] N=1500
+    R=1    c=2.767  rev gets M=4150   TEST nrev=0.7887 rev=0.8054 d=-0.0168 se=0.0026 t=-6.46   TRAIN d=-0.0206 t=-9.90
+    R=10   c=1.811  rev gets M=2720   TEST nrev=0.7887 rev=0.7987 d=-0.0100 se=0.0028 t=-3.59   TRAIN d=-0.0139 t=-6.56
+    R=120  c=1.117  rev gets M=1680   TEST nrev=0.7887 rev=0.7788 d=+0.0099 se=0.0032 t=+3.08   TRAIN d=+0.0079 t=+3.44
+    R=600  c=1.012  rev gets M=1520   TEST nrev=0.7887 rev=0.7718 d=+0.0169 se=0.0033 t=+5.15   TRAIN d=+0.0119 t=+5.08
+  [titanic_lp_s5] N=2000
+    R=1    c=2.767  rev gets M=5530   TEST nrev=0.8012 rev=0.8022 d=-0.0010 se=0.0022 t=-0.44   TRAIN d=-0.0146 t=-8.28
+    R=10   c=1.811  rev gets M=3620   TEST nrev=0.8012 rev=0.8052 d=-0.0040 se=0.0022 t=-1.86   TRAIN d=-0.0109 t=-6.21
+    R=120  c=1.117  rev gets M=2230   TEST nrev=0.8012 rev=0.7929 d=+0.0083 se=0.0026 t=+3.25   TRAIN d=+0.0054 t=+2.68
+    R=600  c=1.012  rev gets M=2020   TEST nrev=0.8012 rev=0.7891 d=+0.0121 se=0.0027 t=+4.56   TRAIN d=+0.0101 t=+5.45
+  [titanic_lp_s1] N=2000
+    R=1    c=2.767  rev gets M=5530   TEST nrev=0.7993 rev=0.8022 d=-0.0029 se=0.0023 t=-1.27   TRAIN d=-0.0183 t=-10.68
+    R=10   c=1.811  rev gets M=3620   TEST nrev=0.7993 rev=0.8052 d=-0.0060 se=0.0022 t=-2.71   TRAIN d=-0.0146 t=-8.90
+    R=120  c=1.117  rev gets M=2230   TEST nrev=0.7993 rev=0.7929 d=+0.0064 se=0.0023 t=+2.77   TRAIN d=+0.0017 t=+0.96
+    R=600  c=1.012  rev gets M=2020   TEST nrev=0.7993 rev=0.7891 d=+0.0101 se=0.0021 t=+4.84   TRAIN d=+0.0064 t=+4.04
+
+Addendum3 wall-clock: 38.2 s

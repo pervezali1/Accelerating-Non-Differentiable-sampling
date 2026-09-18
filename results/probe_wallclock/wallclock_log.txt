@@ -1,0 +1,60 @@
+Titanic: n_train=712 n_test=179 lam=7.12 delta=1.082e-02 a_lower=0.500
+
+=== PHASE 0: per-iteration wall-clock (R=120, OMP_NUM_THREADS=2) ===
+  titanic/ball  rev=  1041.1 us/iter  nrev=  1171.5 us/iter  ratio c=1.1253
+  titanic/lp    rev=  1042.7 us/iter  nrev=  1194.0 us/iter  ratio c=1.1451
+  magic/ball    rev= 20283.0 us/iter  nrev= 21613.9 us/iter  ratio c=1.0656   (n_train=15216)
+
+=== PHASE 1: eta search on TRAIN accuracy, seed=3000 ===
+
+  [titanic_ball_s5] N=1500 (nrev budget)  M=1690 (rev compute-matched budget, c=1.1253)
+    eta= 1.0e-04  TRAIN rev@N=0.7977 rev@M=0.7982  nrev@N=0.7972
+    eta= 3.0e-05  TRAIN rev@N=0.7971 rev@M=0.7989  nrev@N=0.7974
+    eta= 1.0e-05  TRAIN rev@N=0.7646 rev@M=0.7718  nrev@N=0.7742
+    eta= 3.0e-06  TRAIN rev@N=0.6925 rev@M=0.7012  nrev@N=0.6953
+    eta= 1.0e-06  TRAIN rev@N=0.5996 rev@M=0.6101  nrev@N=0.6028
+    -> best-by-TRAIN: rev@N eta=0.0001, rev@M eta=3e-05, nrev@N eta=3e-05
+
+  [titanic_lp_s5] N=2000 (nrev budget)  M=2290 (rev compute-matched budget, c=1.1451)
+    eta= 1.0e-04  TRAIN rev@N=0.8052 rev@M=0.8050  nrev@N=0.7717
+    eta= 3.0e-05  TRAIN rev@N=0.8044 rev@M=0.8054  nrev@N=0.8039
+    eta= 1.0e-05  TRAIN rev@N=0.7809 rev@M=0.7880  nrev@N=0.7906
+    eta= 3.0e-06  TRAIN rev@N=0.7095 rev@M=0.7154  nrev@N=0.7160
+    eta= 1.0e-06  TRAIN rev@N=0.6279 rev@M=0.6400  nrev@N=0.6300
+    -> best-by-TRAIN: rev@N eta=0.0001, rev@M eta=3e-05, nrev@N eta=3e-05
+
+  [titanic_lp_s1] N=2000 (nrev budget)  M=2290 (rev compute-matched budget, c=1.1451)
+    eta= 1.0e-04  TRAIN rev@N=0.8052 rev@M=0.8050  nrev@N=0.8047
+    eta= 3.0e-05  TRAIN rev@N=0.8044 rev@M=0.8054  nrev@N=0.8042
+    eta= 1.0e-05  TRAIN rev@N=0.7809 rev@M=0.7880  nrev@N=0.7893
+    eta= 3.0e-06  TRAIN rev@N=0.7095 rev@M=0.7154  nrev@N=0.7075
+    eta= 1.0e-06  TRAIN rev@N=0.6279 rev@M=0.6400  nrev@N=0.6262
+    -> best-by-TRAIN: rev@N eta=0.0001, rev@M eta=3e-05, nrev@N eta=0.0001
+
+=== PHASE 2: CONFIRMATION on independent seed 4100 (R=120, paired) ===
+
+  [titanic_ball_s5]  s=5  eta_transient=1e-05  N=1500  M=1690  c=1.1253
+  B_iter_matched_same_eta [TEST]     nrev=0.7887  rev=0.7716  d=+0.0171  se=0.0034  t=+5.10  win=0.60
+  C_compute_matched_same_eta [TEST]  nrev=0.7887  rev=0.7799  d=+0.0088  se=0.0032  t=+2.75  win=0.47
+  D_rev_own_best_eta_N [TEST]        nrev=0.7887  rev=0.8057  d=-0.0170  se=0.0024  t=-7.09  win=0.20
+  E_rev_own_best_eta_M [TEST]        nrev=0.7887  rev=0.8068  d=-0.0182  se=0.0024  t=-7.56  win=0.21
+  F_bestVbest_compute_matched [TEST] nrev=0.8051  rev=0.8068  d=-0.0018  se=0.0016  t=-1.09  win=0.42
+    rev best-by-train eta: @N=0.0001  @M=3e-05;  nrev best-by-train eta=3e-05
+
+  [titanic_lp_s5]  s=5  eta_transient=1e-05  N=2000  M=2290  c=1.1451
+  B_iter_matched_same_eta [TEST]     nrev=0.8012  rev=0.7890  d=+0.0122  se=0.0026  t=+4.65  win=0.58
+  C_compute_matched_same_eta [TEST]  nrev=0.8012  rev=0.7940  d=+0.0072  se=0.0024  t=+3.03  win=0.60
+  D_rev_own_best_eta_N [TEST]        nrev=0.8012  rev=0.8053  d=-0.0041  se=0.0022  t=-1.84  win=0.45
+  E_rev_own_best_eta_M [TEST]        nrev=0.8012  rev=0.8035  d=-0.0023  se=0.0022  t=-1.05  win=0.49
+  F_bestVbest_compute_matched [TEST] nrev=0.8037  rev=0.8035  d=+0.0002  se=0.0014  t=+0.16  win=0.49
+    rev best-by-train eta: @N=0.0001  @M=3e-05;  nrev best-by-train eta=3e-05
+
+  [titanic_lp_s1]  s=1  eta_transient=1e-05  N=2000  M=2290  c=1.1451
+  B_iter_matched_same_eta [TEST]     nrev=0.7993  rev=0.7890  d=+0.0103  se=0.0021  t=+4.94  win=0.60
+  C_compute_matched_same_eta [TEST]  nrev=0.7993  rev=0.7940  d=+0.0053  se=0.0021  t=+2.45  win=0.49
+  D_rev_own_best_eta_N [TEST]        nrev=0.7993  rev=0.8053  d=-0.0060  se=0.0022  t=-2.72  win=0.38
+  E_rev_own_best_eta_M [TEST]        nrev=0.7993  rev=0.8035  d=-0.0042  se=0.0022  t=-1.97  win=0.43
+  F_bestVbest_compute_matched [TEST] nrev=0.8048  rev=0.8035  d=+0.0013  se=0.0015  t=+0.87  win=0.48
+    rev best-by-train eta: @N=0.0001  @M=3e-05;  nrev best-by-train eta=0.0001
+
+Total wall-clock: 185.5 s;  configurations run: 45

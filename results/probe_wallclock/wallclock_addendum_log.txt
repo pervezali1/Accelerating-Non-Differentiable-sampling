@@ -1,0 +1,16 @@
+
+=== ADDENDUM 1: cost ratio c vs vectorisation width R (titanic, ball) ===
+  R=1     rev=     58.3 us/iter  nrev=    161.2 us/iter  c=2.7673
+  R=10    rev=    146.7 us/iter  nrev=    265.6 us/iter  c=1.8107
+  R=120   rev=   1033.9 us/iter  nrev=   1154.7 us/iter  c=1.1168
+  R=600   rev=   7061.8 us/iter  nrev=   7149.1 us/iter  c=1.0124
+
+=== ADDENDUM 2: break-even overhead budget N_eq/N (eta=1e-5, seed=4100) ===
+  [titanic_ball_s5] nrev TRAIN@N=0.7780; rev reaches it at N_eq=1920 (1.28x) -> overhead budget c < 1.28 (measured c ~ 1.13)
+      TEST at N_eq (rev) vs N (nrev) nrev=0.7887  rev=0.7858  d=+0.0029  se=0.0030  t=+0.96  win=0.46
+  [titanic_lp_s5] nrev TRAIN@N=0.7903; rev reaches it at N_eq=2420 (1.21x) -> overhead budget c < 1.21 (measured c ~ 1.13)
+      TEST at N_eq (rev) vs N (nrev) nrev=0.8012  rev=0.7965  d=+0.0047  se=0.0022  t=+2.15  win=0.59
+  [titanic_lp_s1] nrev TRAIN@N=0.7866; rev reaches it at N_eq=2300 (1.15x) -> overhead budget c < 1.15 (measured c ~ 1.13)
+      TEST at N_eq (rev) vs N (nrev) nrev=0.7993  rev=0.7941  d=+0.0052  se=0.0022  t=+2.32  win=0.46
+
+Addendum wall-clock: 102.5 s

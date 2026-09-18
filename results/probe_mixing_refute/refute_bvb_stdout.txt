@@ -1,0 +1,48 @@
+
+=== D. BEST-VS-BEST, threshold-free (seed 5400, R=96, n_iter=16000) ===
+   rev eta= 1.0e-04 s=   0 wall=13.91s proj=0.3186 nonf=0  mean(w7)=-0.56510 tau(w7)=  205.1 ESSrate(w7)=  178.08/s
+   rev eta= 3.0e-04 s=   0 wall=14.93s proj=0.4973 nonf=0  mean(w7)=-0.56756 tau(w7)=   78.7 ESSrate(w7)=  416.79/s
+   rev eta= 1.0e-03 s=   0 wall=14.96s proj=0.7327 nonf=0  mean(w7)=-0.57019 tau(w7)=   23.6 ESSrate(w7)= 1343.20/s
+  nrev eta= 1.0e-04 s=   5 wall=16.09s proj=0.3211 nonf=0  mean(w7)=-0.56481 tau(w7)=  149.2 ESSrate(w7)=  214.71/s
+  nrev eta= 3.0e-04 s=   5 wall=16.06s proj=0.5064 nonf=0  mean(w7)=-0.56378 tau(w7)=   53.7 ESSrate(w7)=  564.89/s
+  nrev eta= 3.0e-04 s=   1 wall=16.16s proj=0.4979 nonf=0  mean(w7)=-0.56770 tau(w7)=   70.4 ESSrate(w7)=  428.57/s
+  nrev eta= 1.0e-03 s=   2 wall=16.37s proj=0.7365 nonf=0  mean(w7)=-0.56854 tau(w7)=   18.8 ESSrate(w7)= 1537.35/s
+
+  eta -> 0 extrapolation of the reversible ensemble mean (mean vs eta, in gold-sd units):
+            w4 form=  sqrt  mu0=+0.32847  gold(3e-5)=+0.32851  gold's own bias = +0.000 sd
+            w7 form=linear  mu0=-0.56606  gold(3e-5)=-0.56726  gold's own bias = -0.010 sd
+            w9 form=  sqrt  mu0=-0.27633  gold(3e-5)=-0.27713  gold's own bias = -0.007 sd
+         norm2 form=  sqrt  mu0=+1.93577  gold(3e-5)=+1.94193  gold's own bias = +0.093 sd
+       U_train form=  sqrt  mu0=+383.36919  gold(3e-5)=+383.36506  gold's own bias = -0.002 sd
+
+  bias (max over 12 train-only fns, in sd units) vs eta->0 EXTRAPOLATION, and vs the claimant's eta=3e-5 gold:
+                    cell  bias_vs_mu0  bias_vs_gold  ESSrate(w7)  |bias_w7|
+    ('rev', 0.0001, 0.0)       0.2033        0.1102       178.08     0.0078
+    ('rev', 0.0003, 0.0)       0.3755        0.2825       416.79     0.0122
+     ('rev', 0.001, 0.0)       0.6225        0.5294      1343.20     0.0336
+   ('nrev', 0.0001, 5.0)       0.2069        0.1138       214.71     0.0101
+   ('nrev', 0.0003, 5.0)       0.3942        0.3690       564.89     0.0185
+   ('nrev', 0.0003, 1.0)       0.3766        0.2836       428.57     0.0133
+    ('nrev', 0.001, 2.0)       0.6284        0.5353      1537.35     0.0202
+
+  RMSE (in sd units) of the E[w7] estimate after a wall-clock budget T, each arm picking its OWN best cell:
+      T (s) |          rev best cell  RMSE_rev |         nrev best cell  RMSE_nrev | winner  ratio
+          1 |    ('rev', 0.001, 0.0)    0.0433 |   ('nrev', 0.001, 2.0)     0.0325 |   nrev  1.331
+          3 |   ('rev', 0.0003, 0.0)    0.0308 |   ('nrev', 0.001, 2.0)     0.0250 |   nrev  1.231
+         10 |   ('rev', 0.0003, 0.0)    0.0197 |  ('nrev', 0.0003, 1.0)     0.0203 |    rev  0.972
+         30 |   ('rev', 0.0003, 0.0)    0.0151 |  ('nrev', 0.0003, 1.0)     0.0160 |    rev  0.946
+        100 |   ('rev', 0.0001, 0.0)    0.0108 |  ('nrev', 0.0001, 5.0)     0.0122 |    rev  0.888
+        300 |   ('rev', 0.0001, 0.0)    0.0089 |  ('nrev', 0.0001, 5.0)     0.0108 |    rev  0.823
+       1000 |   ('rev', 0.0001, 0.0)    0.0082 |  ('nrev', 0.0001, 5.0)     0.0103 |    rev  0.790
+      10000 |   ('rev', 0.0001, 0.0)    0.0078 |  ('nrev', 0.0001, 5.0)     0.0101 |    rev  0.775
+     100000 |   ('rev', 0.0001, 0.0)    0.0078 |  ('nrev', 0.0001, 5.0)     0.0101 |    rev  0.773
+
+  MATCHED-BIAS head-to-head at each eta (ESS rate of w7, whole ensemble, per second):
+    eta= 1.0e-04  rev(bias 0.203)   178.08/s   vs  nrev s=5 (bias 0.207)   214.71/s   x1.21
+    eta= 3.0e-04  rev(bias 0.376)   416.79/s   vs  nrev s=5 (bias 0.394)   564.89/s   x1.36
+    eta= 3.0e-04  rev(bias 0.376)   416.79/s   vs  nrev s=1 (bias 0.377)   428.57/s   x1.03
+    eta= 1.0e-03  rev(bias 0.622)  1343.20/s   vs  nrev s=2 (bias 0.628)  1537.35/s   x1.14
+
+  KEY CROSS-ETA: rev@3e-4 416.79/s vs nrev@1e-4 s=5 214.71/s  -> x1.94 in favour of the REVERSIBLE arm at ITS larger step size
+
+total wall 144.9s

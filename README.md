@@ -538,3 +538,99 @@ MAGIC ℓ_p +0.0001, Titanic ball −0.0000, Titanic ℓ_p +0.0011. And at the c
 **Answer:** raising λ does give the non-reversible arm a larger and cleaner lead (t up to 6.4),
 and it is the one knob so far that widens the gap systematically rather than by luck. It buys
 that lead by making the problem harder for both arms, so it does not produce a better model.
+
+---
+
+# Can the non-reversible arm beat the reversible one? A 7-hypothesis investigation
+
+Scripts `probe_*.py`, results in `results/probe_*/`. Seven hypotheses were probed in parallel and
+each claimed win was handed to an adversarial agent told to refute it. Six probes completed
+(`calibration` and three refutations hit a session limit and are marked UNREFUTED below).
+
+## The constraint that shapes the answer
+
+`J` is skew, `div J = 0`, and `Jn = 0` on `∂K`. So **both arms have the same invariant law.** No
+tuning can separate them on any *stationary* quantity — last-iterate accuracy included. That is a
+theorem, not an empirical finding, and it is why ten rounds of tuning η, s, Λ, per-block s and λ
+never produced an accuracy win that survived best-vs-best.
+
+But two theorems guarantee a difference elsewhere: the asymptotic variance of ergodic averages is
+never larger for the non-reversible chain (Hwang–Hwang–Sheu; Duncan–Lelièvre–Pavliotis), and the
+spectral gap is never smaller. **The win has to be measured on a time-average, not a marginal.**
+
+## Results
+
+| hypothesis | verdict | best-vs-best | refutation |
+|---|---|---|---|
+| **mixing** (ESS per second) | **WIN** | **yes** | **survives** |
+| hessian (MSE of ergodic average) | PARTIAL, win on the metric | yes | unrefuted |
+| multimodal (harder target, fixed budget) | WIN at fixed budget | yes | unrefuted |
+| ergodic (ergodic-average accuracy) | PARTIAL | no | unrefuted |
+| overdispersed (hard initialisation) | not a win | no | refuted |
+| wallclock (compute-matched accuracy) | BACKFIRED | no | — |
+| calibration | did not run | — | — |
+
+### The defensible win: sampling efficiency
+
+Titanic, η = 1e-4, s = 5, R = 96 **coupled** chains, wall-clock corrected (the non-reversible arm
+is charged its full 1.13× per-step cost). IACT falls on all nine coordinates; ESS per second:
+
+| test fn | IACT rev → nrev | ESS/s rev → nrev | speed-up |
+|---|---|---|---|
+| w4 | 111 → 17 | 3.26 → 17.8 | **×5.47** |
+| w6 | 107 → 16 | 3.41 → 18.0 | ×5.30 |
+| w9 | 174 → 48 | 2.16 → 6.54 | ×3.03 |
+| w8 | 111 → 33 | 3.29 → 9.00 | ×2.74 |
+| w7 (pre-registered primary) | 190 → 130 | 1.99 → 2.62 | ×1.32 |
+| ‖w‖² | 12.3 → 12.0 | 29.2 → 26.4 | **×0.91 (worse)** |
+
+Summed over 12 training-only test functions: ×1.56. Replicated on the smoothed ℓ_p geometry
+(×1.64) and on three further seeds.
+
+**What the adversarial re-check established.** (i) The `s = 0` pairing control is **bit-identical**
+between the arms (max diff exactly 0), so the paired SEs are real. (ii) An independent 4th seed
+reproduces every coordinate and every backfire. (iii) With both arms started from a common
+*pre-equilibrated* ensemble and no burn-in discarded, the win persists (×1.21, t = 6.9) — it is not
+a transient. (iv) **Best-vs-best survives at matched discretisation bias**: letting each arm pick
+its own (η, s) under a bias ceiling measured against an η→0 reference, the non-reversible arm wins
+at every ceiling tried (×1.21, ×1.36, ×1.14).
+
+**What the re-check knocked down.** The headline ×1.31 is at the optimistic end of its own sampling
+distribution. Under a truncation-free estimator (ESS from the across-chain variance of chain
+time-averages, immune to Geyer truncation) the pre-registered primary function improves only
+**×1.12, bootstrap 95% CI [0.97, 1.30]** — not individually significant. Pooling six independent
+measurements gives **≈ ×1.2**, not ×1.31. The large per-coordinate gains (×2.7–×5.5) are not in
+dispute; the modest gain on the *worst* coordinate is what sets the honest headline.
+
+### Supporting evidence, same direction
+
+* **Monte-Carlo variance of ergodic averages** falls by 2.0–2.6× (test-set predicted probability
+  variance ratio rev/nrev = 2.59 on the ball, 2.43 on ℓ_p), and survives a common-start control
+  that removes initial-condition spread (ratio 2.32).
+* **MSE of the ergodic average at best-vs-best**, each arm at its own training-selected η,
+  confirmation seed, R = 400: non-reversible 8.03e-6 vs reversible 1.157e-5 on the test predicted
+  probability, paired t = −3.54. (Unrefuted.)
+
+### Where it does not win, stated plainly
+
+* **Prediction.** Last-iterate test accuracy: t = +1.37 on the ball, t = −0.02 on ℓ_p — nothing, as
+  the shared-invariant-law argument requires.
+* **Best-vs-best predictive quality.** The reversible arm at its own best η = 1e-3 reaches test
+  accuracy 0.8259 / log loss 0.4884, beating the non-reversible arm's 0.8180 / 0.4900 at η = 3e-5.
+  (Caveat in both directions: at η = 1e-3 the reversible chain is clipped to the boundary on 73% of
+  steps — it scores well predictively while being a badly biased sampler of `π_K`.)
+* **Compute-matched accuracy** depends on an implementation artefact: the cost ratio is 2.77 at
+  R = 1 chain but 1.01 at R = 600, against a break-even of 1.15–1.28. Vectorised, it wins; single
+  chain, it loses.
+* **Not every test function improves.** ‖w‖² is consistently ×0.91, and the likelihood functionals
+  are neutral or slightly worse.
+
+## Bottom line
+
+**Yes — the non-reversible arm beats the reversible one, decisively and reproducibly, on the thing
+non-reversibility is for: Monte-Carlo efficiency per unit wall clock (≈ ×1.2 on the worst
+coordinate, ×2.7–5.5 on the best, ×1.56 summed) and asymptotic variance of posterior functionals
+(2.0–2.6× lower).** It does **not** beat it on predictive accuracy, and it cannot: the two chains
+sample the same law. Anyone wanting posterior functionals — credible intervals, predictive
+variances, expectations — should use the non-reversible arm. Anyone wanting a point prediction
+gains nothing from it.

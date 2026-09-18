@@ -1,0 +1,178 @@
+
+============================================================================================
+[titanic / ball]  n_train=712 n_test=179 lam=7.12 delta=0.01082 n_iter=2000
+============================================================================================
+constrained mode found in 0.2s, ||w*||=1.4142, g(w*) feasible=True, ||grad U_0(w*)||=35.2
+H eigenvalues: [ 11.429  27.062  33.992  75.041 125.18  168.909 296.271 640.769 669.949 709.595]
+H condition number = 62.09   (lmax=709.6, lmin=11.43)
+diag(H) = [146.654 147.354 131.709 700.529  89.921  55.193 635.577  77.083 668.802 105.373]
+top-3 eigenvector mass on natural blocks I1/I2/I3:
+   eigvec lambda=709.6: I1=0.992 I2=0.003 I3=0.005 intercept=0.000
+   eigvec lambda=669.9: I1=0.004 I2=0.008 I3=0.987 intercept=0.002
+   eigvec lambda=640.8: I1=0.001 I2=0.979 I3=0.013 intercept=0.007
+layout natural  perm(feat)=[np.int64(1), np.int64(2), np.int64(3), np.int64(4), np.int64(5), np.int64(6), np.int64(7), np.int64(8), np.int64(9)]  I1: lmax=707.3 cond=6.71 |g|=5.503  I2: lmax=635.9 cond=11.7 |g|=29.66  I3: lmax=669.1 cond=18.8 |g|=16.14
+layout mixed    perm(feat)=[np.int64(3), np.int64(1), np.int64(4), np.int64(8), np.int64(2), np.int64(7), np.int64(6), np.int64(9), np.int64(5)]  I1: lmax=702.7 cond=8.28 |g|=8.953  I2: lmax=669.1 cond=8.8 |g|=15.02  I3: lmax=637.4 cond=17.8 |g|=29.41
+layout homog    perm(feat)=[np.int64(3), np.int64(8), np.int64(6), np.int64(1), np.int64(2), np.int64(9), np.int64(4), np.int64(7), np.int64(5)]  I1: lmax=700.8 cond=1.1 |g|=0.1184  I2: lmax=172.5 cond=1.66 |g|=8.824  I3: lmax=116.8 cond=4.12 |g|=33.06
+  rule iso   -> s/c = (1.0, 1.0, 1.0)
+  rule hess  -> s/c = (0.9734, 1.0266, 1.0008)
+  rule hcond -> s/c = (0.5894, 1.0277, 1.6509)
+  rule grad  -> s/c = (2.5096, 0.4656, 0.8559)
+
+-- stage 1: reversible arm, own best eta (training accuracy, search seed) --
+   eta=0.0001   train=0.8004 (sd 0.0103) proj=0.291
+   eta=0.0003   train=0.7994 (sd 0.0100) proj=0.484
+   eta=0.001    train=0.7979 (sd 0.0111) proj=0.728
+   eta=0.003    train=0.7962 (sd 0.0116) proj=0.914
+   -> reversible best eta = 0.0001  train=0.8004
+
+-- stage 2: stability ceiling, rules x budgets (natural blocks, eta=eta_rev) --
+   iso   c=1      s=(1.0, 1.0, 1.0) train=0.8003 proj=0.293 
+   iso   c=3      s=(3.0, 3.0, 3.0) train=0.8010 proj=0.296 
+   iso   c=10     s=(10.0, 10.0, 10.0) train=0.7977 proj=0.308 
+   iso   c=30     s=(30.0, 30.0, 30.0) train=0.6576 proj=0.945 COLLAPSED
+   iso   c=100    s=(100.0, 100.0, 100.0) train=0.5004 proj=0.999 COLLAPSED
+   hess  c=1      s=(0.973, 1.027, 1.001) train=0.8005 proj=0.293 
+   hess  c=3      s=(2.92, 3.08, 3.002) train=0.8012 proj=0.296 
+   hess  c=10     s=(9.734, 10.266, 10.008) train=0.7974 proj=0.309 
+   hess  c=30     s=(29.201, 30.797, 30.024) train=0.6373 proj=0.953 COLLAPSED
+   hess  c=100    s=(97.336, 102.655, 100.079) train=0.4961 proj=0.999 COLLAPSED
+   hcond c=1      s=(0.589, 1.028, 1.651) train=0.8005 proj=0.293 
+   hcond c=3      s=(1.768, 3.083, 4.953) train=0.8020 proj=0.297 
+   hcond c=10     s=(5.894, 10.277, 16.509) train=0.7953 proj=0.319 
+   hcond c=30     s=(17.683, 30.83, 49.528) train=0.5850 proj=0.996 COLLAPSED
+   hcond c=100    s=(58.942, 102.765, 165.094) train=0.4910 proj=1.000 COLLAPSED
+   grad  c=1      s=(2.51, 0.466, 0.856) train=0.8002 proj=0.291 
+   grad  c=3      s=(7.529, 1.397, 2.568) train=0.8006 proj=0.294 
+   grad  c=10     s=(25.096, 4.656, 8.559) train=0.7982 proj=0.303 
+   grad  c=30     s=(75.287, 13.968, 25.676) train=0.5240 proj=0.756 COLLAPSED
+   grad  c=100    s=(250.956, 46.559, 85.585) train=0.5131 proj=0.985 COLLAPSED
+   stability ceiling (largest non-collapsed budget c): iso=10  hess=10  hcond=10  grad=10
+   -> best (rule, c) by TRAINING accuracy: hcond, c=3 (0.8020)
+
+-- stage 3: rule x block layout at the selected budget c --
+   layout=natural  rule=iso    s=(3.0, 3.0, 3.0) train=0.8010 proj=0.296
+   layout=natural  rule=hess   s=(2.92, 3.08, 3.002) train=0.8012 proj=0.296
+   layout=natural  rule=hcond  s=(1.768, 3.083, 4.953) train=0.8020 proj=nan
+   layout=natural  rule=grad   s=(7.529, 1.397, 2.568) train=0.8006 proj=0.294
+   layout=mixed    rule=iso    s=(3.0, 3.0, 3.0) train=0.7969 proj=0.291
+   layout=mixed    rule=hess   s=(2.928, 3.0, 3.074) train=0.7971 proj=0.291
+   layout=mixed    rule=hcond  s=(2.277, 2.418, 4.903) train=0.7973 proj=0.293
+   layout=mixed    rule=grad   s=(5.299, 3.159, 1.613) train=0.7966 proj=0.290
+   layout=homog    rule=iso    s=(3.0, 3.0, 3.0) train=0.7963 proj=0.293
+   layout=homog    rule=hess   s=(1.762, 3.551, 4.316) train=0.7968 proj=0.294
+   layout=homog    rule=hcond  s=(1.689, 2.535, 6.307) train=0.7980 proj=0.296
+   layout=homog    rule=grad   s=(82.513, 1.107, 0.296) train=0.6374 proj=0.890
+   -> best (rule, layout) by TRAINING accuracy: hcond, natural (0.8020)
+
+-- stage 4: non-reversible arm, own best eta at the selected J --
+   eta=0.0001   train=0.8020 proj=0.297
+   eta=0.0003   train=0.7988 proj=0.490
+   eta=0.001    train=0.7947 proj=0.744
+   eta=0.003    train=0.7343 proj=0.983
+   -> non-reversible best eta = 0.0001
+
+-- stage 5: CONFIRMATION, seed 4100, R=300, never used above --
+   reversible      eta=0.0001  train=0.7987  test=0.8058 +- 0.0007
+   non-rev (hess)  eta=0.0001  train=0.7983  test=0.8058
+   non-rev (iso)   eta=0.0001  test=0.8056
+   non-rev own-best eta=0.0001  train=0.7983  test=0.8058
+   PAIRED sel_vs_rev:test          diff=-0.00006 se=0.00072 t=-0.08 win=39% n=300
+   PAIRED sel_vs_rev:train         diff=-0.00040 se=0.00057 t=-0.70 win=44% n=300
+   PAIRED sel_vs_rev:test_erg      diff=+0.00006 se=0.00018 t=+0.35 win=50% n=300
+   PAIRED sel_vs_rev:train_erg     diff=-0.00029 se=0.00014 t=-1.99 win=40% n=300
+   PAIRED sel_vs_rev:U0_erg        diff=+0.16104 se=0.03837 t=+4.20 win=59% n=300
+   PAIRED sel_vs_rev:sqerr_train_erg diff=-0.00000 se=0.00000 t=-4.43 win=60% n=300
+   PAIRED sel_vs_rev:sqerr_U0_erg  diff=+0.10973 se=0.06453 t=+1.70 win=47% n=300
+   PAIRED iso_vs_rev:test          diff=-0.00026 se=0.00072 t=-0.36 win=37% n=300
+   PAIRED iso_vs_rev:train         diff=+0.00024 se=0.00055 t=+0.44 win=48% n=300
+   PAIRED iso_vs_rev:test_erg      diff=-0.00002 se=0.00017 t=-0.14 win=49% n=300
+   PAIRED iso_vs_rev:train_erg     diff=-0.00024 se=0.00014 t=-1.66 win=42% n=300
+   PAIRED iso_vs_rev:U0_erg        diff=+0.14277 se=0.03585 t=+3.98 win=61% n=300
+   PAIRED iso_vs_rev:sqerr_train_erg diff=-0.00000 se=0.00000 t=-4.30 win=57% n=300
+   PAIRED iso_vs_rev:sqerr_U0_erg  diff=+0.07631 se=0.05725 t=+1.33 win=49% n=300
+   best-vs-best on test accuracy: non-reversible <= reversible
+
+============================================================================================
+[magic / ball]  n_train=15216 n_test=3804 lam=152.2 delta=0.0005062 n_iter=1000
+============================================================================================
+constrained mode found in 1.2s, ||w*||=1.4142, g(w*) feasible=True, ||grad U_0(w*)||=91.5
+H eigenvalues: [  319.993   459.665   807.452  1268.872  1595.01   1688.106  2093.498  2546.619  2672.747 10117.733]
+H condition number = 31.62   (lmax=1.012e+04, lmin=320)
+diag(H) = [2522.469 9563.746 2494.092 2066.625 2225.177 1663.276 1316.907  914.631  449.75   353.02 ]
+top-3 eigenvector mass on natural blocks I1/I2/I3:
+   eigvec lambda=1.012e+04: I1=0.989 I2=0.004 I3=0.001 intercept=0.006
+   eigvec lambda=2673: I1=0.370 I2=0.444 I3=0.004 intercept=0.182
+   eigvec lambda=2547: I1=0.098 I2=0.186 I3=0.001 intercept=0.715
+layout natural  perm(feat)=[np.int64(1), np.int64(2), np.int64(3), np.int64(4), np.int64(5), np.int64(6), np.int64(7), np.int64(8), np.int64(9)]  I1: lmax=1.003e+04 cond=5.13 |g|=63.89  I2: lmax=2251 cond=1.74 |g|=46.61  I3: lmax=925.9 cond=2.83 |g|=18.78
+layout mixed    perm(feat)=[np.int64(1), np.int64(3), np.int64(7), np.int64(2), np.int64(5), np.int64(8), np.int64(4), np.int64(6), np.int64(9)]  I1: lmax=9594 cond=10.7 |g|=22.89  I2: lmax=2502 cond=5.61 |g|=74.09  I3: lmax=2241 cond=6.36 |g|=24.37
+layout homog    perm(feat)=[np.int64(1), np.int64(2), np.int64(4), np.int64(3), np.int64(5), np.int64(6), np.int64(7), np.int64(8), np.int64(9)]  I1: lmax=1.004e+04 cond=5.11 |g|=65.75  I2: lmax=2104 cond=1.64 |g|=43.96  I3: lmax=925.9 cond=2.83 |g|=18.78
+  rule iso   -> s/c = (1.0, 1.0, 1.0)
+  rule hess  -> s/c = (0.524, 1.1063, 1.725)
+  rule hcond -> s/c = (1.7488, 0.5933, 0.9638)
+  rule grad  -> s/c = (0.5986, 0.8204, 2.0364)
+
+-- stage 1: reversible arm, own best eta (training accuracy, search seed) --
+   eta=0.0001   train=0.7833 (sd 0.0011) proj=0.680
+   eta=0.0003   train=0.6295 (sd 0.0056) proj=1.000
+   eta=0.001    train=0.5553 (sd 0.0158) proj=1.000
+   eta=0.003    train=0.5480 (sd 0.0169) proj=1.000
+   -> reversible best eta = 0.0001  train=0.7833
+
+-- stage 2: stability ceiling, rules x budgets (natural blocks, eta=eta_rev) --
+   iso   c=1      s=(1.0, 1.0, 1.0) train=0.7832 proj=0.683 
+   iso   c=10     s=(10.0, 10.0, 10.0) train=0.5017 proj=1.000 COLLAPSED
+   iso   c=100    s=(100.0, 100.0, 100.0) train=0.5373 proj=1.000 COLLAPSED
+   hess  c=1      s=(0.524, 1.106, 1.725) train=0.7832 proj=0.682 
+   hess  c=10     s=(5.24, 11.063, 17.25) train=0.5602 proj=1.000 COLLAPSED
+   hess  c=100    s=(52.402, 110.629, 172.497) train=0.5099 proj=1.000 COLLAPSED
+   hcond c=1      s=(1.749, 0.593, 0.964) train=0.7830 proj=0.698 
+   hcond c=10     s=(17.488, 5.933, 9.638) train=0.4839 proj=1.000 COLLAPSED
+   hcond c=100    s=(174.884, 59.329, 96.378) train=0.5438 proj=1.000 COLLAPSED
+   grad  c=1      s=(0.599, 0.82, 2.036) train=0.7832 proj=0.681 
+   grad  c=10     s=(5.986, 8.204, 20.364) train=0.5433 proj=1.000 COLLAPSED
+   grad  c=100    s=(59.857, 82.04, 203.637) train=0.4838 proj=1.000 COLLAPSED
+   stability ceiling (largest non-collapsed budget c): iso=1  hess=1  hcond=1  grad=1
+   -> best (rule, c) by TRAINING accuracy: grad, c=1 (0.7832)
+
+-- stage 3: rule x block layout at the selected budget c --
+   layout=natural  rule=iso    s=(1.0, 1.0, 1.0) train=0.7832 proj=0.683
+   layout=natural  rule=hess   s=(0.524, 1.106, 1.725) train=0.7832 proj=0.682
+   layout=natural  rule=hcond  s=(1.749, 0.593, 0.964) train=0.7830 proj=0.698
+   layout=natural  rule=grad   s=(0.599, 0.82, 2.036) train=0.7832 proj=nan
+   layout=mixed    rule=iso    s=(1.0, 1.0, 1.0) train=0.7832 proj=0.683
+   layout=mixed    rule=hess   s=(0.627, 1.228, 1.298) train=0.7832 proj=0.684
+   layout=mixed    rule=hcond  s=(1.477, 0.773, 0.876) train=0.7831 proj=0.683
+   layout=mixed    rule=grad   s=(1.511, 0.467, 1.419) train=0.7832 proj=0.683
+   layout=homog    rule=iso    s=(1.0, 1.0, 1.0) train=0.7833 proj=0.683
+   layout=homog    rule=hess   s=(0.518, 1.132, 1.706) train=0.7834 proj=0.682
+   layout=homog    rule=hcond  s=(1.779, 0.571, 0.984) train=0.7832 proj=0.706
+   layout=homog    rule=grad   s=(0.576, 0.861, 2.016) train=0.7834 proj=0.682
+   -> best (rule, layout) by TRAINING accuracy: hess, homog (0.7834)
+
+-- stage 4: non-reversible arm, own best eta at the selected J --
+   eta=0.0001   train=0.7834 proj=0.682
+   eta=0.0003   train=0.7188 proj=1.000
+   eta=0.001    train=0.6212 proj=1.000
+   eta=0.003    train=0.6034 proj=1.000
+   -> non-reversible best eta = 0.0001
+
+-- stage 5: CONFIRMATION, seed 4100, R=100, never used above --
+   reversible      eta=0.0001  train=0.7830  test=0.7835 +- 0.0001
+   non-rev (hess)  eta=0.0001  train=0.7829  test=0.7835
+   non-rev (iso)   eta=0.0001  test=0.7834
+   non-rev own-best eta=0.0001  train=0.7829  test=0.7835
+   PAIRED sel_vs_rev:test          diff=+0.00003 se=0.00010 t=+0.29 win=46% n=100
+   PAIRED sel_vs_rev:train         diff=-0.00003 se=0.00008 t=-0.42 win=53% n=100
+   PAIRED sel_vs_rev:test_erg      diff=-0.00000 se=0.00001 t=-0.26 win=48% n=100
+   PAIRED sel_vs_rev:train_erg     diff=-0.00000 se=0.00001 t=-0.38 win=48% n=100
+   PAIRED sel_vs_rev:U0_erg        diff=+0.16492 se=0.02226 t=+7.41 win=76% n=100
+   PAIRED sel_vs_rev:sqerr_train_erg diff=-0.00000 se=0.00000 t=-0.81 win=50% n=100
+   PAIRED sel_vs_rev:sqerr_U0_erg  diff=-0.02450 se=0.01794 t=-1.37 win=52% n=100
+   PAIRED iso_vs_rev:test          diff=-0.00011 se=0.00009 t=-1.21 win=39% n=100
+   PAIRED iso_vs_rev:train         diff=-0.00009 se=0.00006 t=-1.47 win=44% n=100
+   PAIRED iso_vs_rev:test_erg      diff=-0.00002 se=0.00001 t=-1.89 win=44% n=100
+   PAIRED iso_vs_rev:train_erg     diff=-0.00002 se=0.00001 t=-2.24 win=45% n=100
+   PAIRED iso_vs_rev:U0_erg        diff=+0.40153 se=0.02204 t=+18.22 win=97% n=100
+   PAIRED iso_vs_rev:sqerr_train_erg diff=-0.00000 se=0.00000 t=-0.25 win=50% n=100
+   PAIRED iso_vs_rev:sqerr_U0_erg  diff=+0.00516 se=0.03247 t=+0.16 win=52% n=100
+   best-vs-best on test accuracy: non-reversible > reversible

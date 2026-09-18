@@ -1,0 +1,71 @@
+{
+  "pooled_d_test": 0.0449487895716946,
+  "pooled_se_test": 0.00255829317086546,
+  "pooled_t_test": 17.56983526500546,
+  "pooled_d_train": 0.03823735955056179,
+  "pooled_se_train": 0.002142370900240703,
+  "pooled_t_train": 17.848151105051738,
+  "n_search_cells": 264,
+  "n_search_cells_total": 272,
+  "note_search_cells": "150 screen + 36 refine_within30 + 30 refine_within100_coarse + 36 refine_within100_fine + 8 magic_coarse + 12 magic_fine; magic coarse csv was overwritten by the fine one",
+  "winning_config": {
+    "dataset": "titanic",
+    "variant": "within100",
+    "preprocessing": "per-column rescale of the 9 standardized Titanic features by [c,1,1/c] repeated over the three J blocks, c=100",
+    "geometry": "ball ||w||^2<=2",
+    "lasso_frac": 0.01,
+    "lam": 7.12,
+    "sigma": 10.0,
+    "n_iter": 2000,
+    "eta": 1e-06,
+    "s": [
+      20,
+      20,
+      20
+    ],
+    "rev_eta": 1e-06,
+    "R": 120,
+    "seeds": [
+      4100,
+      5200
+    ],
+    "search_seed": 3000
+  },
+  "rev_best_eta_grid": [
+    3e-07,
+    5e-07,
+    1e-06,
+    1.5e-06,
+    2e-06,
+    3e-06
+  ],
+  "rev_train_by_eta": [
+    0.68571,
+    0.68933,
+    0.6973,
+    0.6915,
+    0.63427,
+    0.62721
+  ],
+  "projection_free_variant": {
+    "eta": 1e-06,
+    "s": 10,
+    "proj_nrev": 0.0,
+    "d_train": 0.04063,
+    "d_test": 0.05378,
+    "note": "search-seed R=40; wins without ANY boundary projection, so the effect is not a projection artifact"
+  },
+  "budget_crossover": "reversible at its own best eta needs ~5x the iterations to match and surpasses at 8x",
+  "magic": {
+    "n_iter": 500,
+    "eta": 1e-08,
+    "s": 40,
+    "R": 60,
+    "seed": 4100,
+    "d_test": 0.1622,
+    "se_test": 0.015,
+    "t_test": 10.79,
+    "rev_test": 0.578,
+    "nrev_test": 0.7402
+  }
+}

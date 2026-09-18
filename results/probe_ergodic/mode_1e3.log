@@ -1,0 +1,24 @@
+
+=== STAGE 'mode': all replicates start at the SAME projected-gradient mode of U_0 ===
+  [titanic_ball] mode w* = [-3.3190e-01 -1.6850e-01 -1.4310e-01 -3.9000e-03  3.1780e-01  1.1487e+00
+ -2.6000e-03 -5.8620e-01  7.0000e-04 -2.7720e-01]  U0=377.676 feasible=True
+[titanic_ball] common-start, eta=0.001, s=0.5, R=300
+   train_logloss          rev=0.507152 nrev=0.507161 diff=+8.958e-06 se=4.79e-06 t=+1.87 win=54%
+   test_logloss           rev=0.488360 nrev=0.488375 diff=+1.436e-05 se=1.22e-05 t=+1.17 win=58%
+   test_brier             rev=0.155339 nrev=0.155342 diff=+2.723e-06 se=6.48e-06 t=+0.42 win=53%
+   test_acc               rev=0.825903 nrev=0.825847 diff=-5.587e-05 se=1.19e-04 t=-0.47 win=6%
+   last_iterate_test_acc  rev=0.805158 nrev=0.805866 diff=+7.076e-04 se=4.36e-04 t=+1.62 win=34%
+   PURE MC Var(ergodic w) ratio rev/nrev pooled = 1.065; per-coord = 1.01, 1.02, 1.04, 1.02, 1.28, 1.04, 1.25, 1.00, 1.13, 1.06
+   PURE MC Var(ergodic test prob) ratio = 1.087
+  [titanic_lp] mode w* = [-4.3030e-01 -2.1250e-01 -1.9530e-01 -1.9200e-02  3.2920e-01  1.5659e+00
+ -5.7000e-03 -7.6010e-01  9.0000e-04 -2.8650e-01]  U0=365.490 feasible=True
+[titanic_lp] common-start, eta=0.001, s=0.5, R=300
+   train_logloss          rev=0.481993 nrev=0.482040 diff=+4.645e-05 se=1.12e-05 t=+4.16 win=61%
+   test_logloss           rev=0.458740 nrev=0.458849 diff=+1.090e-04 se=2.09e-05 t=+5.22 win=62%
+   test_brier             rev=0.144292 nrev=0.144335 diff=+4.309e-05 se=1.09e-05 t=+3.94 win=58%
+   test_acc               rev=0.805270 nrev=0.805326 diff=+5.587e-05 se=2.03e-04 t=+0.27 win=16%
+   last_iterate_test_acc  rev=0.801695 nrev=0.801881 diff=+1.862e-04 se=5.90e-04 t=+0.32 win=38%
+   PURE MC Var(ergodic w) ratio rev/nrev pooled = 1.245; per-coord = 1.02, 1.02, 1.06, 1.02, 2.38, 1.07, 2.92, 1.07, 1.48, 1.36
+   PURE MC Var(ergodic test prob) ratio = 1.345
+
+total 139.9s

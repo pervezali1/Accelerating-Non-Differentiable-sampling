@@ -1,0 +1,8 @@
+
+=== ADDENDUM (exploratory): wider s grid at the selected eta ===
+  arm      eta     s   wall   proj   bias  maxRhat  ESS/s(prim)
+ nrev  1.0e-04     8    6.2  0.323  0.269   1.0556        206.9
+ nrev  1.0e-04    12    5.9  0.341  1.322   1.0498        264.5
+ nrev  1.0e-04    20    6.0  0.714 24.929   1.0235       2300.1
+ nrev  1.0e-04    35    6.1  0.965 50.716   1.0103       8833.2
+admissible-best s at eta=0.0001 on the search seed: s=None

@@ -1,0 +1,22 @@
+
+============================================================================================
+STAGE 7: best-vs-best on MSE of the ergodic average (titanic/ball). J = rule grad, c=10, s=(25.096, 4.656, 8.559)
+============================================================================================
+reference: reversible, eta=1e-05, n_iter=20000, R=200 (same effective time eta*n_iter)
+   reference means: train=0.79892 test=0.80580 U0=383.506
+
+-- eta sweep, both arms, R=400, seed 5200 (n_iter scaled to keep eta*n_iter fixed) --
+   rev  eta=0.0001   n=2000   TRAIN mean=0.79905 bias=+0.00012 var=7.977e-06 MSE=7.992e-06 | TEST MSE=1.085e-05
+   nrev eta=0.0001   n=2000   TRAIN mean=0.79698 bias=-0.00195 var=5.024e-06 MSE=8.814e-06 | TEST MSE=7.226e-06
+   rev  eta=0.0003   n=667    TRAIN mean=0.79884 bias=-0.00009 var=8.863e-06 MSE=8.871e-06 | TEST MSE=1.074e-05
+   nrev eta=0.0003   n=667    TRAIN mean=0.60629 bias=-0.19264 var=2.032e-05 MSE=3.713e-02 | TEST MSE=4.047e-02
+   rev  eta=0.001    n=200    TRAIN mean=0.79852 bias=-0.00041 var=8.108e-06 MSE=8.274e-06 | TEST MSE=1.202e-05
+   nrev eta=0.001    n=200    TRAIN mean=0.54437 bias=-0.25455 var=1.381e-05 MSE=6.481e-02 | TEST MSE=7.023e-02
+   rev  eta=0.003    n=67     TRAIN mean=0.79681 bias=-0.00212 var=8.829e-06 MSE=1.331e-05 | TEST MSE=1.674e-05
+   nrev eta=0.003    n=67     TRAIN mean=0.54665 bias=-0.25228 var=6.185e-05 MSE=6.370e-02 | TEST MSE=6.771e-02
+   -> selected on TRAINING MSE only: reversible eta=0.0001, non-reversible eta=0.0001
+
+-- CONFIRMATION seed 6300, R=400, each arm at its OWN best eta --
+   train_half  nrev mean=0.79708 var=4.798e-06 MSE=8.182e-06 | rev mean=0.79880 var=7.753e-06 MSE=7.767e-06 | paired sq.err diff=+4.232e-07 se=7.867e-07 t=+0.54 win=52%
+   test_half   nrev mean=0.80432 var=5.834e-06 MSE=8.027e-06 | rev mean=0.80579 var=1.157e-05 MSE=1.157e-05 | paired sq.err diff=-3.534e-06 se=9.970e-07 t=-3.54 win=55%
+   U0_half     nrev mean=384.18124 var=7.949e-01 MSE=1.251e+00 | rev mean=383.34810 var=6.422e-01 MSE=6.672e-01 | paired sq.err diff=+5.833e-01 se=1.013e-01 t=+5.76 win=43%

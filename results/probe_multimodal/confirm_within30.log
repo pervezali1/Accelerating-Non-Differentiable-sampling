@@ -1,0 +1,5 @@
+[seed 4100] eta=1.5e-05 s=2 R=120  rev_train=0.7656 nrev_train=0.7676 d_train=+0.0020 (t=+2.45)  |  rev_test=0.7875 nrev_test=0.7888 d_test=+0.0013 (t=+1.46)
+           wall: rev 2.13s  nrev 2.40s  proj rev 0.008 nrev 0.032
+[seed 5200] eta=1.5e-05 s=2 R=120  rev_train=0.7644 nrev_train=0.7663 d_train=+0.0019 (t=+2.10)  |  rev_test=0.7858 nrev_test=0.7872 d_test=+0.0014 (t=+1.46)
+           wall: rev 2.15s  nrev 2.41s  proj rev 0.009 nrev 0.038
+confirm total 9s -> confirm_within30.json

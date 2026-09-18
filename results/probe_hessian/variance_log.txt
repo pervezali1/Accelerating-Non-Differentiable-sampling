@@ -1,0 +1,32 @@
+
+============================================================================================
+STAGE 6: asymptotic variance of ergodic averages, titanic/ball, eta=0.0001 (reversible arm's own best), n_iter=2000
+============================================================================================
+-- selection (training ergodic average, search seed, R=120) --
+   rule=iso    c=1     var_nrev/var_rev = 0.7882 (diff -1.913e-06, t=-2.58)
+   rule=iso    c=3     var_nrev/var_rev = 0.6178 (diff -3.452e-06, t=-2.73)
+   rule=iso    c=10    var_nrev/var_rev = 0.5953 (diff -3.654e-06, t=-2.65)
+   rule=hess   c=1     var_nrev/var_rev = 0.7838 (diff -1.953e-06, t=-2.63)
+   rule=hess   c=3     var_nrev/var_rev = 0.6075 (diff -3.545e-06, t=-2.79)
+   rule=hess   c=10    var_nrev/var_rev = 0.6788 (diff -2.900e-06, t=-1.98)
+   rule=hcond  c=1     var_nrev/var_rev = 0.7387 (diff -2.360e-06, t=-2.49)
+   rule=hcond  c=3     var_nrev/var_rev = 0.5699 (diff -3.884e-06, t=-3.09)
+   rule=hcond  c=10    var_nrev/var_rev = 0.7673 (diff -2.101e-06, t=-1.46)
+   rule=grad   c=1     var_nrev/var_rev = 0.8085 (diff -1.730e-06, t=-2.77)
+   rule=grad   c=3     var_nrev/var_rev = 0.6473 (diff -3.185e-06, t=-2.54)
+   rule=grad   c=10    var_nrev/var_rev = 0.4690 (diff -4.795e-06, t=-3.66)
+   -> selected on TRAINING variance: rule=grad, c=10 (ratio 0.4690)
+
+-- CONFIRMATION seed 5200, R=400, paired (same W0, same noise) --
+   sel train_half  VAR nrev/rev=0.6298  diff=-2.9455e-06 se=6.286e-07 t=-4.69 boot95=[-4.202e-06,-1.759e-06] | MEAN diff=-0.00207 t=-14.85
+   sel test_half   VAR nrev/rev=0.4882  diff=-5.5142e-06 se=8.432e-07 t=-6.54 boot95=[-7.236e-06,-3.909e-06] | MEAN diff=-0.00163 t=-10.83
+   sel U0_half     VAR nrev/rev=1.2156  diff=+1.2155e-01 se=5.843e-02 t=+2.08 boot95=[+1.004e-02,+2.342e-01] | MEAN diff=+0.92670 t=+22.85
+   sel train_q4    VAR nrev/rev=0.5927  diff=-6.3392e-06 se=1.193e-06 t=-5.31 boot95=[-8.672e-06,-4.027e-06] | MEAN diff=-0.00198 t=-10.31
+   sel test_q4     VAR nrev/rev=0.5337  diff=-8.4192e-06 se=1.306e-06 t=-6.44 boot95=[-1.108e-05,-5.888e-06] | MEAN diff=-0.00173 t=-8.71
+   sel U0_q4       VAR nrev/rev=1.3619  diff=+3.3958e-01 se=1.147e-01 t=+2.96 boot95=[+1.197e-01,+5.648e-01] | MEAN diff=+0.93561 t=+16.09
+   iso train_half  VAR nrev/rev=0.8396  diff=-1.2762e-06 se=6.545e-07 t=-1.95 boot95=[-2.541e-06,+1.948e-08] | MEAN diff=-0.00285 t=-19.46
+   iso test_half   VAR nrev/rev=0.6833  diff=-3.4116e-06 se=9.368e-07 t=-3.64 boot95=[-5.276e-06,-1.593e-06] | MEAN diff=-0.00259 t=-15.54
+   iso U0_half     VAR nrev/rev=1.8949  diff=+5.0461e-01 se=8.714e-02 t=+5.79 boot95=[+3.363e-01,+6.734e-01] | MEAN diff=+1.59243 t=+30.64
+   iso train_q4    VAR nrev/rev=0.8055  diff=-3.0277e-06 se=1.288e-06 t=-2.35 boot95=[-5.482e-06,-4.469e-07] | MEAN diff=-0.00261 t=-13.13
+   iso test_q4     VAR nrev/rev=0.6924  diff=-5.5535e-06 se=1.551e-06 t=-3.58 boot95=[-8.686e-06,-2.529e-06] | MEAN diff=-0.00261 t=-11.78
+   iso U0_q4       VAR nrev/rev=2.1870  diff=+1.1138e+00 se=2.237e-01 t=+4.98 boot95=[+7.037e-01,+1.575e+00] | MEAN diff=+1.54773 t=+21.42

@@ -1,0 +1,8 @@
+  rev x2 (4000 iters): train 0.7037 test 0.7281   (nrev at x1: train 0.7265 test 0.7542)
+  rev x4 (8000 iters): train 0.7219 test 0.7501   (nrev at x1: train 0.7265 test 0.7542)
+  rev x8 (16000 iters): train 0.7464 test 0.7734   (nrev at x1: train 0.7265 test 0.7542)
+  rev x16 (32000 iters): train 0.7692 test 0.7939   (nrev at x1: train 0.7265 test 0.7542)
+
+per-iteration wall clock: rev 0.7080 ms, nrev 0.8478 ms  (overhead 19.8%)
+budget total 44s
+ALLDONE

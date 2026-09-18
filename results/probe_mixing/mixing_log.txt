@@ -1,0 +1,78 @@
+# dataset titanic n_train=712 n_test=179 lam=7.12 delta=0.010817 a_lower=0.500
+
+=== stage 0: gold reference (reversible, eta=3e-5, long) ===
+gold wall=44.4s proj=0.187 maxRhat=1.0629
+gold means : w1=-0.1690 w2=-0.1455 w3=-0.0090 w4=+0.3285 w5=+1.0913 w6=-0.0147 w7=-0.5673 w8=+0.0064 w9=-0.2771 norm2=+1.9419
+gold sds   : w1=0.0771 w2=0.0813 w3=0.0647 w4=0.0992 w5=0.0591 w6=0.0964 w7=0.1231 w8=0.1079 w9=0.1217 norm2=0.0662
+gold ESS(total, w5) = 5597  -> MC se of reference mean ~ 0.0134 sd
+
+=== stage 1: search grid, seed=3000, R=48, n_iter=10000 ===
+  arm      eta     s   wall   proj   bias  maxRhat  ESS/s(w5)  ESS/s(slow)  tau_slow
+  rev  1.0e-04     0    4.8  0.317  0.111   1.0759      364.0        183.6        w9
+  rev  3.0e-04     0    4.8  0.496  0.286   1.0266      872.6        443.5        w7
+  rev  1.0e-03     0    4.8  0.732  0.531   1.0079     2700.0       1356.6        w7
+ nrev  1.0e-04     1    6.1  0.318  0.113   1.0684      330.8        145.7        w7
+ nrev  1.0e-04     2    6.1  0.318  0.114   1.0621      377.6        163.7        w7
+ nrev  1.0e-04     5    6.1  0.320  0.119   1.0567      523.1        199.5        w7
+ nrev  3.0e-04     1    6.1  0.497  0.286   1.0239      797.4        357.6        w7
+ nrev  3.0e-04     2    6.1  0.498  0.288   1.0221      923.6        394.2        w7
+ nrev  3.0e-04     5    6.1  0.505  0.344   1.0198     1971.3        474.8        w7
+ nrev  1.0e-03     1    6.1  0.733  0.532   1.0070     2574.0       1143.1        w7
+ nrev  1.0e-03     2    6.1  0.736  0.537   1.0064     3264.6       1286.3        w7
+ nrev  1.0e-03     5    6.2  0.866  9.769   1.0042    10721.7       1349.9   U_train
+
+primary (pre-registered = reversible-arm bottleneck on the search seed): w7   votes={'w9': 1, 'w7': 2}
+B*=0.10  rev-best=None  nrev-best=None
+B*=0.25  rev-best=('rev', 0.0001, 0.0)  nrev-best=('nrev', 0.0001, 5.0)
+B*=0.50  rev-best=('rev', 0.0003, 0.0)  nrev-best=('nrev', 0.0003, 5.0)
+
+headline selection (B*=0.25): rev ('rev', 0.0001, 0.0) vs nrev ('nrev', 0.0001, 5.0)
+
+=== stage 2: confirmation, INDEPENDENT seed=4100, R=96, n_iter=16000 ===
+rev: eta=0.0001 s=0 wall=14.2s proj=0.319 bias=0.120 maxRhat=1.0547 acc_train=0.7988
+nrev: eta=0.0001 s=5 wall=16.1s proj=0.321 bias=0.122 maxRhat=1.0418 acc_train=0.7984
+clean per-iteration cost (R=96): rev=0.888 ms  nrev=1.005 ms   ratio nrev/rev = 1.132
+
+--- paired per-chain results (R=96 coupled chains, same W0, same noise) ---
+           fn   tau_rev  tau_nrev   ratio |  ESSps_rev  ESSps_nrev         d       se       t   win%
+           w1      68.3      55.6   0.814 |       5.26        5.78      0.51     0.10    4.98   68.8
+           w2      77.5      53.6   0.692 |       4.76        5.85      1.09     0.10   10.61   88.5
+           w3      46.2      26.8   0.580 |       7.73       11.26      3.52     0.17   20.36   99.0
+           w4     120.4      16.6   0.138 |       3.16       18.06     14.90     0.11  129.87  100.0
+           w5     101.3      65.0   0.641 |       3.72        5.51      1.79     0.18    9.69   87.5
+           w6     107.1      16.4   0.153 |       3.49       18.27     14.77     0.12  128.46  100.0
+           w7     203.8     144.5   0.709 |       1.85        2.43      0.58     0.08    7.27   81.2
+           w8     117.4      33.7   0.287 |       3.14        8.92      5.78     0.10   55.83  100.0
+           w9     189.0      46.9   0.248 |       1.98        6.57      4.59     0.11   42.16  100.0
+        norm2      12.1      11.8   0.978 |      29.99       27.09     -2.91     0.40   -7.31   19.8
+       zhold0      67.0      30.4   0.454 |       5.44        9.92      4.48     0.16   27.59   99.0
+       zhold1      58.2      34.0   0.583 |       6.48        9.89      3.40     0.22   15.55   94.8
+       zhold2      62.1      23.1   0.373 |       5.74       13.39      7.65     0.23   33.82  100.0
+ loglik_train      59.3      50.4   0.851 |       6.43        6.56      0.13     0.18    0.71   55.2
+      U_train      53.2      47.1   0.885 |       7.14        6.75     -0.40     0.22   -1.79   40.6
+
+HEADLINE  metric = ESS per second of wall clock, test function 'w7', confirmation seed 4100
+  reversible  ('rev', 0.0001, 0.0): 1.849 ESS/s   (IACT 203.8 it)
+  non-rev     ('nrev', 0.0001, 5.0): 2.429 ESS/s   (IACT 144.5 it)
+  paired d=+0.580  se=0.080  t=7.27  win rate 81.2%  speed-up x1.31
+  sum over 12 train-only fns: rev 78.7 -> nrev 123.0 (x1.56);  worst-case fn: 1.85 -> 2.43 (x1.31)
+  CK=2 vs smallest IACT seen = 11.8 iterations (CK must be << IACT)
+
+=== stage 3: cross-geometry replication, smoothed l_p, seed=4100 ===
+           fn   tau_rev  tau_nrev  ESSps_rev  ESSps_nrev       t
+           w1      91.5      50.2       1.46        2.34    6.37
+           w2      98.1      48.3       1.39        2.49    7.77
+           w3      62.6      19.6       2.15        5.12   22.14
+           w4     100.4       7.5       1.26       13.40  184.53
+           w5      96.9       9.4       1.52       10.76   40.45
+           w6     136.4       7.3       1.08       13.70  134.88
+           w7     201.8     122.9       0.67        1.10    3.92
+           w8     127.4      18.7       1.11        5.53   20.38
+           w9     193.4      29.5       0.72        3.52   23.63
+        norm2      33.9      17.1       4.08        9.38    6.15
+ loglik_train      72.5     144.2       2.07        0.79   -7.17
+      U_train      61.1     149.0       2.27        0.76  -10.68
+l_p, primary 'w7': x1.64 ESS/s, t=3.92
+
+configurations run by this script: 17
+total wall clock: 216.8s

@@ -1,0 +1,73 @@
+=== A. s=0 CONTROL: with scales=0 the two arms must be BIT-IDENTICAL ===
+  [titanic_ball] max|J(w,g)| at s=0 = 0.000e+00;  trajectories bit-identical = True; max|diff| = 0.000e+00
+  [titanic_lp] max|J(w,g)| at s=0 = 0.000e+00;  trajectories bit-identical = True; max|diff| = 0.000e+00
+
+=== B. INDEPENDENT RE-RUN, seed 5501 (never used in search or confirmation), R=300 ===
+
+ titanic_ball  eta=3e-05 s=10 R=300
+  [titanic_ball] N_avg=751  proj rev/nrev=0.100/0.113
+    test_acc               rev=0.809944 nrev=0.817579 diff=+7.6350e-03 se=6.47e-04 t=+11.81 win=66%
+    test_logloss           rev=0.492727 nrev=0.490058 diff=-2.6685e-03 se=2.59e-04 t=-10.29 win=28%
+    test_brier             rev=0.157500 nrev=0.156105 diff=-1.3942e-03 se=1.21e-04 t=-11.50 win=25%
+    train_logloss          rev=0.510944 nrev=0.509012 diff=-1.9323e-03 se=1.43e-04 t=-13.55 win=19%
+    last_iterate_test_acc  rev=0.804581 nrev=0.804730 diff=+1.4898e-04 se=9.68e-04 t=+0.15 win=43%
+    VarRatio rev/nrev: w pooled=2.340  testprob=2.464 (rev=8.821e-04 nrev=3.581e-04)
+
+ titanic_lp  eta=3e-05 s=5 R=300
+  [titanic_lp] N_avg=1001  proj rev/nrev=0.038/0.048
+    test_acc               rev=0.807989 nrev=0.809274 diff=+1.2849e-03 se=6.17e-04 t=+2.08 win=43%
+    test_logloss           rev=0.464983 nrev=0.462124 diff=-2.8592e-03 se=2.47e-04 t=-11.57 win=27%
+    test_brier             rev=0.147020 nrev=0.145605 diff=-1.4146e-03 se=1.07e-04 t=-13.20 win=23%
+    train_logloss          rev=0.487356 nrev=0.485130 diff=-2.2251e-03 se=1.46e-04 t=-15.25 win=17%
+    last_iterate_test_acc  rev=0.804730 nrev=0.803780 diff=-9.4972e-04 se=8.13e-04 t=-1.17 win=39%
+    VarRatio rev/nrev: w pooled=1.989  testprob=2.299 (rev=1.003e-03 nrev=4.362e-04)
+
+[59s]
+
+=== C. DECISIVE: does the variance ratio PERSIST as the averaging window grows? ===
+    common start (PGD mode of U_0), eta=3e-5 fixed, burn-in 50%, checkpoint_every=1
+  ball mode w* = [-3.3190e-01 -1.6850e-01 -1.4310e-01 -3.9000e-03  3.1780e-01  1.1487e+00
+ -2.6000e-03 -5.8620e-01  7.0000e-04 -2.7720e-01]
+
+ ball common-start n_iter=1500 (T=eta*n_iter=0.045)  R=100
+  [n=1500] N_avg=751  proj rev/nrev=0.192/0.193
+    test_acc               rev=0.813128 nrev=0.818603 diff=+5.4749e-03 se=9.63e-04 t=+5.69 win=55%
+    test_logloss           rev=0.489868 nrev=0.489680 diff=-1.8756e-04 se=2.72e-04 t=-0.69 win=49%
+    test_brier             rev=0.156120 nrev=0.155949 diff=-1.7072e-04 se=1.24e-04 t=-1.38 win=46%
+    train_logloss          rev=0.508838 nrev=0.508389 diff=-4.4906e-04 se=1.52e-04 t=-2.95 win=41%
+    last_iterate_test_acc  rev=0.805587 nrev=0.802905 diff=-2.6816e-03 se=1.46e-03 t=-1.84 win=36%
+    VarRatio rev/nrev: w pooled=1.887  testprob=2.188 (rev=6.580e-04 nrev=3.007e-04)
+    [65s]
+
+ ball common-start n_iter=6000 (T=eta*n_iter=0.18)  R=100
+  [n=6000] N_avg=3001  proj rev/nrev=0.191/0.192
+    test_acc               rev=0.821676 nrev=0.823464 diff=+1.7877e-03 se=5.49e-04 t=+3.25 win=39%
+    test_logloss           rev=0.489346 nrev=0.489529 diff=+1.8323e-04 se=1.69e-04 t=+1.08 win=60%
+    test_brier             rev=0.155769 nrev=0.155821 diff=+5.2226e-05 se=8.12e-05 t=+0.64 win=59%
+    train_logloss          rev=0.508277 nrev=0.508144 diff=-1.3308e-04 se=6.83e-05 t=-1.95 win=43%
+    last_iterate_test_acc  rev=0.806145 nrev=0.804525 diff=-1.6201e-03 se=1.39e-03 t=-1.17 win=36%
+    VarRatio rev/nrev: w pooled=1.984  testprob=2.271 (rev=2.377e-04 nrev=1.047e-04)
+    [83s]
+
+ ball common-start n_iter=24000 (T=eta*n_iter=0.72)  R=100
+  [n=24000] N_avg=12001  proj rev/nrev=0.190/0.191
+    test_acc               rev=0.824637 nrev=0.825642 diff=+1.0056e-03 se=3.67e-04 t=+2.74 win=19%
+    test_logloss           rev=0.489241 nrev=0.489369 diff=+1.2741e-04 se=8.93e-05 t=+1.43 win=61%
+    test_brier             rev=0.155711 nrev=0.155742 diff=+3.1127e-05 se=4.22e-05 t=+0.74 win=58%
+    train_logloss          rev=0.507865 nrev=0.508004 diff=+1.3859e-04 se=3.55e-05 t=+3.91 win=64%
+    last_iterate_test_acc  rev=0.805642 nrev=0.806201 diff=+5.5866e-04 se=1.68e-03 t=+0.33 win=44%
+    VarRatio rev/nrev: w pooled=1.922  testprob=2.224 (rev=6.476e-05 nrev=2.911e-05)
+    [150s]
+
+=== D. BUDGET FAIRNESS at eta=3e-5: give the REVERSIBLE arm 2x and 4x the iterations ===
+  nrev n_iter=1500 s=10 : test acc=0.817402 ll=0.490098 brier=0.156131 (2.9s)
+  rev n_iter=3000 (5.8s, 2.02x nrev cost):
+     test_acc       rev=0.817123 nrev=0.817402 diff(nrev-rev)=+2.7933e-04 se=8.56e-04 t=+0.33
+     test_logloss   rev=0.489862 nrev=0.490098 diff(nrev-rev)=+2.3630e-04 se=2.62e-04 t=+0.90
+     test_brier     rev=0.156049 nrev=0.156131 diff(nrev-rev)=+8.1531e-05 se=1.11e-04 t=+0.74
+  rev n_iter=6000 (11.5s, 4.01x nrev cost):
+     test_acc       rev=0.821648 nrev=0.817402 diff(nrev-rev)=-4.2458e-03 se=7.56e-04 t=-5.62
+     test_logloss   rev=0.489533 nrev=0.490098 diff(nrev-rev)=+5.6517e-04 se=3.08e-04 t=+1.83
+     test_brier     rev=0.155865 nrev=0.156131 diff(nrev-rev)=+2.6619e-04 se=1.30e-04 t=+2.05
+
+total 178.4s
