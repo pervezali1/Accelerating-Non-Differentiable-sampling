@@ -695,3 +695,111 @@ confirmation seed.
 3. **It is one cell out of four.** The Titanic ball shows a bigger matched-η gain (+0.354 pts) and
    still loses best-vs-best by 0.186; both MAGIC cells lose. Nothing here overturns the earlier
    conclusion — it locates the one place where the gap and the metric line up.
+
+---
+
+# Notebook for the `29bbf2f` state: `exact_anchored_langevin.ipynb`
+
+A second self-contained, **executed** notebook covering the exact-gradient / LASSO-anchored
+formulation — the state of the repository at commit `29bbf2f`, including the η = 3e-5 result that
+commit is named for. The first notebook (`nonreversible_anchored_langevin.ipynb`) covers the
+mini-batch SGLD formulation and is unchanged.
+
+| File | What it is |
+|---|---|
+| `exact_anchored_langevin.ipynb` | The notebook, executed, all 37 cells, 9 inline figures, 0 errors. |
+| `exact_notebook_source.py` | Single source of truth (jupytext "percent" format). |
+| `exact_nb.py` | Library cells, auto-generated; importing it has no side effects. |
+| `figures/exact_nb/`, `results/exact_nb/` | 9 figures (PNG + PDF) and 5 result files. |
+
+```bash
+python make_notebook.py --src exact_notebook_source.py \
+    --nb exact_anchored_langevin.ipynb --module exact_nb.py
+XNB_MODE=full jupyter nbconvert --to notebook --execute --inplace \
+    --ExecutePreprocessor.timeout=-1 exact_anchored_langevin.ipynb
+```
+
+`XNB_MODE=quick` is a smoke test (R = 20/60), not the experiment; the notebook labels it as such.
+It imports `nral.py` for the dataset builders, the geometry/projection classes and a few helpers —
+everything specific to the ℓ₁ formulation is defined in the notebook itself.
+
+## Contents
+
+Eleven sections: configuration; data and the ten-column design (intercept + nine features);
+the potential `U`, its smoothing `U₀` and the anchor `a = e^{U−U₀}`; the two geometries;
+the block matrices `J` and initialisation; **implementation checks**; the sampler and the
+shared-invariant-law argument; the four experiments; the **η = 3e-5 study**; **final iterate
+versus post-burn-in time average**; and what the notebook does and does not establish.
+
+## What it finds
+
+**Section 7 proves the result that shapes everything else.** With `J` skew, `div J = 0` and
+`Jn = 0` on ∂K, the reversible and non-reversible processes share the invariant law
+`π_K ∝ e^{−U} 1_K`. So no setting of η, s, λ, δ or the geometry can separate the arms on a
+*stationary* quantity — and accuracy is one. All three identities are verified to machine
+precision in Section 6 for the `J` actually used.
+
+**Section 8 (η = 1e-6 MAGIC, η = 1e-5 Titanic, R = 100, s = (5,5,5)), final iterate:**
+
+| experiment | rev test | nrev test | Δ test | t |
+|---|---|---|---|---|
+| magic_ball | 0.78107 | 0.78123 | +0.00016 | +0.65 |
+| magic_lp | 0.78107 | 0.78155 | +0.00048 | +1.87 |
+| titanic_ball | 0.77162 | 0.78603 | +0.01441 | **+4.55** |
+| titanic_lp | 0.78894 | 0.80190 | +0.01296 | **+5.51** |
+
+The Titanic curves are still visibly climbing at the last iteration, so this is a **transient**
+separation, not a stationary one.
+
+**Section 9 — the `29bbf2f` headline, at the specified η = 3e-5 (R = 150, seed 4100), final
+iterate.** Across sixteen live comparisons (2 geometries × 4 strengths × 2 splits), **nothing
+clears |t| > 2.5 in either direction.** The largest magnitude in the sweep is t = −2.40
+(titanic_lp, s = 5, training) and it points *against* the non-reversible arm; the largest
+non-reversible test gain is +0.15 pts at t = 1.31. Tripling the step did not improve the
+reversible arm's asymptotics — it let both arms approach the law they share, and the lead went
+with the transient. The projection rate rises monotonically with s (9.6% → 10.6% ball,
+3.7% → 4.5% ℓ_p): the rotation drives more boundary traffic, which is a finite-η cost.
+
+**Section 10 — the same runs, a different estimator.** Averaging accuracy over the post-burn-in
+half of each trajectory (burn-in fixed in advance at 50%) instead of taking the last state. At a
+cell fixed in advance (titanic_lp, s = (2,2,2)) on a **third seed used nowhere else** (5200),
+R = 1500:
+
+| split | rev | nrev | Δ (pts) | s.e. | t | final-iterate Δ (pts) | t |
+|---|---|---|---|---|---|---|---|
+| train | 0.8028 | 0.8039 | **+0.1075** | 0.0101 | **+10.63** | −0.0038 | −0.19 |
+| test | 0.8040 | 0.8048 | **+0.0778** | 0.0126 | **+6.19** | +0.0819 | +2.75 |
+
+## What that is worth, stated plainly
+
+- **It cannot be a difference in the target.** Section 7 proves the arms share π_K, so a
+  difference in a sample average of a bounded functional is a difference in convergence rate and
+  O(η) discretisation bias — nothing more.
+- **The size is about a tenth of a percentage point** on 179 test rows, i.e. well under one row.
+  It is resolvable only because R = 1500 paired replicates buy an s.e. of ~0.01 points.
+- **It is one cell** out of twenty reported here, and it is not the screen's largest: that is
+  titanic_ball at s = 5, deliberately left unchased.
+- **The two estimators disagree on the same runs.** The final iterate gives +0.082 pts on test
+  (t = 2.75) but −0.004 pts on training (t = −0.19). A quantity whose sign depends on which split
+  and which estimator you pick is not a robust advantage.
+
+The clean result of the η = 3e-5 study is the negative one it was run for: the accuracy lead
+visible at η = 1e-5 is a transient, and it does not survive letting the chains approach the law
+both arms share.
+
+## Implementation checks (Section 6, all at machine precision)
+
+| check | value |
+|---|---|
+| `max |a − exp(U − U₀)|` | 1.0e-13 |
+| `a` range vs bound `exp(−9λδ)` | [0.500000, 0.999080] |
+| exact ∇U₀ vs central differences | 9.9e-10 (titanic), 3.1e-10 (magic) |
+| `J + Jᵀ`, `div J` (ball, ℓ_p) | 0.0, 0.0 |
+| matrix-free `apply_J` vs explicit matrix | 2.2e-16, 8.9e-16 |
+| `Jn` on ∂K (ball, ℓ_p) | 2.2e-16, 8.7e-16 |
+| ball-tangential `J` on the ℓ_p set | 2.1e-01 — **fails, as it must** |
+| projection feasibility / KKT / vs `brentq` | 1.3e-15, 2.7e-15, 4.9e-15 |
+| α = 1 with s = 0 vs α = 0, same seed | **exactly 0** (bit-identical pairing control) |
+
+The last row is what makes every paired standard error in the notebook meaningful: the two arms
+share `W₀` and the Gaussian stream, so with `J = 0` they are the same chain bit for bit.

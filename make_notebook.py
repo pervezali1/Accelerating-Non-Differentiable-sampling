@@ -16,9 +16,15 @@ import re
 import sys
 import uuid
 
-SRC = "notebook_source.py"
-NB = "nonreversible_anchored_langevin.ipynb"
-MODULE = "nral.py"
+import argparse as _ap
+
+_p = _ap.ArgumentParser()
+_p.add_argument("--src", default="notebook_source.py")
+_p.add_argument("--nb", default="nonreversible_anchored_langevin.ipynb")
+_p.add_argument("--module", default="nral.py")
+_p.add_argument("--module-doc", default="")
+_ARGS, _ = _p.parse_known_args()
+SRC, NB, MODULE = _ARGS.src, _ARGS.nb, _ARGS.module
 
 MARKER = re.compile(r"^# %%(.*)$")
 
@@ -107,7 +113,7 @@ def main() -> int:
     with open(NB, "w") as fh:
         json.dump(nb, fh, indent=1)
 
-    header = (
+    header = (f'"""{_ARGS.module_doc}\n\nAUTO-GENERATED from {SRC} by make_notebook.py -- edit that file, not this one.\nContains exactly the library cells of {NB}, so the notebook and this module\ncan never drift apart.\n"""\n\n') if _ARGS.module_doc else (
         '"""Reusable implementation of non-reversible anchored Langevin with block\n'
         "state-dependent skew-symmetric matrices for constrained Bayesian logistic regression.\n\n"
         "AUTO-GENERATED from notebook_source.py by make_notebook.py -- edit that file, not this one.\n"
