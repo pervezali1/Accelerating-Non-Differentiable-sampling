@@ -653,3 +653,45 @@ on colour alone.
 | `mixing_rmse_budget` | The caveat. RMSE of the posterior mean against compute budget, both arms re-optimised at each budget. Non-reversible is ×1.33 ahead at short budgets; the curves cross near T = 10 and the reversible arm wins beyond it. |
 | `mixing_accuracy_ball` | Accuracy at *exactly* the mixing-win configuration. The two curves sit on top of each other: the gap is **0.08 percentage points** of test accuracy (final iterate −0.0038, t = −2.6), in the non-reversible arm's slight disfavour. This is what a shared invariant law looks like. |
 | `mixing_accuracy_lp` | The same plot on the smoothed ℓ_p set — and here the same `s = 5` costs **2.3 percentage points** of test accuracy (−0.0245, t = −7.0; training −0.0355, t = −12.4). On this geometry `J`'s axis is `∇g` rather than `w`, so the same strength gives a ~3× stronger rotation and a correspondingly larger discretisation bias. **The ℓ_p mixing win is real but it is not free.** |
+
+---
+
+# Pushing accuracy: +0.13 percentage points at best-vs-best
+
+`push_accuracy.py`; `results/push_accuracy/`, figure `figures/push/`. Base setup unchanged from
+`9d43048` (exact gradient, LASSO anchor, d = 10) — only `(η, s)` and the replicate count move.
+
+**Why more replicates rather than more tuning.** The earlier grid and per-block studies already
+produced gains of the right size at converged step sizes (gradient-balanced `s` gave +0.0014 on
+Titanic ℓ_p, +0.0016 on the ball) but at R = 100 those sit at t ≈ 1.2 — the effect was not absent,
+it was unresolved. Raising R by 15× shrinks the paired SE about 4×.
+
+**Protocol.** `(η, s)` selected on **training accuracy only** (mean over post-burn-in checkpoints)
+from 10 candidates at seed 3000; headline from a confirmation run on independent seed 4100 at
+R = 1500 (Titanic) / 600 (MAGIC). The reversible arm gets its own best η, also chosen on training.
+
+| experiment | matched-η gain | t | best-vs-best gap |
+|---|---|---|---|
+| **Titanic ℓ_p** (η = 3e-5, s = (2,2,2)) | **+0.156 pts** | **+11.97** | **+0.134 pts** |
+| Titanic ball (η = 3e-5, s = (2,2,2)) | +0.354 pts | +17.07 | −0.186 pts |
+| MAGIC ball (η = 3e-6, balanced) | +0.007 pts | +2.57 | −0.050 pts |
+| MAGIC ℓ_p (η = 3e-6, balanced) | +0.005 pts | +1.60 | −0.094 pts |
+
+**One of four clears it.** On Titanic smoothed ℓ_p the non-reversible arm reaches test accuracy
+**0.80490** against **0.80356** for the reversible arm at its own training-selected best step size
+— a gain of **+0.134 percentage points**, inside the requested 0.1–0.2 band, on an independent
+confirmation seed.
+
+## Three things that qualify it
+
+1. **The metric is the average over the run, not the final iterate.** On the final iterate alone
+   the gain is +0.041 points (t = 1.3), not significant — as the shared-invariant-law argument
+   requires. What moves is the height of the accuracy curve over the last 60% of the run, which
+   is what these plots have always displayed.
+2. **The reversible arm wins the training metric it was selected by.** `rev` at η = 1e-4 is above
+   `nrev` on training accuracy and below it on test. The protocol (select on train, evaluate on
+   test, both arms treated alike) is the right one, but the gain is therefore partly a
+   generalisation effect, not purely sampling quality.
+3. **It is one cell out of four.** The Titanic ball shows a bigger matched-η gain (+0.354 pts) and
+   still loses best-vs-best by 0.186; both MAGIC cells lose. Nothing here overturns the earlier
+   conclusion — it locates the one place where the gap and the metric line up.
