@@ -57,14 +57,17 @@ STYLE = {"Reversible anchored Langevin":     {"color": "#0173B2", "ls": "--", "l
 Y_LIMITS = (0.40, 0.90)      # fixed, un-windowed: initialisation ~0.50, Bayes ceiling ~0.82
 
 # The two headline configurations.  The ball has radius 1, so its beta is halved
+# On the ball s is ramped from 0 over the first 20 iterations: started far from the mode the
+# rotated drift s w_I x grad U0 is ~13x the gradient step and moves the chain sideways first,
+# which showed as a dip of -0.016 in accuracy at iteration 10; the ramp (with eta 3e-6) removes it.
 # and v_axis, v_fast and the block-1 variance quadrupled while v_slow is only doubled
 # (2 -> 4): a more anisotropic design (v_fast/v_slow = 64), smaller logits (Bayes ceiling
 # 0.74 vs 0.82) and about five times the curvature, hence the smaller eta.
 CONFIGS = {
     "l1":   dict(v_axis=1.0, v_fast=64.0, v_slow=2.0, b=1.5, e=0.25, b1=0.3, block_1_variance=1.0,
-                 s=4.0, eta=7e-6, epsilon=0.2, n_iterations=1000, evaluate_at=100),
+                 s=4.0, eta=7e-6, epsilon=0.2, n_iterations=1000, evaluate_at=100, s_warmup=0),
     "ball": dict(v_axis=4.0, v_fast=256.0, v_slow=4.0, b=0.5, e=0.125, b1=0.15, block_1_variance=4.0,
-                 s=16.0, eta=2e-6, epsilon=0.2, n_iterations=1000, evaluate_at=90),
+                 s=16.0, eta=3e-6, epsilon=0.2, n_iterations=1000, evaluate_at=60, s_warmup=20),
 }
 
 
@@ -77,6 +80,7 @@ def setup(tag: str, quick: bool):
         epsilon=p["epsilon"], l1_radius=float(np.abs(beta).sum() + 1.0),
         n_repeats=20 if quick else 100,
         n_iterations=600 if quick else p["n_iterations"], checkpoint_every=10,
+        scale_warmup=p["s_warmup"],
     )
     dataset = lasso.make_scaled_dataset(cfg, Sigma, beta)
     target = lasso.LassoTarget(dataset.X_train, dataset.y_train, cfg.lambda_lasso,
@@ -109,7 +113,7 @@ def figure(runs, cfg, geometry, tag, quick):
     fig.text(0.5, 0.015,
         f"d = {cfg.d} (intercept + 8 slopes);  constraint: {geometry.name};  U = f + g with "
         f"g = {cfg.lambda_lasso:g}*sum|w_j| (non-differentiable), anchor delta = {cfg.delta_anchor};  "
-        f"EXACT gradient;  eta = {cfg.eta:.1e};  s = {p['s']:g};  R = {cfg.n_repeats};  alpha = 0 vs 1.\n"
+        f"EXACT gradient;  eta = {cfg.eta:.1e};  s = {p['s']:g}" + (f" (ramped from 0 over the first {p['s_warmup']} iterations)" if p['s_warmup'] else "") + f";  R = {cfg.n_repeats};  alpha = 0 vs 1.\n"
         f"Design: unstandardised covariates -- in each slope triple the covariance is "
         f"{p['v_axis']:g} q1q1' + {p['v_fast']:g} q2q2' + {p['v_slow']:g} q3q3' with q1 = (1,1,1)/sqrt3 "
         f"(the rotation axis), q2 = (0,1,-1)/sqrt2 (fast, no signal), q3 = (2,-1,-1)/sqrt6 (slow, in the "

@@ -17,6 +17,7 @@ Config keys (all optional except as noted):
   beta        for design=scaled: the true 9-vector, intercept first
   epsilon     smoothing of the constraint (soft-sign width of grad g)  (0.2)
   init_scale  jitter around the origin for init=origin               (0.02)
+  s_warmup    ramp s linearly from 0 over this many iterations        (0)
   lambda      lambda_lasso                                       (2)
   delta       delta_anchor                                       (0.02)
   s           block strength, scalar or [s1,s2,s3]               (5)
@@ -51,7 +52,7 @@ def build(cfgd):
         eta=float(cfgd.get("eta", 1e-5)), n_repeats=int(cfgd.get("R", 60)),
         n_iterations=int(cfgd.get("n_iter", 1000)), checkpoint_every=int(cfgd.get("checkpoint", 20)),
         block_scales=scales, l1_radius=float(cfgd.get("l1_radius", 1.9)), n_total=n_total,
-        epsilon=float(cfgd.get("epsilon", 0.2)),
+        epsilon=float(cfgd.get("epsilon", 0.2)), scale_warmup=int(cfgd.get("s_warmup", 0)),
     )
     design = cfgd.get("design", "isotropic")
     if design == "isotropic":

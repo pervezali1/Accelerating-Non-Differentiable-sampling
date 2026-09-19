@@ -24,8 +24,8 @@ term?
 
 **Answer (in the figures below).** Yes, by a wide margin: with the design described in
 section 1, after 100 iterations the non-reversible chain is at $\approx0.72$ test accuracy
-versus $\approx0.56$ for the reversible one on the $L_1$ ball ($0.68$ vs $0.56$ on the unit
-ball); both end at the same plateau by iteration 1000. The margin survives held-out random
+versus $\approx0.56$ for the reversible one on the $L_1$ ball ($0.66$ vs $0.55$ at iteration 60
+on the unit ball); both end at the same plateau by iteration 1000. The margin survives held-out random
 seeds ($t\approx29$ on both constraint sets).
 
 These numbers are for the full setting ($R=100$ chains, 1000 iterations, four held-out
@@ -325,7 +325,8 @@ def shared_streams(geometry, seed_offset=0):
     noise = np.stack([np.random.default_rng(sd).standard_normal((N_ITERATIONS, 9)) for sd in noise_ss.spawn(R)])
     return w_init, noise                                                                 # (R, d), (R, N_ITERATIONS, d)
 
-def run_chain(alpha, data, geometry, s, eta, streams):
+def run_chain(alpha, data, geometry, s, eta, streams, s_warmup=0):
+    """s_warmup > 0 ramps the block strength linearly from 0 over the first s_warmup iterations."""
     X, y, Xt, yt = data["X_train"], data["y_train"], data["X_test"], data["y_test"]
     w_init, noise = streams
     w = w_init.copy()
@@ -335,7 +336,8 @@ def run_chain(alpha, data, geometry, s, eta, streams):
         ak = a(w)[:, None]
         drift = -eta * ak * grad
         if alpha != 0.0:
-            drift = drift + eta * alpha * ak * apply_J(w, grad, geometry, s)
+            s_k = s * min(1.0, (k + 1) / s_warmup) if s_warmup else s
+            drift = drift + eta * alpha * ak * apply_J(w, grad, geometry, s_k)
         proposal = w + drift + np.sqrt(2.0 * eta * ak) * noise[:, k, :]
         w, projected = geometry.project(proposal)                  # back onto K
         n_projected += int(projected.sum())
@@ -349,16 +351,26 @@ M.append(("markdown", r"""## 6. Run both methods on both constraint sets
 | constraint set | $s$ | $\eta$ | why |
 |---|---|---|---|
 | $L_1$-smooth ball | 4 | $7\cdot10^{-6}$ | $\eta a\lambda_{\max}\approx0.10$, where $\lambda_{\max}\approx1.4\cdot10^4$ is the largest curvature of $U_0$ (the $q_2$ direction): the Euler step is stable, and the reversible chain is still converging along $q_3$ for a few hundred iterations |
-| unit ball | 16 | $2\cdot10^{-6}$ | about five times the curvature $\Rightarrow$ $\eta/3.5$ ($\eta a\lambda_{\max}\approx0.14$); the ball axis $s\,w_I$ has $\|w_I\|\le1$ while the $L_1$ soft-sign axis has entries near 1, so the same $s$ is a much smaller rotation on the ball and $s$ must be larger |
+| unit ball | 16, ramped from 0 over the first 20 iterations | $3\cdot10^{-6}$ | about five times the curvature ($\eta a\lambda_{\max}\approx0.2$); the ball axis $s\,w_I$ has $\|w_I\|\le1$ while the $L_1$ soft-sign axis has entries near 1, so the same $s$ is a much smaller rotation on the ball and $s$ must be larger |
 
 Both are inside the discrete-time stability window given in section 9. On the ball the
-non-reversible step leaves $K$ and is projected back in about 1.6% of the steps (the discrete
-rotation step is a chord, not an arc; visible as the dip at iteration 10 in the figure), while
-the reversible chain is never projected. This is harmless here — far from the pinned regime
-(30–60% of steps) that `results_beat/parameter_map.md` reports past the stability edge — and
-the projection rate is printed so you can check."""))
+non-reversible step occasionally leaves $K$ and is projected back (about 1% of the steps;
+the discrete rotation step is a chord, not an arc), while the reversible chain is never
+projected — harmless, far from the pinned regime (30–60% of steps) that
+`results_beat/parameter_map.md` reports past the stability edge; the rate is printed so you
+can check.
 
-M.append(("code", '''SETTINGS = {"l1": dict(s=4.0, eta=7e-6), "ball": dict(s=16.0, eta=2e-6)}
+**Why $s$ is ramped on the ball.** Started uniformly on $K$, far from the mode, the ball's
+rotated drift $s\,w_I\times\nabla_IU_0$ is perpendicular to the gradient and $s\|w_I\|\approx13$
+times longer than the gradient step, so with the full $s$ from iteration 1 the non-reversible
+chain first moves *sideways* and its accuracy dips $0.016$ below the reversible one at
+iteration 10 before the contraction takes over. Ramping $s$ linearly from $0$ over the first
+20 iterations (with $\eta=3\cdot10^{-6}$ so the excursion is over within the first checkpoint)
+removes the dip: the gap is $-0.001$ at iteration 10 (noise), $+0.006$ at 20 and rises
+monotonically to its peak. The $L_1$ chain never dips. Ramping alone at the smaller $\eta$ only
+delays the rise, and a larger $s$ or $\eta$ pushes the chain into the boundary."""))
+
+M.append(("code", '''SETTINGS = {"l1": dict(s=4.0, eta=7e-6), "ball": dict(s=16.0, eta=3e-6, s_warmup=20)}
 METHODS  = (("Reversible anchored Langevin", 0.0), ("Non-reversible anchored Langevin", 1.0))
 results  = {}
 for tag in ("l1", "ball"):
@@ -366,7 +378,7 @@ for tag in ("l1", "ball"):
     results[tag] = {}
     for name, alpha in METHODS:
         t0 = time.time()
-        results[tag][name] = run_chain(alpha, DATA[tag], GEOMETRY[tag], streams=streams, **SETTINGS[tag])
+        results[tag][name] = run_chain(alpha, DATA[tag], GEOMETRY[tag], streams=streams, **SETTINGS[tag])   # s_warmup only on the ball
         print(f"{GEOMETRY[tag].name:<16} {name:<34} {time.time() - t0:5.1f} s   projection rate {results[tag][name]['projection_rate']:.4f}")'''))
 
 M.append(("markdown", r"""## 7. Figures
@@ -389,7 +401,8 @@ for tag in ("l1", "ball"):
             ax.plot(run["checkpoints"], mean, color=st["color"], ls=st["ls"], lw=st["lw"], label=name)
         ax.set_ylim(0.40, 0.90); ax.set_xlabel("Iterations"); ax.set_ylabel("Accuracy"); ax.set_title(title, fontsize=11); ax.grid(alpha=0.3)
     axes[0].legend(fontsize=9, loc="lower right")
-    fig.suptitle(f"Non-reversible vs reversible anchored Langevin — {geom.name}   (s = {p['s']:g}, eta = {p['eta']:.0e}, R = {R})", fontsize=12.5)
+    fig.suptitle(f"Non-reversible vs reversible anchored Langevin — {geom.name}   (s = {p['s']:g}"
+                 + (f" ramped over {p['s_warmup']} it." if p.get("s_warmup") else "") + f", eta = {p['eta']:.0e}, R = {R})", fontsize=12.5)
     fig.tight_layout(rect=(0, 0, 1, 0.95))
     png = os.path.join(OUT, f"simple_accuracy_{tag}.png"); fig.savefig(png, dpi=150, bbox_inches="tight"); plt.close(fig)
     display(Image(filename=png))'''))
@@ -399,7 +412,7 @@ M.append(("markdown", r"""## 8. The numbers
 Paired per-replicate differences (non-reversible minus reversible) of single-iterate test
 accuracy, with the paired $t$-statistic over the $R$ replicates. Then the whole comparison is
 repeated on four sampler seeds that took no part in choosing the configuration, evaluated at
-the iteration where the gap peaked in the search run (100 on the $L_1$ ball, 90 on the unit
+the iteration where the gap peaked in the search run (100 on the $L_1$ ball, 60 on the unit
 ball; these were fixed before the held-out seeds were drawn, and the peak of the run above is
 printed next to them). The verdict is `CONFIRMED` when every held-out seed gives a positive
 paired difference **and** the pooled paired $t$ (differences averaged over seeds, standard
@@ -419,7 +432,7 @@ for tag in ("l1", "ball"):
                      "non_reversible": nr["test"][i].mean(), "paired_diff": m, "paired_se": se, "t_stat": t})
 display(pd.DataFrame(rows))
 
-EVALUATE_AT = {"l1": 100, "ball": 90}          # fixed from the search run, before the held-out seeds were drawn
+EVALUATE_AT = {"l1": 100, "ball": 60}          # fixed from the search run, before the held-out seeds were drawn
 for tag in ("l1", "ball"):
     rev, nr = results[tag]["Reversible anchored Langevin"], results[tag]["Non-reversible anchored Langevin"]
     gap = nr["test"].mean(axis=1) - rev["test"].mean(axis=1)

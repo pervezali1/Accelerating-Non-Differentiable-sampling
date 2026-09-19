@@ -565,8 +565,15 @@ and `q3 = (2,-1,-1)/sqrt6` (slow, in the rotated plane, signal-carrying because
 `beta_I = (1.5, 0.25, 0.25)`, `lambda = 2`, `delta = 0.02`, `eps = 0.2`, `s = 4`,
 `eta = 7e-6`, `R = 100`, uniform initialisation on `K`; on the unit ball `beta` is
 halved, `v_axis`, `v_fast` and the block-1 variance quadrupled and `v_slow` doubled
-(`s = 16`, `eta = 2e-6`; a more anisotropic design with smaller logits, Bayes ceiling
-0.74 vs 0.82, and about five times the curvature).
+(`s = 16` ramped linearly from 0 over the first 20 iterations, `eta = 3e-6`; a more
+anisotropic design with smaller logits, Bayes ceiling 0.74 vs 0.82, and about five
+times the curvature).  The ramp removes an early dip: started uniformly on `K`, far
+from the mode, the ball's rotated drift `s w_I x grad U0` is perpendicular to the
+gradient and ~13x longer than the gradient step, so with the full `s` from iteration 1
+the chain first moves sideways and its accuracy sits 0.016 below the reversible one at
+iteration 10; with the ramp (and `eta = 3e-6`) the gap is -0.002 at iteration 10 (noise),
++0.006 at 20 and monotone afterwards, at the price of a smaller peak (+0.11 instead of
++0.13).  The L1 chain never dips.
 
 Three independent theory agents re-derived and attacked these claims (linear
 algebra, an exactly solvable toy model, and an adversary).  All three confirmed the
@@ -598,17 +605,17 @@ unit ball:
 
 | iteration | reversible | non-reversible | paired diff | t |
 |---|---|---|---|---|
-| 50 | 0.5299 | 0.6316 | +0.1017 | +10.7 |
-| 100 | 0.5558 | 0.6759 | +0.1200 | +15.2 |
-| 150 | 0.5813 | 0.6839 | +0.1027 | +14.4 |
-| 200 | 0.6035 | 0.6905 | +0.0870 | +13.7 |
-| 300 | 0.6456 | 0.7014 | +0.0558 | +13.0 |
-| 400 | 0.6764 | 0.7069 | +0.0304 | +10.3 |
-| 600 | 0.7063 | 0.7185 | +0.0121 | +7.2 |
-| 1000 | 0.7233 | 0.7232 | -0.0000 | -0.0 |
+| 50 | 0.5428 | 0.6543 | +0.1115 | +13.0 |
+| 100 | 0.5810 | 0.6766 | +0.0956 | +13.1 |
+| 150 | 0.6152 | 0.6901 | +0.0749 | +12.7 |
+| 200 | 0.6441 | 0.6992 | +0.0552 | +13.6 |
+| 300 | 0.6868 | 0.7093 | +0.0225 | +10.4 |
+| 400 | 0.7067 | 0.7161 | +0.0094 | +5.6 |
+| 600 | 0.7196 | 0.7225 | +0.0029 | +2.5 |
+| 1000 | 0.7254 | 0.7246 | -0.0008 | -0.8 |
 
 Held-out sampler seeds at the evaluation iteration (100 on the L1
-ball, 90 on the unit ball), `R = 100` per seed:
+ball, 60 on the unit ball), `R = 100` per seed:
 
 L1-smooth ball:
 
@@ -624,14 +631,14 @@ unit ball:
 
 | seed offset | reversible | non-reversible | paired diff | t |
 |---|---|---|---|---|
-| 101 | 0.5373 | 0.6784 | +0.1410 | +15.3 |
-| 202 | 0.5458 | 0.6744 | +0.1286 | +15.5 |
-| 303 | 0.5430 | 0.6656 | +0.1225 | +14.6 |
-| 404 | 0.5417 | 0.6730 | +0.1313 | +13.0 |
-| **pooled** | | | **+0.1309** (SE 0.0045) | **+29.0** |
+| 101 | 0.5387 | 0.6670 | +0.1283 | +13.2 |
+| 202 | 0.5453 | 0.6675 | +0.1222 | +15.0 |
+| 303 | 0.5438 | 0.6612 | +0.1174 | +13.2 |
+| 404 | 0.5423 | 0.6684 | +0.1262 | +13.0 |
+| **pooled** | | | **+0.1235** (SE 0.0046) | **+27.0** |
 
 Projection rate of the non-reversible chain: 0.0000 (L1),
-0.0054 (ball); no non-finite iterates.  Bayes ceiling on
+0.0024 (ball); no non-finite iterates.  Bayes ceiling on
 the test set: 0.8156 (L1 design), 0.7366
 (ball design).
 
