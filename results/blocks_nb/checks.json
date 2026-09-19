@@ -1,0 +1,10 @@
+{
+  "a_identity": 1.9628743075372768e-13,
+  "s0_control_bit_identical": 0.0,
+  "search_rhat_max": 1.090598083633563,
+  "confirm_rhat_max": 1.059472676043165,
+  "separability_holds": {
+    "lasso": false,
+    "graded": false
+  }
+}
