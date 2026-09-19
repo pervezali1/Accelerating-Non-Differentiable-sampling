@@ -782,17 +782,25 @@ Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda
 
 | run | v_fast | v_slow | s | eta | iterations | held-out at |
 |---|---|---|---|---|---|---|
-| Titanic, L1 | 256 | 1 | 8 | 7e-6 | 1000 | 140 |
-| Titanic, ball | 1024 | 1 | 16 | 7e-7 | 1000 | 140 |
+| Titanic, L1 | 256 | 1 | 8 | 7e-6 | 3000 | 140 |
+| Titanic, ball | 1024 | 1 | 16 | 7e-7 | 3000 | 140 |
 | MAGIC, L1 | 256 | 1 | 8 | 2e-6 | 1000 | 80 |
 | MAGIC, ball | 256 | 1 | 16 | 2e-7 | 1500 | 50 |
 
 ### Honest scope
 
 * As on synthetic data it is a **convergence-speed** effect: the curves meet at the
-  reference accuracy (MAGIC by iteration 600; on Titanic the reversible chain is still
-  climbing at iteration 1000 with `eta = 7e-6`), and the gap at the end is 0 +- 0.001 on
-  MAGIC.
+  reference accuracy (MAGIC by iteration 600, Titanic by iteration 2000-3000 at its
+  smaller `eta`); the gap at the end is 0 +- 0.001 on MAGIC and on the Titanic ball,
+  and a small late deficit of -0.004 (`t = -3.5`) at iteration 3000 on the Titanic L1
+  run, the same `s = 8` discretisation bias the synthetic map shows near the edge.
+* Audit of the Titanic numbers (they looked suspicious): the reference 0.782 is exactly
+  the test accuracy of the mode of `U_0`; the logits are identical in the standard and
+  reparametrised coordinates (max difference 6e-3 on the test set, from the pilot fit's
+  weak regularisation); the majority-class rate is 0.615; a uniform draw on `K` predicts
+  at 0.50 +- 0.08, so both chains starting at 0.50 is right; train and test curves
+  track each other within 0.01.  `age` is median-imputed over all 891 rows before the
+  split — a routine, tiny leak that affects both samplers identically.
 * Without the block reparametrisation the non-reversible sampler does **not** beat the
   reversible one on either data set beyond +0.02–0.035; the win needs the posterior
   to be written in coordinates whose slow, signal-carrying direction lies in the plane
@@ -801,6 +809,11 @@ Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda
 * Past the stability edge (`s = 8` at `eta = 7e-5` on Titanic, `s = 16` at the larger
   `eta` values) the projection fires on 60% of the steps and the non-reversible chain
   loses; the parameter windows are the ones the synthetic map predicts.
+
+`real_data_nonreversible_vs_reversible.ipynb` (executed copy alongside) is the
+self-contained notebook for all four cases: data loading, the parametrisation, `U`,
+`U_0`, `J_s`, the update, the figures and the numbers, importing nothing from the
+repository (the data files are downloaded if `data/` is absent).
 
 Reproduce: `python real_data_beat.py '<config>'` with the configurations printed in
 `results_real/<run>.json`, or `python parameter_sweep.py results_real/search/real2_configs.json out.jsonl`.
