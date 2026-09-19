@@ -21,6 +21,7 @@ import exact_nb as X
 from nral import _wrap, build_magic_dataset, build_titanic_dataset, mean_sd
 
 N_ITER = 600
+Y_LO = 0.40                 # accuracy axis floor, requested
 OUT = os.path.join(os.getcwd(), "figures", "exact_nb_600")
 RES = os.path.join(os.getcwd(), "results", "exact_nb_600")
 TRUNC = (f"ALL RUNS STOPPED AT ITERATION {N_ITER} -- a truncation of the notebook's longer runs "
@@ -35,9 +36,9 @@ def accuracy_fig(spec, arms, pot, ds, scales, eta, R, tag=""):
             x, A = arms[t]["x"], arms[t][key]
             mu, sd = mean_sd(A, axis=1)
             ax.fill_between(x, np.clip(mu - sd, 0, 1), np.clip(mu + sd, 0, 1), color=col,
-                            alpha=0.15, linewidth=0)
+                            alpha=0.15, linewidth=0)      # may run below the axis floor
             ax.plot(x, mu, color=col, linewidth=2.0, label=lab)
-        ax.set_xlim(x.min(), x.max()); ax.set_ylim(0.0, 1.0)
+        ax.set_xlim(x.min(), x.max()); ax.set_ylim(Y_LO, 1.0)
         ax.set_xlabel("Iterations"); ax.set_ylabel("Accuracy")
         ax.grid(True, alpha=0.9); ax.set_axisbelow(True)
         gname = "ball" if spec["geometry"] == "ball" else "smoothed $\\ell_p$ ($p=2.4$)"
@@ -46,7 +47,12 @@ def accuracy_fig(spec, arms, pot, ds, scales, eta, R, tag=""):
         for sp in ("top", "right"):
             ax.spines[sp].set_visible(False)
         i0 = int(0.4 * len(x))
-        ins = ax.inset_axes([0.46, 0.13, 0.50, 0.40])
+        # On a [0.4, 1] axis the band fills the lower half, so park the inset ABOVE it: take the
+        # highest band edge under the inset's own x-span and start just clear of that.
+        j0 = int(0.46 * len(x))
+        ceil = max(float(sum(mean_sd(arms[t][key], axis=1))[j0:].max()) for t in ("rev", "nrev"))
+        bot = min(0.70, (ceil - Y_LO) / (1.0 - Y_LO) + 0.04)
+        ins = ax.inset_axes([0.46, bot, 0.50, 0.95 - bot])
         lo, hi = [], []
         for t, col in (("rev", X.REV), ("nrev", X.NREV)):
             mu, sd = mean_sd(arms[t][key], axis=1)
@@ -61,8 +67,10 @@ def accuracy_fig(spec, arms, pot, ds, scales, eta, R, tag=""):
         ins.set_title("zoom (mean $\\pm$ 1 s.e.)", fontsize=6.8, pad=2, color=X.INK2)
         for sp in ("top", "right"):
             ins.spines[sp].set_visible(False)
-    axes[0].legend(loc="upper left", fontsize=8.4)   # curves plateau below 0.8, so the
-    #                                                  upper-left corner is always clear
+    # one shared legend beneath the panels: on a [0.4, 1] axis there is no in-panel corner
+    # that is free of both the band and the zoom inset
+    _h, _l = axes[0].get_legend_handles_labels()
+    fig.legend(_h, _l, loc="lower center", bbox_to_anchor=(0.5, -0.055), ncol=2, fontsize=9.0)
     d_tr = X.paired(arms["nrev"]["tr"][-1], arms["rev"]["tr"][-1])
     d_te = X.paired(arms["nrev"]["te"][-1], arms["rev"]["te"][-1])
     gtxt = ("ball ||w||^2 <= 2 (radius sqrt(2))" if spec["geometry"] == "ball" else
@@ -71,7 +79,7 @@ def accuracy_fig(spec, arms, pot, ds, scales, eta, R, tag=""):
     fig.suptitle(f"{spec['key']}{tag}: exact gradient, LASSO anchor "
                  f"(first {N_ITER} iterations)", fontsize=12.0, y=1.005, x=0.02, ha="left",
                  color=X.INK)
-    fig.text(0.5, -0.05, _wrap(
+    fig.text(0.5, -0.105, _wrap(
         f"{TRUNC} {spec['dataset'].upper()} -- {gtxt}. d = 10 (intercept w_0 + nine features), "
         f"no mini-batching: the EXACT gradient is used at every step. sigma = {pot.sigma:g}, "
         f"lambda = {pot.lam:.4g}, delta = {pot.delta:.4g}, so a in [{pot.a_lower:.2f}, 1]. Block "
@@ -81,7 +89,10 @@ def accuracy_fig(spec, arms, pot, ds, scales, eta, R, tag=""):
         f"difference AT ITERATION {N_ITER}, non-reversible minus reversible: training "
         f"{d_tr[0]:+.4f} (t = {d_tr[2]:+.2f}), test {d_te[0]:+.4f} (t = {d_te[2]:+.2f}). Bands: "
         f"mean +- 1 SD (ddof = 1) across replicates -- repeat-run variability at a fixed split, "
-        f"not a confidence or credible interval.", 126),
+        f"not a confidence or credible interval. The ACCURACY AXIS IS [{Y_LO:g}, 1], so the lower "
+        f"band edge runs off the bottom of the panel during the first few hundred iterations: "
+        f"about a quarter of replicates start below {Y_LO:g} and the lowest state visited is near "
+        f"0.27 (see figures/axis_explainer.png).", 126),
         ha="center", va="top", fontsize=7.0, color=X.INK2)
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     name = f"{spec['key']}{tag}_600"
