@@ -25,6 +25,7 @@ checkpoint, init, observable, held_out, geometry):
                explicit list of feature indices
   radius_margin  l1_radius = |beta_hat|_1 + margin                        (1.0)
   ball_target    for geometry=ball, features are scaled so |beta_hat|_2 = this   (0.8)
+  s_warmup       ramp the block strength linearly from 0 over this many iterations (0)
 The pilot coefficients beta_hat come from scikit-learn logistic regression (C = 100)
 on the training rows in the FINAL coordinates; they are used only for the
 preprocessing choices and as the 'beta_true' reference (antipodal init, reference
@@ -157,6 +158,7 @@ def build(cfgd):
         eta=float(cfgd.get("eta", 1e-4)), n_repeats=int(cfgd.get("R", 40)), n_iterations=int(cfgd.get("n_iter", 1000)),
         checkpoint_every=int(cfgd.get("checkpoint", 10)), block_scales=scales, epsilon=float(cfgd.get("epsilon", 0.2)),
         l1_radius=float(np.abs(beta_ref).sum() + float(cfgd.get("radius_margin", 1.0))), n_total=len(y),
+        scale_warmup=int(cfgd.get("s_warmup", 0)),
     )
     ds = lasso.Dataset(np.ascontiguousarray(X_train), ytr, np.ascontiguousarray(X_test), yte, beta_ref)
     tg = lasso.LassoTarget(ds.X_train, ds.y_train, cfg.lambda_lasso, cfg.sigma_intercept, cfg.delta_anchor)

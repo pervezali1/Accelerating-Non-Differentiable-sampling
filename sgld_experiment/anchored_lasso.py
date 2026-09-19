@@ -87,6 +87,7 @@ class LassoConfig:
     n_repeats: int = 100
     checkpoint_every: int = 10
     block_scales: tuple[float, ...] = (5.0, 5.0, 5.0)
+    scale_warmup: int = 0            # ramp s linearly from 0 over this many iterations (0 = none)
     # l^p ball
     p_constraint: float = 1.0        # smoothed L1 ball
     epsilon: float = 0.2
@@ -509,7 +510,8 @@ def run_chain(dataset: Dataset, target: LassoTarget, geometry: Geometry,
         if alpha == 0.0:
             drift = -eta * a[:, None] * gradient
         else:
-            rotated = apply_J(w, gradient, geometry, scales)
+            ramp = min(1.0, (k + 1) / cfg.scale_warmup) if cfg.scale_warmup > 0 else 1.0
+            rotated = apply_J(w, gradient, geometry, scales * ramp)
             drift = -eta * a[:, None] * gradient + eta * alpha * a[:, None] * rotated
             ratio_sum += float(np.mean(
                 np.linalg.norm(alpha * rotated, axis=1)

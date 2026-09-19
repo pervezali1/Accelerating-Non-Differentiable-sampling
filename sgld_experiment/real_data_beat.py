@@ -43,7 +43,7 @@ def figure(runs, cfg, info, cfgd, tag, y_limits):
     fig.tight_layout(rect=(0, 0.14, 1, 0.95))
     fig.text(0.5, 0.012,
              f"d = {info['d']} (intercept + {len(info['features'])} columns: {', '.join(info['features'])});  n_train = {info['n_train']}, n_test = {info['n_test']};  "
-             f"U = f + g, g = {cfg.lambda_lasso:g}*sum|w_j|, anchor delta = {cfg.delta_anchor};  EXACT gradient;  eta = {cfg.eta:.1e};  s = {cfgd.get('s')};  R = {cfg.n_repeats}.\n"
+             f"U = f + g, g = {cfg.lambda_lasso:g}*sum|w_j|, anchor delta = {cfg.delta_anchor};  EXACT gradient;  eta = {cfg.eta:.1e};  s = {cfgd.get('s')}" + (f" (ramped from 0 over the first {cfgd['s_warmup']} iterations)" if cfgd.get('s_warmup') else "") + f";  R = {cfg.n_repeats}.\n"
              f"Preprocessing: scaling = '{cfgd.get('scaling', 'standard')}', order = '{cfgd.get('order', 'natural')}', signs aligned = {cfgd.get('align', True)}"
              + (f", block reparametrisation (v_axis, v_fast, v_slow) = ({cfgd.get('v_axis', 1)}, {cfgd.get('v_fast', 64)}, {cfgd.get('v_slow', 2)}), (b, e) = ({cfgd.get('b', 1.5)}, {cfgd.get('e', 0.25)})" if cfgd.get("scaling") == "design" else "")
              + f".  Reference (scikit-learn logistic regression) test accuracy {info['reference_test_accuracy']:.3f}.\n"

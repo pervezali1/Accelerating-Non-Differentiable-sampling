@@ -281,7 +281,8 @@ def shared_streams(geometry, n_iterations, seed_offset=0):
     noise = np.stack([np.random.default_rng(sd).standard_normal((n_iterations, geometry.d)) for sd in noise_ss.spawn(R)])
     return w_init, noise
 
-def run_chain(alpha, P, s, eta, n_iterations, streams):
+def run_chain(alpha, P, s, eta, n_iterations, streams, s_warmup=0):
+    """s_warmup > 0 ramps the block strength linearly from 0 over the first s_warmup iterations."""
     X, y, Xt, yt, geometry = P["X_train"], P["y_train"], P["X_test"], P["y_test"], P["geometry"]
     w_init, noise = streams; w = w_init.copy()
     checkpoints, train, test, n_projected = [0], [accuracy(w, X, y)], [accuracy(w, Xt, yt)], 0
@@ -289,7 +290,8 @@ def run_chain(alpha, P, s, eta, n_iterations, streams):
         grad = grad_U0(w, X, y); ak = a(w)[:, None]
         drift = -eta * ak * grad
         if alpha != 0.0:
-            drift = drift + eta * alpha * ak * apply_J(w, grad, geometry, s)
+            s_k = s * min(1.0, (k + 1) / s_warmup) if s_warmup else s
+            drift = drift + eta * alpha * ak * apply_J(w, grad, geometry, s_k)
         w, projected = geometry.project(w + drift + np.sqrt(2.0 * eta * ak) * noise[:, k, :])
         n_projected += int(projected.sum())
         if (k + 1) % CHECKPOINT == 0:
@@ -302,11 +304,23 @@ Four cases. $\eta$ is set so that the Euler step is stable on the fast direction
 ($\eta a\lambda_{\max}\approx0.1$; MAGIC has $\sim20\times$ the training rows of Titanic, hence the
 smaller $\eta$) and $s$ sits inside the discrete-time stability window (the ball needs a
 larger $s$ because its axis $s\,w_I$ is short). The held-out evaluation iteration is the
-one where the search-run gap peaked (fixed before the held-out seeds were drawn)."""))
+one where the search-run gap peaked (fixed before the held-out seeds were drawn).
+
+**The early dip on the ball, and how it is avoided.** Started uniformly on $K$, far from
+the mode, the ball's rotated drift $s\,w_I\times\nabla_IU_0$ is perpendicular to the gradient
+and $s\|w_I\|\approx13$ times longer than the gradient step, so for the first tens of
+iterations the non-reversible chain moves *sideways* and its accuracy dips $\approx0.02$
+below the reversible one before the contraction takes over. A larger step
+($\eta=1.4\cdot10^{-6}$ instead of $7\cdot10^{-7}$, with $s=12$ instead of $16$ so the chain is
+not pushed into the boundary) finishes that excursion within the first checkpoint, and
+ramping $s$ from $0$ over the first 10 iterations removes what is left: the Titanic ball
+curve is then monotone from the start, projected on under 1% of the steps, with no late
+deficit — at the price of a smaller peak ($+0.10$ instead of $+0.16$ with the dip). The $L_1$
+runs have no dip, and neither does the MAGIC ball run."""))
 
 M.append(("code", '''CASES = {
     "titanic_l1":   dict(name="titanic", geometry="l1",   v_axis=1.0, v_fast=256.0,  v_slow=1.0, s=8.0,  eta=7e-6, n_iterations=3000, evaluate_at=140),
-    "titanic_ball": dict(name="titanic", geometry="ball", v_axis=1.0, v_fast=1024.0, v_slow=1.0, s=16.0, eta=7e-7, n_iterations=3000, evaluate_at=140),
+    "titanic_ball": dict(name="titanic", geometry="ball", v_axis=1.0, v_fast=1024.0, v_slow=1.0, s=12.0, eta=1.4e-6, n_iterations=2000, evaluate_at=135, s_warmup=10),
     "magic_l1":     dict(name="magic",   geometry="l1",   v_axis=1.0, v_fast=256.0,  v_slow=1.0, s=8.0,  eta=2e-6, n_iterations=1000, evaluate_at=80),
     "magic_ball":   dict(name="magic",   geometry="ball", v_axis=1.0, v_fast=256.0,  v_slow=1.0, s=16.0, eta=2e-7, n_iterations=1500, evaluate_at=50),
 }
@@ -320,7 +334,7 @@ for tag, c in CASES.items():
           f"beta_ref feasible: {bool(P['geometry'].feasible(P['beta_ref']))}, order: {P['names']}")
     streams = shared_streams(P["geometry"], c["n_iterations"]); results[tag] = {}
     for method, alpha in METHODS:
-        t0 = time.time(); results[tag][method] = run_chain(alpha, P, c["s"], c["eta"], c["n_iterations"], streams)
+        t0 = time.time(); results[tag][method] = run_chain(alpha, P, c["s"], c["eta"], c["n_iterations"], streams, c.get("s_warmup", 0))
         print(f"   {method:<34} {time.time() - t0:6.1f} s   projection rate {results[tag][method]['projection_rate']:.4f}", flush=True)'''))
 
 M.append(("markdown", r"""## 8. Figures — training and test accuracy only
@@ -373,7 +387,7 @@ for tag, c in CASES.items():
     P, diffs, ses = problems[tag], [], []
     for off in HELD_OUT:
         streams = shared_streams(P["geometry"], c["evaluate_at"] + CHECKPOINT, seed_offset=off)     # only up to the evaluation iteration
-        rev = run_chain(0.0, P, c["s"], c["eta"], c["evaluate_at"], streams); nr = run_chain(1.0, P, c["s"], c["eta"], c["evaluate_at"], streams)
+        rev = run_chain(0.0, P, c["s"], c["eta"], c["evaluate_at"], streams, c.get("s_warmup", 0)); nr = run_chain(1.0, P, c["s"], c["eta"], c["evaluate_at"], streams, c.get("s_warmup", 0))
         m, se, t = paired(nr["test"][-1], rev["test"][-1]); diffs.append(m); ses.append(se)
         held.append({"case": tag, "seed_offset": off, "iteration": c["evaluate_at"], "reversible": rev["test"][-1].mean(),
                      "non_reversible": nr["test"][-1].mean(), "paired_diff": m, "t_stat": t})

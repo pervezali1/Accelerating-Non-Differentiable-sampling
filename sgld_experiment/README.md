@@ -783,7 +783,7 @@ Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda
 | run | v_fast | v_slow | s | eta | iterations | held-out at |
 |---|---|---|---|---|---|---|
 | Titanic, L1 | 256 | 1 | 8 | 7e-6 | 3000 | 140 |
-| Titanic, ball | 1024 | 1 | 16 | 7e-7 | 3000 | 140 |
+| Titanic, ball | 1024 | 1 | 12 (ramped over 10 it.) | 1.4e-6 | 2000 | 135 |
 | MAGIC, L1 | 256 | 1 | 8 | 2e-6 | 1000 | 80 |
 | MAGIC, ball | 256 | 1 | 16 | 2e-7 | 1500 | 50 |
 
@@ -791,9 +791,23 @@ Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda
 
 * As on synthetic data it is a **convergence-speed** effect: the curves meet at the
   reference accuracy (MAGIC by iteration 600, Titanic by iteration 2000-3000 at its
-  smaller `eta`); the gap at the end is 0 +- 0.001 on MAGIC and on the Titanic ball,
+  smaller `eta`); the gap at the end is 0 +- 0.002 on MAGIC and on the Titanic ball,
   and a small late deficit of -0.004 (`t = -3.5`) at iteration 3000 on the Titanic L1
   run, the same `s = 8` discretisation bias the synthetic map shows near the edge.
+* **The early dip on the ball, and how it was removed.**  Started uniformly on `K`,
+  far from the mode, the ball's rotated drift `s w_I x grad_I U0` is perpendicular to
+  the gradient and `s|w_I| ~ 13` times longer than the gradient step, so for the first
+  tens of iterations the non-reversible chain moves sideways and its accuracy dips
+  about 0.02 below the reversible one before the contraction takes over (the L1 runs
+  and the MAGIC ball run have no dip).  Ramping `s` from 0 over the first 10 iterations
+  (`scale_warmup` in `LassoConfig`, `s_warmup` in the helper) only delays the rise; a
+  larger step (`eta = 1.4e-6` instead of `7e-7`, with `s = 12` instead of 16 so the
+  chain is not pushed into the boundary) finishes the excursion within the first
+  checkpoint.  The Titanic ball run now shows -0.006 (`t = -0.3`, noise) at iteration
+  20 and is monotone afterwards, projected on 1.7% of the steps, with no late deficit,
+  at the price of a smaller peak (+0.14 instead of +0.16).  Tested grid: `s` in
+  {6, 8, 12, 16}, `eta` in {7e-7, 1.4e-6, 2.8e-6}, warm-up in {0, 10}, ball target in
+  {0.5, 0.6, 0.8}; smaller ball targets raise the projection rate sharply.
 * Audit of the Titanic numbers (they looked suspicious): the reference 0.782 is exactly
   the test accuracy of the mode of `U_0`; the logits are identical in the standard and
   reparametrised coordinates (max difference 6e-3 on the test set, from the pilot fit's
