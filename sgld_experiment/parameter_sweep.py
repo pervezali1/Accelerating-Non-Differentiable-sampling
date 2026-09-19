@@ -3,7 +3,8 @@
     python3 parameter_sweep.py CONFIGS.json RESULTS.jsonl [--workers 3]
 
 ``CONFIGS.json`` is a list of hunt_helper config dicts (an optional ``"tag"``
-key is carried through untouched).  Each finished run is appended to
+key is carried through untouched; an optional ``"helper"`` key names another
+helper script with the same interface, e.g. ``real_hunt.py``).  Each finished run is appended to
 ``RESULTS.jsonl`` as it completes, and a one-line summary is printed:
 
     tag | eval it  rev  nr  diff  t | peak it diff t | proj  rising | held pooled diff t allpos | s
@@ -27,7 +28,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 def run_one(cfg: dict) -> dict:
     env = dict(os.environ, OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1", MKL_NUM_THREADS="1")
     t0 = time.time()
-    proc = subprocess.run([sys.executable, "hunt_helper.py", json.dumps(cfg)],
+    helper = cfg.get("helper", "hunt_helper.py")           # e.g. real_hunt.py for the real-data runs
+    proc = subprocess.run([sys.executable, helper, json.dumps(cfg)],
                           capture_output=True, text=True, env=env, cwd=HERE, timeout=3600)
     if proc.returncode != 0:
         return {"config": cfg, "error": proc.stderr[-3000:], "seconds": time.time() - t0}

@@ -696,3 +696,111 @@ python make_beat_notebook.py                        # accuracy_curves_beat.ipynb
 python build_parameter_map.py                       # tables from results_beat/search
 python parameter_sweep.py results_beat/search/map_configs.json map.jsonl --workers 3
 ```
+
+## Real data: MAGIC gamma telescope and Titanic
+
+The same two samplers, the same target `U = f + g` (LASSO `lambda = 2`, `delta = 0.02`),
+the same block cross-product `J`, on two real classification problems:
+
+* **Titanic** (`data/titanic.csv`, 891 passengers): intercept + 8 engineered columns
+  (`pclass`, `sex`, median-imputed `age`, `sibsp`, `parch`, `log(1 + fare)`, `embarked = C`,
+  `embarked = Q`); `d = 9`.  Reference (scikit-learn logistic regression) test accuracy 0.782.
+* **MAGIC gamma telescope** (`data/magic.tsv.gz`, PMLB mirror of UCI `magic04`, 19,020
+  events, 10 features): intercept + 10 features + one zero column so that `d = 12` is a
+  multiple of 3 (the zero column's coefficient is pulled to 0 by `g`).  Reference test
+  accuracy 0.790.  The search used 4,000 training rows; the final runs use all 15,216.
+
+Stratified 80/20 split (`random_state = 2027`), pilot coefficients from scikit-learn
+(`C = 100`), features sign-flipped so every pilot coefficient is positive (harmless: `g`
+and both constraint sets are symmetric under sign flips).  Everything else is
+`real_hunt.py` (one paired comparison from a JSON config, same output as
+`hunt_helper.py`), `real_data_beat.py` (figures + held-out confirmation) and
+`build_real_summary.py`; the raw search (366 configurations) is in `results_real/search/`.
+
+### What was tried, in order of how much preprocessing it takes
+
+1. **Standardised features, natural or importance order** — the plain thing.  Ties on
+   both data sets (best peak gap +0.018, `t` about 2): after z-scoring the block
+   Hessians are nearly isotropic, so there is nothing for `J` to accelerate, exactly as
+   on the isotropic synthetic design.
+2. **Equalised coefficients** (each z-scored feature rescaled by its pilot coefficient
+   so the L1 axis is democratic) — ties.  Slow coordinates are then the least
+   predictive ones: the whitened-coordinates ceiling.
+3. **Raw scales** (MAGIC, feature variances from 0.01 to 5,600) — +0.035 (`t = 4`) with
+   `eta = 3e-8`: huge anisotropy, but the slow coordinates sit along the L1 axis, so
+   only the oblique cap applies.
+4. **Block reparametrisation** — the synthetic recipe transplanted.  Inside each full
+   slope triple `I` an invertible linear map `A` is applied to the (standardised,
+   sign-aligned) features so that the triple's covariance becomes
+   `v_axis q1q1' + v_fast q2q2' + v_slow q3q3'` and the pilot coefficients become
+   proportional to `(b, e, e)`: `A = Sigma^(1/2) W C^(-1/2)` with `C` the block covariance
+   and `W` the Householder reflection taking the whitened coefficient vector
+   `C^(1/2) beta_I` onto `Sigma^(1/2) (b, e, e)`.  The logits `x' beta` are unchanged, so
+   the model, the reference accuracy and the data are the same; only the coordinates in
+   which the posterior is written change (it is a data-dependent choice of
+   parametrisation, made from a pilot fit).  The six most informative features go to the
+   two full triples.  This wins by **+0.16 to +0.23** on both data sets and both
+   constraint sets, confirmed on held-out seeds with `R = 100`:
+
+![titanic l1](results_real/titanic_l1.png)
+![titanic ball](results_real/titanic_ball.png)
+![magic l1](results_real/magic_l1.png)
+![magic ball](results_real/magic_ball.png)
+
+Final runs: R = 100 shared-randomness replicates, held-out confirmation on four extra sampler seeds (R = 100 each) at the iteration where the search-run gap peaked.  Search rounds: R = 40, 1000 iterations (2000 for the raw-scale runs), MAGIC subsampled to 4000 training rows.
+
+## Final runs
+
+| run | n_train | reference acc. | REV / NR at the peak | peak gap (it.) | held-out pooled gap | t | gap at the end |
+|---|---|---|---|---|---|---|---|
+| Titanic, L1-smooth ball | 712 | 0.782 | 0.540 / 0.730 | +0.190 (140) | +0.174 | +22.3 | +0.0341 |
+| Titanic, unit ball | 712 | 0.782 | 0.567 / 0.726 | +0.159 (230) | +0.157 | +20.1 | +0.0792 |
+| MAGIC telescope, L1-smooth ball | 15216 | 0.790 | 0.550 / 0.737 | +0.188 (20) | +0.127 | +29.7 | -0.0001 |
+| MAGIC telescope, unit ball | 15216 | 0.790 | 0.538 / 0.701 | +0.162 (40) | +0.157 | +29.0 | -0.0010 |
+
+## Search: best valid configuration per preprocessing ladder (projection rate < 0.05)
+
+| data set | ladder | best peak gap (it.) | t | REV / NR | configurations |
+|---|---|---|---|---|---|
+| titanic | standard scaling, natural order | +0.018 (70) | +2.3 | 0.599 / 0.618 | 30 |
+| titanic | standard scaling, importance order | +0.014 (40) | +2.2 | 0.528 / 0.542 | 6 |
+| titanic | equalised coefficients | +0.018 (30) | +1.4 | 0.624 / 0.643 | 30 |
+| titanic | block reparametrisation, L1 | +0.233 (50) | +10.2 | 0.515 / 0.748 | 64 |
+| titanic | standard scaling, unit ball | +0.024 (200) | +2.6 | 0.654 / 0.678 | 11 |
+| titanic | block reparametrisation, unit ball | +0.119 (140) | +5.7 | 0.588 / 0.707 | 26 |
+| magic | standard scaling, natural order | +0.014 (40) | +1.7 | 0.610 / 0.624 | 30 |
+| magic | standard scaling, importance order | +0.017 (60) | +2.1 | 0.638 / 0.655 | 6 |
+| magic | equalised coefficients | +0.008 (10) | +1.0 | 0.612 / 0.620 | 14 |
+| magic | raw (unstandardised) scales | +0.035 (560) | +4.0 | 0.587 / 0.623 | 6 |
+| magic | block reparametrisation, L1 | +0.189 (20) | +9.8 | 0.546 / 0.735 | 58 |
+| magic | standard scaling, unit ball | +0.011 (10) | +1.2 | 0.528 / 0.539 | 11 |
+| magic | block reparametrisation, unit ball | +0.131 (60) | +7.4 | 0.573 / 0.704 | 21 |
+
+Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda = 2`,
+`delta = 0.02`, L1 radius `|beta_hat|_1 + 1`, unit ball reached by scaling all columns so
+`|beta_hat|_2 = 0.8`):
+
+| run | v_fast | v_slow | s | eta | iterations | held-out at |
+|---|---|---|---|---|---|---|
+| Titanic, L1 | 256 | 1 | 8 | 7e-6 | 1000 | 140 |
+| Titanic, ball | 1024 | 1 | 16 | 7e-7 | 1000 | 140 |
+| MAGIC, L1 | 256 | 1 | 8 | 2e-6 | 1000 | 80 |
+| MAGIC, ball | 256 | 1 | 16 | 2e-7 | 1500 | 50 |
+
+### Honest scope
+
+* As on synthetic data it is a **convergence-speed** effect: the curves meet at the
+  reference accuracy (MAGIC by iteration 600; on Titanic the reversible chain is still
+  climbing at iteration 1000 with `eta = 7e-6`), and the gap at the end is 0 +- 0.001 on
+  MAGIC.
+* Without the block reparametrisation the non-reversible sampler does **not** beat the
+  reversible one on either data set beyond +0.02–0.035; the win needs the posterior
+  to be written in coordinates whose slow, signal-carrying direction lies in the plane
+  that `J` rotates.  Those coordinates come from a pilot fit, so this is a designed
+  parametrisation of a real problem, not a property of the raw features.
+* Past the stability edge (`s = 8` at `eta = 7e-5` on Titanic, `s = 16` at the larger
+  `eta` values) the projection fires on 60% of the steps and the non-reversible chain
+  loses; the parameter windows are the ones the synthetic map predicts.
+
+Reproduce: `python real_data_beat.py '<config>'` with the configurations printed in
+`results_real/<run>.json`, or `python parameter_sweep.py results_real/search/real2_configs.json out.jsonl`.

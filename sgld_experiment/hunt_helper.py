@@ -103,9 +103,8 @@ def accuracy_series(run, ds, observable):
     return out
 
 
-def main():
-    cfgd = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
-    cfg, ds, tg, geom = build(cfgd)
+def evaluate(cfg, ds, tg, geom, cfgd):
+    """Paired comparison + held-out confirmation for an already-built problem; returns the result dict."""
     observable = cfgd.get("observable", "single")
     eval_at = int(cfgd.get("eval_at", cfg.n_iterations))
     result = {"config": cfgd}
@@ -151,7 +150,13 @@ def main():
         result["held_out_pooled_diff"] = float(ds_.mean())
         result["held_out_pooled_t"] = float(ds_.mean() / pse)
         result["held_out_all_positive"] = bool((ds_ > 0).all())
-    print(json.dumps(result, indent=1))
+    return result
+
+
+def main():
+    cfgd = json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}
+    cfg, ds, tg, geom = build(cfgd)
+    print(json.dumps(evaluate(cfg, ds, tg, geom, cfgd), indent=1))
 
 
 if __name__ == "__main__":
