@@ -737,7 +737,9 @@ the same block cross-product `J`, on two real classification problems:
   multiple of 3 (the zero column's coefficient is pulled to 0 by `g`).  Reference test
   accuracy 0.790.  The search used 4,000 training rows; the final runs use all 15,216.
 
-Stratified 80/20 split (`random_state = 2027`), pilot coefficients from scikit-learn
+Anchor: the Gaussian smoothing `p0(t) = lambda E|t + mu Z|` of the LASSO term with
+`mu = 0.02` (see the section above); the earlier sqrt-smoothing runs gave the same
+numbers to within noise.  Stratified 80/20 split (`random_state = 2027`), pilot coefficients from scikit-learn
 (`C = 100`), features sign-flipped so every pilot coefficient is positive (harmless: `g`
 and both constraint sets are symmetric under sign flips).  Everything else is
 `real_hunt.py` (one paired comparison from a JSON config, same output as
@@ -853,7 +855,7 @@ Final configurations (`b = 1`, `e = 0.5`, `v_axis = 1`, `epsilon = 0.2`, `lambda
 
 `real_data_nonreversible_vs_reversible.ipynb` (executed copy alongside) is the
 self-contained notebook for all four cases: data loading, the parametrisation, `U`,
-`U_0`, `J_s`, the update, the figures and the numbers, importing nothing from the
+`U_0` with the Gaussian smoothing, `J_s`, the update, the figures and the numbers, importing nothing from the
 repository (the data files are downloaded if `data/` is absent).
 
 Reproduce: `python real_data_beat.py '<config>'` with the configurations printed in

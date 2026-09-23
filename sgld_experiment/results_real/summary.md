@@ -6,10 +6,10 @@ Final runs: R = 100 shared-randomness replicates, held-out confirmation on four 
 
 | run | n_train | reference acc. | REV / NR at the peak | peak gap (it.) | held-out pooled gap | t | gap at the end |
 |---|---|---|---|---|---|---|---|
-| Titanic, L1-smooth ball | 712 | 0.782 | 0.540 / 0.730 | +0.190 (140) | +0.174 | +22.3 | -0.0042 |
-| Titanic, unit ball | 712 | 0.782 | 0.568 / 0.709 | +0.140 (110) | +0.143 | +19.6 | -0.0015 |
-| MAGIC telescope, L1-smooth ball | 15216 | 0.790 | 0.550 / 0.737 | +0.188 (20) | +0.127 | +29.7 | -0.0001 |
-| MAGIC telescope, unit ball | 15216 | 0.790 | 0.538 / 0.701 | +0.162 (40) | +0.157 | +29.0 | -0.0010 |
+| Titanic, L1-smooth ball | 712 | 0.782 | 0.537 / 0.727 | +0.190 (130) | +0.174 | +22.6 | -0.0044 |
+| Titanic, unit ball | 712 | 0.782 | 0.565 / 0.706 | +0.141 (100) | +0.143 | +19.6 | -0.0008 |
+| MAGIC telescope, L1-smooth ball | 15216 | 0.790 | 0.550 / 0.744 | +0.193 (20) | +0.125 | +29.8 | -0.0001 |
+| MAGIC telescope, unit ball | 15216 | 0.790 | 0.540 / 0.704 | +0.164 (40) | +0.157 | +29.0 | -0.0011 |
 
 ## Search: best valid configuration per preprocessing ladder (projection rate < 0.05)
 

@@ -56,7 +56,7 @@ M.append(("code", '''import os, sys, time, hashlib, urllib.request
 import numpy as np, pandas as pd
 import matplotlib.pyplot as plt
 from IPython.display import display, Image
-from scipy.special import expit
+from scipy.special import expit, erf
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 
@@ -64,7 +64,7 @@ QUICK           = os.environ.get("NRAL_QUICK", "0") == "1"
 R               = 20 if QUICK else 100        # replicate chains
 CHECKPOINT      = 10
 LAMBDA_LASSO    = 2.0                         # strength of the non-differentiable g
-DELTA           = 0.02                        # smoothing of g inside U_0
+DELTA           = 0.02                        # width mu of the Gaussian smoothing of |w_j| inside U_0
 SIGMA_INTERCEPT = 5.0                         # sd of the Gaussian prior on the intercept
 EPSILON         = 0.2                         # smoothing of the L1 constraint
 HELD_OUT        = (101,) if QUICK else (101, 202, 303, 404)
@@ -195,11 +195,18 @@ M.append(("code", simple_cell("def f(w, X, y):")))
 
 M.append(("markdown", r"""## 4. The anchor $U_0=f+g_0$ and $a(w)=e^{U-U_0}$
 
-$g_0(w)=\lambda_{\rm lasso}\sum_{j\ge1}\sqrt{w_j^2+\delta^2}$ with $\delta=0.02$; $a(w)\in[e^{-8\lambda\delta},1]$
-on Titanic ($8$ slopes) and $[e^{-11\lambda\delta},1]$ on MAGIC. The anchored diffusion
+$|t|$ is replaced by its **Gaussian smoothing** $p_0(t)=\lambda\,\mathbb E|t+\mu Z|$, $Z\sim N(0,1)$,
+$\mu=0.02$ (`DELTA`), the Huber-type function
+
+$$p_0(t)=\lambda\Bigl\{t\bigl(2\Phi(t/\mu)-1\bigr)+2\mu\,\phi(t/\mu)\Bigr\},\qquad
+p_0'(t)=\lambda\,\mathrm{erf}\!\bigl(t/(\mu\sqrt2)\bigr),\qquad p_0''(t)=\frac{2\lambda}{\mu}\phi(t/\mu),$$
+
+which is $\frac{2\lambda}{\mu\sqrt{2\pi}}$-smooth with $0\le p_0(t)-\lambda|t|\le\lambda\mu\sqrt{2/\pi}$. So
+$g_0(w)=\sum_{j\ge1}p_0(w_j)$ and $a(w)\in[e^{-8\lambda\mu\sqrt{2/\pi}},1]$ on Titanic ($8$ slopes),
+$[e^{-11\lambda\mu\sqrt{2/\pi}},1]$ on MAGIC. The anchored diffusion
 $dw=-a\nabla U_0\,dt+\sqrt{2a}\,dB$ has invariant density $\propto e^{-U_0}/a=e^{-U}$, the true
 non-differentiable target, although only $U_0$ is ever differentiated."""))
-M.append(("code", simple_cell("def g0(w):")))
+M.append(("code", simple_cell("def p0(t):")))
 
 M.append(("markdown", r"""## 5. Constraint sets and the block matrix $J_s$
 
