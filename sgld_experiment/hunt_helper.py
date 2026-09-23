@@ -18,6 +18,7 @@ Config keys (all optional except as noted):
   epsilon     smoothing of the constraint (soft-sign width of grad g)  (0.2)
   init_scale  jitter around the origin for init=origin               (0.02)
   s_warmup    ramp s linearly from 0 over this many iterations        (0)
+  smoothing   anchor smoothing of |w_j|: "sqrt" or "gaussian" (E|w_j + delta Z|)   (sqrt)
   lambda      lambda_lasso                                       (2)
   delta       delta_anchor                                       (0.02)
   s           block strength, scalar or [s1,s2,s3]               (5)
@@ -67,7 +68,8 @@ def build(cfgd):
         ds = lasso.make_scaled_dataset(cfg, cfgd["variances"], cfgd["beta"])
     else:
         raise ValueError(design)
-    tg = lasso.LassoTarget(ds.X_train, ds.y_train, cfg.lambda_lasso, cfg.sigma_intercept, cfg.delta_anchor)
+    tg = lasso.LassoTarget(ds.X_train, ds.y_train, cfg.lambda_lasso, cfg.sigma_intercept, cfg.delta_anchor,
+                           smoothing=cfgd.get("smoothing", "sqrt"))
     geom = (nral.BallGeometry(cfg.d) if cfgd.get("geometry", "ball") == "ball"
             else nral.L1SmoothBallGeometry(cfg.d, cfg.epsilon, cfg.l1_radius))
     return cfg, ds, tg, geom

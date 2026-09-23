@@ -48,7 +48,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from scipy.optimize import brentq
-from scipy.special import expit
+from scipy.special import erf, expit
 from sklearn.model_selection import train_test_split
 
 from anchored_sgld import (  # verified machinery, reused unchanged
@@ -182,13 +182,50 @@ def make_dataset(cfg: LassoConfig) -> Dataset:
 # ==========================================================================
 @dataclass
 class LassoTarget:
-    """``U = f + g`` with a non-differentiable ``g``, and its smooth anchor."""
+    """``U = f + g`` with a non-differentiable ``g``, and its smooth anchor.
+
+    Two smoothings of ``|t|`` are available for the anchor ``U0 = f + g0``, both with
+    the single width parameter ``delta_anchor``:
+
+    * ``smoothing="sqrt"``:      ``p0(t) = lambda sqrt(t^2 + delta^2)``;
+    * ``smoothing="gaussian"``:  ``p0(t) = lambda E|t + delta Z|, Z ~ N(0, 1)``, i.e.
+      ``p0(t) = lambda { t (2 Phi(t/delta) - 1) + 2 delta phi(t/delta) }`` with
+      ``p0'(t) = lambda (2 Phi(t/delta) - 1) = lambda erf(t / (delta sqrt 2))`` and
+      ``p0''(t) = (2 lambda / delta) phi(t/delta)``: a Huber-type function that is
+      ``2 lambda / (delta sqrt(2 pi))``-smooth.  ``p0(t) - lambda|t|`` lies in
+      ``[0, lambda delta sqrt(2/pi)]`` so ``a(w) = exp(U - U0)`` is bounded below by
+      ``exp(-(d-1) lambda delta sqrt(2/pi))``.
+    """
 
     X: np.ndarray
     y: np.ndarray
     lambda_lasso: float
     sigma_intercept: float
     delta_anchor: float
+    smoothing: str = "sqrt"
+
+    def __post_init__(self) -> None:
+        if self.smoothing not in ("sqrt", "gaussian"):
+            raise ValueError("smoothing must be 'sqrt' or 'gaussian'")
+
+    # ---- the smoothed |t| and its derivative (per coordinate) ----
+    def _p0(self, t: np.ndarray) -> np.ndarray:
+        if self.smoothing == "sqrt":
+            return np.sqrt(t * t + self.delta_anchor ** 2)
+        z = t / self.delta_anchor
+        return t * erf(z / math.sqrt(2.0)) + self.delta_anchor * math.sqrt(2.0 / math.pi) * np.exp(-0.5 * z * z)
+
+    def _p0_prime(self, t: np.ndarray) -> np.ndarray:
+        if self.smoothing == "sqrt":
+            return t / np.sqrt(t * t + self.delta_anchor ** 2)
+        return erf(t / (self.delta_anchor * math.sqrt(2.0)))
+
+    @property
+    def anchor_curvature(self) -> float:
+        """``sup p0''`` (times lambda): ``lambda/delta`` (sqrt) or ``2 lambda/(delta sqrt(2 pi))`` (gaussian)."""
+        if self.smoothing == "sqrt":
+            return self.lambda_lasso / self.delta_anchor
+        return 2.0 * self.lambda_lasso / (self.delta_anchor * math.sqrt(2.0 * math.pi))
 
     @property
     def d(self) -> int:
@@ -217,15 +254,13 @@ class LassoTarget:
 
     def g_smooth(self, w: np.ndarray) -> np.ndarray:
         w2, squeeze = _as_2d(w)
-        value = self.lambda_lasso * np.sqrt(
-            w2[:, 1:] ** 2 + self.delta_anchor ** 2).sum(axis=1)
+        value = self.lambda_lasso * self._p0(w2[:, 1:]).sum(axis=1)
         return value[0] if squeeze else value
 
     def grad_g_smooth(self, w: np.ndarray) -> np.ndarray:
         w2, squeeze = _as_2d(w)
         out = np.zeros_like(w2)
-        out[:, 1:] = (self.lambda_lasso * w2[:, 1:]
-                      / np.sqrt(w2[:, 1:] ** 2 + self.delta_anchor ** 2))
+        out[:, 1:] = self.lambda_lasso * self._p0_prime(w2[:, 1:])
         return out[0] if squeeze else out
 
     # ---- potentials ----
@@ -244,9 +279,7 @@ class LassoTarget:
         """``U - U0 = g - g_smooth``, from the penalty difference directly."""
         w2, squeeze = _as_2d(w)
         slopes = w2[:, 1:]
-        value = self.lambda_lasso * (
-            np.abs(slopes) - np.sqrt(slopes ** 2 + self.delta_anchor ** 2)
-        ).sum(axis=1)
+        value = self.lambda_lasso * (np.abs(slopes) - self._p0(slopes)).sum(axis=1)
         return value[0] if squeeze else value
 
     def a(self, w: np.ndarray) -> np.ndarray:
@@ -254,7 +287,8 @@ class LassoTarget:
 
     @property
     def log_a_lower_bound(self) -> float:
-        return -(self.d - 1) * self.lambda_lasso * self.delta_anchor
+        width = self.delta_anchor if self.smoothing == "sqrt" else self.delta_anchor * math.sqrt(2.0 / math.pi)
+        return -(self.d - 1) * self.lambda_lasso * width
 
     @property
     def a_lower_bound(self) -> float:
@@ -263,8 +297,7 @@ class LassoTarget:
     def lipschitz_constant(self) -> float:
         """Upper bound on ``||Hess U0||``: data curvature plus anchor curvature."""
         eig_max = float(np.linalg.eigvalsh(self.X.T @ self.X).max())
-        return 0.25 * eig_max + max(1.0 / self.sigma_intercept ** 2,
-                                    self.lambda_lasso / self.delta_anchor)
+        return 0.25 * eig_max + max(1.0 / self.sigma_intercept ** 2, self.anchor_curvature)
 
 
 def accuracy(w: np.ndarray, X: np.ndarray, y: np.ndarray) -> np.ndarray:

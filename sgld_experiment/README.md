@@ -685,6 +685,26 @@ map and the seven held-out confirmations — is in `results_beat/search/` as the
 * The antipodal-initialisation number (+0.65) is a curiosity, not a claim: starting at
   `-beta` is not a fair start.
 
+### Gaussian (Huber-type) smoothing of the LASSO term
+
+`LassoTarget(..., smoothing="gaussian")` replaces `lambda sqrt(t^2 + delta^2)` by the
+Gaussian smoothing of `lambda |t|`, `p0(t) = lambda E|t + mu Z|` with `mu = delta_anchor`:
+
+    p0(t)  = lambda { t (2 Phi(t/mu) - 1) + 2 mu phi(t/mu) },
+    p0'(t) = lambda (2 Phi(t/mu) - 1) = lambda erf(t / (mu sqrt 2)),
+    p0''(t) = (2 lambda / mu) phi(t/mu)        ->  p0 is 2 lambda / (mu sqrt(2 pi))-smooth,
+
+with `0 <= p0(t) - lambda|t| <= lambda mu sqrt(2/pi)`, so `a = exp(U - U0)` is bounded
+below by `exp(-(d-1) lambda mu sqrt(2/pi))` (0.775 at `lambda = 2`, `mu = 0.02`, against
+0.726 for the sqrt smoothing) and the anchor curvature is `2 lambda/(mu sqrt(2 pi)) = 80`
+instead of `lambda/mu = 100`.  Both helpers take `"smoothing": "gaussian"`,
+`nonreversible_beats_reversible.py --smoothing gaussian` writes to `results_beat_gaussian/`,
+and `simple_nonreversible_vs_reversible.ipynb` now uses this smoothing throughout (section 3
+states the formulas; the checks cell verifies `p0 - |t|` and `p0'`).  The results are
+unchanged to within noise: held-out pooled gap +0.165 (t = 30) on the L1 ball and +0.124
+(t = 27) on the unit ball in the notebook; `results_beat_gaussian/summary.json` holds the
+script's numbers.
+
 ### A self-contained, explained notebook
 
 `simple_nonreversible_vs_reversible.ipynb` (executed copy alongside) defines

@@ -1,0 +1,66 @@
+{
+  "L1-smooth ball": {
+    "evaluate_at": 100,
+    "pooled_diff": 0.1648,
+    "pooled_se": 0.005570114524918413,
+    "pooled_t": 29.58646528051663,
+    "all_positive": true,
+    "confirmed": true,
+    "projection_rate_nr": 3e-05,
+    "bayes_ceiling_test": 0.8156104105226314,
+    "config": {
+      "v_axis": 1.0,
+      "v_fast": 64.0,
+      "v_slow": 2.0,
+      "b": 1.5,
+      "e": 0.25,
+      "b1": 0.3,
+      "block_1_variance": 1.0,
+      "s": 4.0,
+      "eta": 7e-06,
+      "epsilon": 0.2,
+      "n_iterations": 1000,
+      "evaluate_at": 100,
+      "s_warmup": 0,
+      "lambda_lasso": 2.0,
+      "delta_anchor": 0.02,
+      "l1_radius": 5.6,
+      "n_repeats": 100
+    }
+  },
+  "unit ball": {
+    "evaluate_at": 60,
+    "pooled_diff": 0.1235125,
+    "pooled_se": 0.004506360806788511,
+    "pooled_t": 27.408479989870592,
+    "all_positive": true,
+    "confirmed": true,
+    "projection_rate_nr": 0.00239,
+    "bayes_ceiling_test": 0.7365816866863705,
+    "config": {
+      "v_axis": 4.0,
+      "v_fast": 256.0,
+      "v_slow": 4.0,
+      "b": 0.5,
+      "e": 0.125,
+      "b1": 0.15,
+      "block_1_variance": 4.0,
+      "s": 16.0,
+      "eta": 3e-06,
+      "epsilon": 0.2,
+      "n_iterations": 1000,
+      "evaluate_at": 60,
+      "s_warmup": 20,
+      "lambda_lasso": 2.0,
+      "delta_anchor": 0.02,
+      "l1_radius": 2.8,
+      "n_repeats": 100
+    }
+  },
+  "figures": [
+    "results_beat_gaussian/accuracy_l1.png",
+    "results_beat_gaussian/accuracy_l1.pdf",
+    "results_beat_gaussian/accuracy_ball.png",
+    "results_beat_gaussian/accuracy_ball.pdf"
+  ]
+}

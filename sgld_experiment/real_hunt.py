@@ -161,7 +161,8 @@ def build(cfgd):
         scale_warmup=int(cfgd.get("s_warmup", 0)),
     )
     ds = lasso.Dataset(np.ascontiguousarray(X_train), ytr, np.ascontiguousarray(X_test), yte, beta_ref)
-    tg = lasso.LassoTarget(ds.X_train, ds.y_train, cfg.lambda_lasso, cfg.sigma_intercept, cfg.delta_anchor)
+    tg = lasso.LassoTarget(ds.X_train, ds.y_train, cfg.lambda_lasso, cfg.sigma_intercept, cfg.delta_anchor,
+                           smoothing=cfgd.get("smoothing", "sqrt"))
     geom = nral.BallGeometry(cfg.d) if geometry_name == "ball" else nral.L1SmoothBallGeometry(cfg.d, cfg.epsilon, cfg.l1_radius)
     sk_acc = float((((ds.X_test @ beta_ref) > 0) == (yte > 0.5)).mean())
     info = {"dataset": name, "d": cfg.d, "n_train": int(len(ytr)), "n_test": int(len(yte)), "features": names,

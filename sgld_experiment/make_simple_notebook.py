@@ -49,7 +49,7 @@ M.append(("code", '''import os, sys, time, hashlib
 import numpy as np, pandas as pd
 import matplotlib.pyplot as plt
 from IPython.display import display, Image
-from scipy.special import expit
+from scipy.special import expit, erf
 from sklearn.model_selection import train_test_split
 
 QUICK           = os.environ.get("NRAL_QUICK", "0") == "1"
@@ -57,7 +57,7 @@ R               = 20 if QUICK else 100        # replicate chains
 N_ITERATIONS    = 300 if QUICK else 1000
 CHECKPOINT      = 10                          # accuracy is recorded every CHECKPOINT iterations
 LAMBDA_LASSO    = 2.0                         # strength of the non-differentiable g
-DELTA           = 0.02                        # smoothing of g inside the anchor U_0
+DELTA           = 0.02                        # width mu of the Gaussian smoothing of |w_j| inside U_0
 SIGMA_INTERCEPT = 5.0                         # sd of the Gaussian prior on the intercept w_0
 EPSILON         = 0.2                         # smoothing of the L1 constraint (soft-sign width)
 HELD_OUT        = (101,) if QUICK else (101, 202, 303, 404)   # extra sampler seeds for confirmation
@@ -153,22 +153,43 @@ def U(w, X, y):
 
 M.append(("markdown", r"""## 3. The anchor $U_0=f+g_0$ and the state-dependent scale $a(w)$
 
-Replace $|w_j|$ by the smooth $\sqrt{w_j^2+\delta^2}$:
+Replace $|t|$ by its **Gaussian smoothing** $p_0(t)=\lambda\,\mathbb E|t+\mu Z|$, $Z\sim N(0,1)$, which
+in closed form is the Huber-type function
 
-$$g_0(w)=\lambda_{\rm lasso}\sum_{j=1}^{8}\sqrt{w_j^2+\delta^2},\qquad U_0=f+g_0,\qquad
-a(w)=e^{U(w)-U_0(w)}=e^{\,g(w)-g_0(w)}\in\bigl[e^{-8\lambda_{\rm lasso}\delta},\,1\bigr].$$
+$$p_0(t)=\lambda\Bigl\{t\bigl(2\Phi(t/\mu)-1\bigr)+2\mu\,\phi(t/\mu)\Bigr\},\qquad
+p_0'(t)=\lambda\bigl(2\Phi(t/\mu)-1\bigr)=\lambda\,\mathrm{erf}\!\bigl(t/(\mu\sqrt2)\bigr),\qquad
+p_0''(t)=\frac{2\lambda}{\mu}\phi(t/\mu),$$
 
-$U_0$ is $C^\infty$, so its gradient exists everywhere — but $e^{-U_0}$ is the wrong target.
+with $2\mu\phi(t/\mu)=\mu\sqrt{2/\pi}\,e^{-t^2/(2\mu^2)}$; $p_0$ is $\frac{2\lambda}{\mu\sqrt{2\pi}}$-smooth,
+$p_0(t)\ge\lambda|t|$ and $p_0(t)-\lambda|t|\le p_0(0)=\lambda\mu\sqrt{2/\pi}$. Then
+
+$$g_0(w)=\sum_{j=1}^{8}p_0(w_j),\qquad U_0=f+g_0,\qquad
+a(w)=e^{U(w)-U_0(w)}=e^{\,g(w)-g_0(w)}\in\bigl[e^{-8\lambda_{\rm lasso}\mu\sqrt{2/\pi}},\,1\bigr].$$
+
+(`DELTA` in the code is $\mu$. The earlier version of this notebook used
+$\lambda\sqrt{t^2+\delta^2}$ instead; the sampler and everything else are unchanged.)
+
+$U_0$ is $C^\infty$ (the smoothing is a Gaussian convolution), so its gradient exists
+everywhere — but $e^{-U_0}$ is the wrong target.
 The anchored diffusion fixes this by rescaling both drift and noise by $a(w)$, which is why
 $a$ multiplies every term of the update in section 5:
 $dw=-a(w)\nabla U_0(w)\,dt+\sqrt{2a(w)}\,dB_t$ has invariant density
 $\propto e^{-U_0}/a=e^{-U}$ — the *true* non-differentiable target — even though only $U_0$ is
-ever differentiated. The cost of a large $\lambda_{\rm lasso}\delta$ is a small $a$, i.e. a
-slow clock, so $\delta$ is kept small."""))
+ever differentiated. The cost of a large $\lambda_{\rm lasso}\mu$ is a small $a$, i.e. a
+slow clock, so $\mu$ is kept small."""))
 
-M.append(("code", '''def g0(w):
-    """Smooth stand-in for g: lambda * sum_j sqrt(w_j^2 + delta^2) over the slopes."""
-    return LAMBDA_LASSO * np.sqrt(w[:, 1:] ** 2 + DELTA ** 2).sum(axis=1)
+M.append(("code", '''def p0(t):
+    """Gaussian smoothing of |t|: E|t + mu Z| = t (2 Phi(t/mu) - 1) + 2 mu phi(t/mu), mu = DELTA."""
+    z = t / DELTA
+    return t * erf(z / np.sqrt(2.0)) + DELTA * np.sqrt(2.0 / np.pi) * np.exp(-0.5 * z * z)
+
+def p0_prime(t):
+    """d/dt of the smoothing: 2 Phi(t/mu) - 1 = erf(t / (mu sqrt 2))."""
+    return erf(t / (DELTA * np.sqrt(2.0)))
+
+def g0(w):
+    """Smooth stand-in for g: lambda * sum_j p0(w_j) over the slopes."""
+    return LAMBDA_LASSO * p0(w[:, 1:]).sum(axis=1)
 
 def U0(w, X, y):
     """The anchor: f + g_0, smooth everywhere."""
@@ -179,12 +200,12 @@ def grad_U0(w, X, y):
     residual = expit(X @ w.T) - y[:, None]                        # (n, R) = p_j(w) - y_j
     grad = residual.T @ X                                         # (R, d) gradient of the log-likelihood part
     grad[:, 0] += w[:, 0] / SIGMA_INTERCEPT ** 2                  # prior on the intercept
-    grad[:, 1:] += LAMBDA_LASSO * w[:, 1:] / np.sqrt(w[:, 1:] ** 2 + DELTA ** 2)   # gradient of g_0
+    grad[:, 1:] += LAMBDA_LASSO * p0_prime(w[:, 1:])                            # gradient of g_0
     return grad
 
 def log_a(w):
-    """log a(w) = U - U_0 = g - g_0, in [-8 lambda_lasso delta, 0]."""
-    return LAMBDA_LASSO * (np.abs(w[:, 1:]) - np.sqrt(w[:, 1:] ** 2 + DELTA ** 2)).sum(axis=1)
+    """log a(w) = U - U_0 = g - g_0, in [-8 lambda_lasso mu sqrt(2/pi), 0]."""
+    return LAMBDA_LASSO * (np.abs(w[:, 1:]) - p0(w[:, 1:])).sum(axis=1)
 
 def a(w):
     return np.exp(log_a(w))'''))
@@ -197,7 +218,8 @@ numeric = np.array([(U0(w + h * np.eye(9)[i], X, y) - U0(w - h * np.eye(9)[i], X
 print(f"grad_U0 vs finite differences (max relative error): {np.abs(grad_U0(w, X, y)[0] - numeric).max() / np.abs(numeric).max():.2e}")
 probe = rng.normal(scale=0.5, size=(500, 9))
 print(f"|log a - (U - U_0)| on 500 random points:           {np.abs(log_a(probe) - (U(probe, X, y) - U0(probe, X, y))).max():.2e}")
-print(f"a(w) in [{a(probe).min():.4f}, {a(probe).max():.4f}]  (bound exp(-8 lambda delta) = {np.exp(-8 * LAMBDA_LASSO * DELTA):.4f})")'''))
+print(f"a(w) in [{a(probe).min():.4f}, {a(probe).max():.4f}]  (bound exp(-8 lambda mu sqrt(2/pi)) = {np.exp(-8 * LAMBDA_LASSO * DELTA * np.sqrt(2 / np.pi)):.4f})")
+t = np.linspace(-0.1, 0.1, 5); print("p0(t) - |t| in [0, mu sqrt(2/pi)]:", np.round(p0(t) - np.abs(t), 4), f"(cap {DELTA * np.sqrt(2 / np.pi):.4f});  p0'(t):", np.round(p0_prime(t), 3))'''))
 
 M.append(("markdown", r"""## 4. The constraint sets and the skew-symmetric matrix $J_s(w)$
 

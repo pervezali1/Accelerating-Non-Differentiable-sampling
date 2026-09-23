@@ -52,6 +52,7 @@ import anchored_sgld as nral
 
 OUTPUT_DIR = "results_beat"
 LAMBDA, DELTA = 2.0, 0.02
+SMOOTHING = "sqrt"               # "sqrt": lambda sqrt(w^2 + delta^2); "gaussian": lambda E|w + delta Z| (Huber-type)
 STYLE = {"Reversible anchored Langevin":     {"color": "#0173B2", "ls": "--", "lw": 2.0},
          "Non-reversible anchored Langevin": {"color": "#CC3311", "ls": "-",  "lw": 2.6}}
 Y_LIMITS = (0.40, 0.90)      # fixed, un-windowed: initialisation ~0.50, Bayes ceiling ~0.82
@@ -84,7 +85,7 @@ def setup(tag: str, quick: bool):
     )
     dataset = lasso.make_scaled_dataset(cfg, Sigma, beta)
     target = lasso.LassoTarget(dataset.X_train, dataset.y_train, cfg.lambda_lasso,
-                               cfg.sigma_intercept, cfg.delta_anchor)
+                               cfg.sigma_intercept, cfg.delta_anchor, smoothing=SMOOTHING)
     geometry = (nral.BallGeometry(cfg.d) if tag == "ball"
                 else nral.L1SmoothBallGeometry(cfg.d, cfg.epsilon, cfg.l1_radius))
     assert bool(geometry.feasible(dataset.beta_true)), f"beta_true outside {geometry.name}"
@@ -112,7 +113,7 @@ def figure(runs, cfg, geometry, tag, quick):
     fig.tight_layout(rect=(0, 0.15, 1, 0.95))
     fig.text(0.5, 0.015,
         f"d = {cfg.d} (intercept + 8 slopes);  constraint: {geometry.name};  U = f + g with "
-        f"g = {cfg.lambda_lasso:g}*sum|w_j| (non-differentiable), anchor delta = {cfg.delta_anchor};  "
+        f"g = {cfg.lambda_lasso:g}*sum|w_j| (non-differentiable), anchor {'E|w + delta Z| (Gaussian smoothing)' if SMOOTHING == 'gaussian' else 'sqrt(w^2 + delta^2)'}, delta = {cfg.delta_anchor};  "
         f"EXACT gradient;  eta = {cfg.eta:.1e};  s = {p['s']:g}" + (f" (ramped from 0 over the first {p['s_warmup']} iterations)" if p['s_warmup'] else "") + f";  R = {cfg.n_repeats};  alpha = 0 vs 1.\n"
         f"Design: unstandardised covariates -- in each slope triple the covariance is "
         f"{p['v_axis']:g} q1q1' + {p['v_fast']:g} q2q2' + {p['v_slow']:g} q3q3' with q1 = (1,1,1)/sqrt3 "
@@ -134,7 +135,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--quick", action="store_true")
     parser.add_argument("--geometry", choices=["l1", "ball", "both"], default="both")
+    parser.add_argument("--smoothing", choices=["sqrt", "gaussian"], default="sqrt",
+                        help="anchor smoothing of |w_j|; 'gaussian' writes to results_beat_gaussian/")
     args = parser.parse_args()
+    global SMOOTHING, OUTPUT_DIR
+    SMOOTHING = args.smoothing
+    if SMOOTHING == "gaussian":
+        OUTPUT_DIR = "results_beat_gaussian"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     tags = ["l1", "ball"] if args.geometry == "both" else [args.geometry]
 
