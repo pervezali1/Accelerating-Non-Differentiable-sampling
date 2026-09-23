@@ -614,6 +614,58 @@ def fig_improving_js(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig13_improving_js_{mode}.png")))
 
 
+# ------------------------------------------------------------------ fig 14
+
+
+def fig_simple_vs_state(mode):
+    """d = 3: a simple stiff<->soft constant J against the gap-optimal one and
+    against two state-dependent fields, under both starting ensembles."""
+    path = os.path.join(DATA, "exp14_simple_vs_state.json")
+    if not os.path.exists(path):
+        print("  skip: exp14_simple_vs_state.json not found")
+        return
+    b = runner.load_json(path)
+    floor, keep, pretty = b["floor"], b["keep"], b["pretty"]
+    priors = ("normal10", "uniform5")
+    ptitle = {"normal10": r"$X_0 \sim N(0,\,10\,I_d)$",
+              "uniform5": r"$X_0 \sim \mathrm{Uniform}(-5,5)^d$"}
+    p = plotting.use_style(mode)
+    fig, axes = plt.subplots(1, 2, figsize=(12.4, 4.8), sharey=True)
+    for ax, prior in zip(axes, priors):
+        rows = [next(r for r in b["rows"] if r["label"] == k and r["prior"] == prior)
+                for k in keep]
+        base = rows[0]["iters"]
+        for i, r in enumerate(rows):
+            colour = p["categorical"][i % len(p["categorical"])]
+            it = np.asarray(r["rec"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            lab = pretty[r["label"]]
+            if r["iters"] > 0:
+                lab += f"   $\\bf{{{r['iters']:d}}}$ it, {base / r['iters']:.2f}$\\times$"
+            # the two state-dependent fields dashed, so the three constant ones read first
+            dashed = r["label"].startswith("state dep")
+            ax.plot(it, np.asarray(r["w2"], dtype=float), color=colour,
+                    lw=2.4 if i == 1 else 1.8, label=lab,
+                    ls=(0, (5, 2.5)) if dashed else "-", zorder=4 - 0.1 * i)
+            if r["iters"] > 0:
+                j = int(np.argmin(np.abs(it - r["iters"])))
+                ax.plot([it[j]], [np.asarray(r["w2"])[j]], "o", color=colour, ms=5.5,
+                        markeredgecolor=p["surface"], markeredgewidth=1.3, zorder=5)
+        ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_title(ptitle[prior], loc="left", fontsize=11)
+        ax.grid(True, which="major", lw=0.6, alpha=0.45)
+        ax.grid(True, which="minor", lw=0.4, alpha=0.20)
+        ax.set_axisbelow(True)
+        ax.legend(loc="upper right", fontsize=8.2, framealpha=0.93)
+    axes[0].set_ylabel("Wasserstein distance")
+    axes[0].set_ylim(top=axes[0].get_ylim()[1] * 3.0)
+    fig.tight_layout()
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig14_simple_vs_state_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -634,6 +686,7 @@ def main():
         fig_curl_potentials(mode)
         fig_three_fields(mode)
         fig_improving_js(mode)
+        fig_simple_vs_state(mode)
 
 
 if __name__ == "__main__":
