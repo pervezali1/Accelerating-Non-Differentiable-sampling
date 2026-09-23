@@ -666,6 +666,59 @@ def fig_simple_vs_state(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig14_simple_vs_state_{mode}.png")))
 
 
+# ------------------------------------------------------------------ fig 15
+
+
+def fig_mcp_user_matrices(mode):
+    """MCP target, d = 3: J = 0 against the tridiagonal J_a and the
+    cross-product J_s, both starting ensembles."""
+    path = os.path.join(DATA, "exp15_mcp_user_matrices.json")
+    if not os.path.exists(path):
+        print("  skip: exp15_mcp_user_matrices.json not found")
+        return
+    b = runner.load_json(path)
+    floor = b["floor"]
+    pretty = {"zero": r"$J = 0$",
+              "const": rf"$J_a$,  $a = {b['a']:g}$",
+              "cross": rf"$J_s(x)$,  $s = {b['s']:g}$"}
+    ptitle = {"normal10": r"$X_0 \sim N(0,\,10\,I_d)$",
+              "uniform5": r"$X_0 \sim \mathrm{Uniform}(-5,5)^d$"}
+    p = plotting.use_style(mode)
+    fig, axes = plt.subplots(1, 2, figsize=(11.6, 4.5), sharey=True)
+    for ax, prior in zip(axes, ("normal10", "uniform5")):
+        rows = [next(r for r in b["rows"] if r["kind"] == k and r["prior"] == prior)
+                for k in ("zero", "const", "cross")]
+        base = rows[0]["iters"]
+        for i, r in enumerate(rows):
+            colour = p["categorical"][i % len(p["categorical"])]
+            it = np.asarray(r["rec"], dtype=float)
+            it[0] = max(it[1] * 0.5, 0.5)
+            lab = pretty[r["kind"]]
+            if r["iters"] > 0:
+                lab += f"   $\\bf{{{r['iters']:d}}}$ it, {base / r['iters']:.2f}$\\times$"
+            # J_s lies on top of J = 0; dash it so both are visible
+            ax.plot(it, np.asarray(r["w2"], dtype=float), color=colour, lw=2.2,
+                    ls=(0, (5, 2.5)) if r["kind"] == "cross" else "-",
+                    label=lab, zorder=3 - 0.1 * i)
+            if r["iters"] > 0:
+                j = int(np.argmin(np.abs(it - r["iters"])))
+                ax.plot([it[j]], [np.asarray(r["w2"])[j]], "o", color=colour, ms=6,
+                        markeredgecolor=p["surface"], markeredgewidth=1.3, zorder=5)
+        ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlabel("iteration")
+        ax.set_title(ptitle[prior], loc="left", fontsize=11)
+        ax.grid(True, which="major", lw=0.6, alpha=0.45)
+        ax.grid(True, which="minor", lw=0.4, alpha=0.20)
+        ax.set_axisbelow(True)
+        ax.legend(loc="upper right", fontsize=8.8, framealpha=0.93)
+    axes[0].set_ylabel("Wasserstein distance")
+    axes[0].set_ylim(top=axes[0].get_ylim()[1] * 2.6)
+    fig.tight_layout()
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig15_mcp_user_matrices_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -687,6 +740,7 @@ def main():
         fig_three_fields(mode)
         fig_improving_js(mode)
         fig_simple_vs_state(mode)
+        fig_mcp_user_matrices(mode)
 
 
 if __name__ == "__main__":
