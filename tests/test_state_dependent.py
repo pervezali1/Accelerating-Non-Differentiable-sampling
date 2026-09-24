@@ -7,7 +7,7 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from skewanchor import samplers, skew, skewfield as sf  # noqa: E402
+from skewanchor import nonsmooth, samplers, skew, skewfield as sf  # noqa: E402
 from skewanchor.targets import anisotropic_student_t  # noqa: E402
 
 
@@ -482,6 +482,54 @@ def test_cross_product_sampler_preserves_the_target():
     assert res.diverged_at is None
     got, truth = res.final_state.var(axis=0), np.diag(t.cov())
     assert np.all(np.abs(got - truth) / truth < 0.12), (got, truth)
+
+
+def test_smoothed_curvature_matches_a_finite_difference():
+    """``smoothed_curvature`` is the second derivative of the smoothed MCP at 0."""
+    for lam, a, eps in ((1.0, 2.0, 0.1), (0.5, 2.0, 0.1), (0.25, 3.0, 0.4)):
+        h = 1e-5
+        fd = (nonsmooth.mcp_smoothed(h, lam, a, eps)
+              - 2.0 * nonsmooth.mcp_smoothed(0.0, lam, a, eps)
+              + nonsmooth.mcp_smoothed(-h, lam, a, eps)) / (h * h)
+        got = nonsmooth.smoothed_curvature(lam, a, eps)
+        assert abs(got - fd) / abs(fd) < 1e-4, (lam, a, eps, got, fd)
+
+
+def test_gaussianised_matches_the_anchor_hessian_at_the_origin():
+    """The stand-in's anchor has the same Hessian at 0 as the MCP target's."""
+    t = nonsmooth.make(3, 6.0, 100.0, lam=0.5, a=2.0, eps=0.1)
+    g = nonsmooth.gaussianised(t)
+    h, d = 1e-5, 3
+    H_mcp = np.zeros((d, d))
+    H_std = np.zeros((d, d))
+    for j in range(d):
+        e = np.zeros((1, d))
+        e[0, j] = h
+        H_mcp[:, j] = np.atleast_2d(t.grad_U0(e) - t.grad_U0(-e))[0] / (2 * h)
+        H_std[:, j] = np.atleast_2d(g.grad_U0(e) - g.grad_U0(-e))[0] / (2 * h)
+    assert np.allclose(H_mcp, H_std, rtol=2e-4, atol=1e-6), (H_mcp, H_std)
+    # and the anchor exponent is unchanged, so the stand-in is still s = 1
+    assert abs(g.s - t.s) < 1e-12
+
+
+def test_the_regulariser_makes_the_target_rounder():
+    """Larger ``lambda / eps`` means a smaller effective condition number.
+
+    This is the whole reason the skew perturbation does less on the regularised
+    target: it trades on anisotropy, and the penalty removes anisotropy.
+    """
+    conds = [np.linalg.cond(nonsmooth.gaussianised(
+        nonsmooth.make(3, 6.0, 100.0, lam=lam, a=2.0, eps=0.1)).Sigma)
+        for lam in (0.0, 0.25, 0.5, 0.75, 1.0)]
+    assert np.all(np.diff(conds) < 0), conds
+    assert abs(conds[0] - 100.0) < 1e-6, conds[0]
+    # eps enters only through lambda / eps, so it moves the same quantity
+    loose = np.linalg.cond(nonsmooth.gaussianised(
+        nonsmooth.make(3, 6.0, 100.0, lam=0.5, a=2.0, eps=0.5)).Sigma)
+    tight = np.linalg.cond(nonsmooth.gaussianised(
+        nonsmooth.make(3, 6.0, 100.0, lam=0.5, a=2.0, eps=0.05)).Sigma)
+    assert loose > 4.0 * tight, (loose, tight)
+
 
 if __name__ == "__main__":
     import traceback
