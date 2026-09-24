@@ -16,6 +16,7 @@ import numpy as np  # noqa: E402
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.ticker as mticker  # noqa: E402
 
 from skewanchor import plotting, runner  # noqa: E402
 
@@ -719,6 +720,148 @@ def fig_mcp_user_matrices(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig15_mcp_user_matrices_{mode}.png")))
 
 
+def fig_stepsize_and_lambda(mode):
+    """MCP target: the stepsize is the knob that pays, and it pays for J = 0 too."""
+    path = os.path.join(DATA, "exp16_stepsize_and_lambda_normal10.json")
+    if not os.path.exists(path):
+        print("  skip: exp16_stepsize_and_lambda_normal10.json not found")
+        return
+    b = runner.load_json(path)
+    eta0 = b["eta0"]
+    lam = sorted({r["lam"] for r in b["rows"]})[0]
+    rows = [r for r in b["rows"] if r["lam"] == lam]
+    floor = rows[0]["floor"]
+    keys = []
+    for r in rows:
+        if r["label"] not in keys:
+            keys.append(r["label"])
+    pretty = {k: (r"$J = 0$" if k == "J = 0" else
+                  "$J_a$,  $a = %g$" % float(k.split("=")[1]) if k.startswith("J_a") else
+                  "$J_s(x)$,  $s = %g$" % float(k.split("=")[1])) for k in keys}
+
+    p = plotting.use_style(mode)
+    fig, axes = plt.subplots(1, 3, figsize=(15.4, 4.5))
+    colours = {k: p["categorical"][i % len(p["categorical"])] for i, k in enumerate(keys)}
+
+    # (a) iterations to the fixed accuracy, as a function of the stepsize
+    ax = axes[0]
+    for k in keys:
+        rs = sorted((r for r in rows if r["label"] == k), key=lambda r: r["mult"])
+        m = np.array([r["mult"] for r in rs], dtype=float)
+        it = np.array([r["iters"] if r["iters"] > 0 else np.nan for r in rs], dtype=float)
+        ax.plot(m, it, "o-", color=colours[k], lw=2.0, ms=5, label=pretty[k])
+        ok = np.isfinite(it)
+        if ok.any():
+            j = int(np.nanargmin(it))
+            ax.plot([m[j]], [it[j]], "*", color=colours[k], ms=15,
+                    markeredgecolor=p["surface"], markeredgewidth=1.0, zorder=6)
+    mults = sorted({r["mult"] for r in rows})
+    top = np.nanmax([r["iters"] for r in rows if r["iters"] > 0]) * 1.25
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xticks(mults)
+    ax.set_xticklabels([f"{m:g}" for m in mults], fontsize=8.5)
+    ax.xaxis.set_minor_locator(mticker.NullLocator())
+    ax.set_ylim(top=top * 1.5)
+    lo = np.nanmin([r["iters"] for r in rows if r["iters"] > 0])
+    ticks = [t for t in (500, 700, 1000, 1500, 2000, 3000, 4000, 6000)
+             if lo * 0.8 <= t <= top]
+    ax.set_yticks(ticks)
+    ax.set_yticklabels([str(t) for t in ticks], fontsize=8.5)
+    ax.yaxis.set_minor_locator(mticker.NullLocator())
+    ax.set_xlabel(r"stepsize  $\eta / \eta_0$")
+    ax.set_ylabel("iterations to the target accuracy")
+    ax.set_title(r"(a)  each field's own best stepsize   ($\lambda = %g$)" % lam,
+                 loc="left", fontsize=11)
+    ax.legend(loc="lower left", fontsize=8.5, framealpha=0.93)
+
+    # (b) the convergence curves at those best stepsizes
+    ax = axes[1]
+    best = {}
+    for k in keys:
+        rs = [r for r in rows if r["label"] == k and r["iters"] > 0]
+        if rs:
+            best[k] = min(rs, key=lambda r: r["iters"])
+    base = best.get("J = 0", {}).get("iters")
+    slow = min((r for r in rows if r["label"] == "J = 0" and r["mult"] == 1.0),
+               key=lambda r: r["mult"], default=None)
+    if slow is not None:
+        it = np.asarray(slow["rec"], dtype=float)
+        it[0] = max(it[1] * 0.5, 0.5)
+        ax.plot(it, np.asarray(slow["w2"], dtype=float), color=p["reference"], lw=1.6,
+                ls=":", zorder=1,
+                label=r"$J = 0$ at the old $\eta_0$   $\bf{%d}$ it" % slow["iters"])
+    show = ["J = 0"]
+    for prefix in ("J_a", "J_s"):        # the best member of each family only
+        fam = [(best[k]["iters"], k) for k in keys if k.startswith(prefix) and k in best]
+        if fam:
+            show.append(min(fam)[1])
+    for i, k in enumerate(keys):
+        if k not in best or k not in show:
+            continue
+        r = best[k]
+        it = np.asarray(r["rec"], dtype=float)
+        it[0] = max(it[1] * 0.5, 0.5)
+        lab = (pretty[k] + r"  at $%.2g\,\eta_0$   $\bf{%d}$ it, %.2f$\times$"
+               % (r["mult"], r["iters"], base / r["iters"]))
+        ax.plot(it, np.asarray(r["w2"], dtype=float), color=colours[k], lw=2.2,
+                ls=(0, (5, 2.5)) if k.startswith("J_s") else "-",
+                label=lab, zorder=3 - 0.1 * i)
+        j = int(np.argmin(np.abs(it - r["iters"])))
+        ax.plot([it[j]], [np.asarray(r["w2"])[j]], "o", color=colours[k], ms=6,
+                markeredgecolor=p["surface"], markeredgewidth=1.3, zorder=5)
+    blocks = sorted(glob.glob(os.path.join(
+        DATA, "exp16_stepsize_and_lambda_normal10_seed*.json")))
+    hits = [best["J = 0"]["iters"]] if "J = 0" in best else []
+    for f in blocks:
+        bb = runner.load_json(f)
+        zs = [r for r in bb["rows"] if r["kind"] == "zero" and r["iters"] > 0]
+        if zs:
+            hits.append(min(zs, key=lambda r: r["iters"])["iters"])
+    if len(hits) > 1:
+        ax.axvspan(min(hits), max(hits), color=p["reference"], alpha=0.16, zorder=0)
+        ax.text(0.03, 0.06, "shaded: where $J = 0$ alone lands over\n"
+                            "%d seed blocks, %d-%d it" % (len(hits), min(hits), max(hits)),
+                transform=ax.transAxes, fontsize=8.2, color=p["reference"],
+                ha="left", va="bottom")
+    ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("Wasserstein distance")
+    ax.set_title(r"(b)  tuned against tuned: the three coincide   ($\lambda = %g$)" % lam,
+                 loc="left", fontsize=11)
+    ax.set_ylim(top=ax.get_ylim()[1] * 2.8)
+    ax.legend(loc="upper right", fontsize=8.2, framealpha=0.93)
+
+    # (c) why lambda cannot rescue it: the exact ceiling against the regulariser
+    ax = axes[2]
+    cs = sorted(b["ceilings"], key=lambda c: c["lam"])
+    lams = [c["lam"] for c in cs]
+    ax.plot(lams, [c["stiff_soft"] for c in cs], "s--", color=p["reference"], lw=1.8, ms=6,
+            label=r"any skew $J$ (best stiff$\leftrightarrow$soft)")
+    ax.plot(lams, [c["tridiagonal"] for c in cs], "o-",
+            color=colours.get("J_a,  a = 1", p["categorical"][1]), lw=2.2, ms=6,
+            label=r"the tridiagonal $J_a$, best $a$")
+    ax.axhline(1.0, color=p["reference"], lw=0.9, ls=":")
+    for c in cs[:-1]:
+        ax.annotate(r"$\mathrm{cond}=%.0f$" % c["cond"], (c["lam"], c["stiff_soft"]),
+                    textcoords="offset points", xytext=(12, 7), ha="left", fontsize=8,
+                    color=p["reference"])
+    ax.set_xlabel(r"MCP strength  $\lambda$")
+    ax.set_ylabel(r"best speedup at equal bias")
+    ax.set_title(r"(c)  the regulariser rounds the target off", loc="left", fontsize=11)
+    ax.legend(loc="upper right", fontsize=8.8, framealpha=0.93)
+    ax.set_ylim(bottom=0.9)
+
+    for ax in axes:
+        ax.grid(True, which="major", lw=0.6, alpha=0.45)
+        ax.grid(True, which="minor", lw=0.4, alpha=0.20)
+        ax.set_axisbelow(True)
+    fig.tight_layout()
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig16_stepsize_and_lambda_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -741,6 +884,7 @@ def main():
         fig_improving_js(mode)
         fig_simple_vs_state(mode)
         fig_mcp_user_matrices(mode)
+        fig_stepsize_and_lambda(mode)
 
 
 if __name__ == "__main__":

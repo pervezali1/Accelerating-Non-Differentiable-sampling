@@ -365,6 +365,117 @@ needing its stepsize backed off. Measured on $s=0.5$:
 Unlike a constant field, where the ramp is free, here it is a real trade — and
 one worth making, because forty relaxations is also what buys the stability.
 
+## 3d. The regulariser is not a neutral bystander, and neither is the stepsize
+
+Asked to "play with the stepsize or the regulariser $\lambda$" on the MCP
+target while holding the two matrices fixed, the sweep produced two findings,
+and the larger one belongs to $J = 0$.
+
+**The stepsize was the binding protocol, not the matrix.** Every earlier
+experiment here gave each field its *equal-bias* stepsize: the largest $\eta$
+whose exact stationary covariance bias is 2%. That is the right protocol for
+comparing convergence rates at a fixed asymptotic accuracy, but 2% is far
+tighter than the accuracy a run of $n = 5000$ particles can resolve. The
+sliced-$W_2$ estimator's own two-sample floor is about $0.045$ there, and the
+measured plateau sits on that floor until the bias is several times 2%: at
+$\lambda = 0.5$ the plateau reads $0.047$, $0.050$, $0.056$, $0.065$ for
+covariance biases of $0.03$, $0.07$, $0.11$, $0.17$. Tuning each field's
+stepsize against the accuracy actually being measured, $J = 0$ goes
+
+| $\eta/\eta_0$ | 1 | 2 | 4 | 8 |
+|---|---|---|---|---|
+| iterations to $2\times$ floor | 2482 | 1165 | **798** | never |
+| exact covariance bias ($\lambda = 1$) | 0.032 | 0.069 | 0.167 | 0.654 |
+
+so the baseline this repository had been quoting was undertuned by $3.1\times$.
+At $8\eta_0$ the bias finally overtakes the floor and the chain never reaches
+the accuracy at all, which is exactly where the exact stand-in says it should
+stop. Nothing about this is specific to $J$; it is a correction to the
+baseline, and it applies at every $\lambda$ tested ($0.25$, $0.5$, $1$ all give
+798).
+
+**$\lambda$ moves the ceiling, but in the wrong direction, and the tridiagonal
+$J_a$ cannot reach it anyway.** The smoothed penalty is separable and even, so
+near the origin it adds the *same* curvature to every coordinate,
+
+$$(p^\varepsilon_\lambda)''(0) \;=\; \frac{\lambda}{\varepsilon}
+  \;-\; \frac{\lambda}{\sqrt{a^2\lambda^2+\varepsilon^2}},$$
+
+an isotropic term in the anchor's Hessian. Replacing the penalty by that
+curvature gives a log-quadratic stand-in (`nonsmooth.gaussianised`) on which
+every exact quantity is available, and it shows the regulariser **rounding the
+target off**:
+
+| $\lambda$ | 0 | 0.25 | 0.5 | 0.75 | 1 |
+|---|---|---|---|---|---|
+| effective $\mathrm{cond}$ | 100.0 | 37.4 | 21.4 | 15.1 | 11.8 |
+| best speedup, any skew $J$ | 4.38× | 2.03× | 1.46× | 1.25× | 1.15× |
+| best speedup, tridiagonal $J_a$ | 1.13× | 1.07× | 1.02× | 1.00× | 1.00× |
+
+A skew perturbation earns its keep by moving mass between directions of
+*different* stiffness, so what it can earn is set by the anisotropy — and the
+regulariser destroys anisotropy. Since $\varepsilon$ enters only through
+$\lambda/\varepsilon$, it is the stronger of the two knobs: at $\lambda = 0.5$
+the effective condition number is $11.8$ for $\varepsilon = 0.05$ but $89.0$
+for $\varepsilon = 0.5$. Lowering $\lambda$ therefore does restore room for a
+skew field, but only for one that couples the stiff axis to the soft one
+directly. The tridiagonal $J_a$ couples $x_1\!\leftrightarrow\!x_2$ and
+$x_2\!\leftrightarrow\!x_3$ with the *same* strength $a$; with
+$\Sigma = \mathrm{diag}(0.01, 0.1, 1)$ that is stiff$\leftrightarrow$middle and
+middle$\leftrightarrow$soft, and the stiff$\leftrightarrow$middle entry is the
+one that forces the stepsize down while buying almost no rate. At a 2% bias its ceiling
+is $\le 1.13\times$ *everywhere* in the $(\lambda, \varepsilon)$ plane, and
+loosening the bias tolerance all the way to 50% lifts that only to
+$1.31\times$. The cross-product $J_s$ conserves $\|x\|$, and the stiff and soft directions
+live at different $\|x\|$, so it is blocked outright at every $\lambda$.
+
+The two findings interact in a way that is easy to misread. At a *common*
+stepsize $\eta_0$ the tridiagonal field looks good — the exact rate ratio is
+$1.78\times$ at $a = 2$, and the measured crossing moves from 2482 to 1292
+iterations. All of that is the baseline's slack, not the field: give $J = 0$
+the same freedom and it reaches the accuracy in 798 iterations.
+
+Tuned against tuned at $\lambda = 0.5$, the sweep's single best cell for the
+tridiagonal field is $a = 1$ at $2.83\eta_0$: 620 iterations against 798, a
+$1.29\times$. That number is a measurement artefact, and it is worth being
+careful about, because it is the sort of thing that gets reported.
+
+The exact stand-in, maximising the rate over *all* stepsizes at each bias
+tolerance, allows the tridiagonal at most
+
+| bias tolerance | 0.02 | 0.05 | 0.10 | 0.20 | 0.50 |
+|---|---|---|---|---|---|
+| best over every $a$ | 1.02× | 1.04× | 1.04× | 1.08× | 1.12× |
+| at $a = 1$ | 0.91× | 0.94× | 0.95× | 1.02× | 1.10× |
+
+so there is no accuracy at which $1.29\times$ is on offer. The measurement
+agrees once it is asked more than once. A crossing is read off a log-spaced
+grid whose points are 9% apart, from a few chains against a single reference
+draw, and the estimator floor that sets the threshold is itself a heavy-tailed
+average — it reads 0.0442, 0.0450, 0.0577 on three seed blocks. Re-running the
+*identical* $J = 0$ configuration at $2.83\eta_0$ on two of those blocks gives
+1165 and 704 iterations: the noise on one configuration is $1.65\times$, larger
+than any field-versus-$J = 0$ difference in the sweep. Taking only ratios
+measured against $J = 0$ *inside* the same block, across three seed blocks, both
+priors and four accuracy levels (`exp16 --aggregate`):
+
+| field | cells | geometric mean | range |
+|---|---|---|---|
+| $J_a$, $a = 1$ | 15 | **1.03×** | 0.68–1.29× |
+| $J_a$, $a = 2$ | 8 | 0.69× | 0.41–1.13× |
+| $J_s$, $s = 0.05$ | 15 | 0.84× | 0.41–1.00× |
+| $J_s$, $s = 0.1$ | 8 | 0.54× | 0.28–0.88× |
+
+$1.03\times$ for the best tridiagonal setting, against an exact ceiling of
+$1.02$–$1.12\times$. The two agree, and neither is worth having.
+
+So the answer to the question as asked is that the stepsize is worth $3.1\times$
+and belongs to $J = 0$; that $\lambda$ sets how much a skew field could win but
+the tridiagonal $J_a$ is capped near 1 wherever $\lambda$ is put; and that
+$J_s$, which conserves $\|x\|$, is not neutral but mildly harmful — at
+$s = 0.05$ it reproduces $J = 0$'s crossings (2482, 1499, 1165, 798) and then
+loses its stability a grid point sooner, and at $s = 0.1$ it is half the speed.
+
 ## 4. The price
 
 A constant $J$ makes the anchored drift linear in $x$ (for the canonical anchor
