@@ -476,6 +476,81 @@ $J_s$, which conserves $\|x\|$, is not neutral but mildly harmful — at
 $s = 0.05$ it reproduces $J = 0$'s crossings (2482, 1499, 1165, 798) and then
 loses its stability a grid point sooner, and at $s = 0.1$ it is half the speed.
 
+## 3e. The single plane that does work
+
+Everything in §3d says the tridiagonal $J_a$ is capped near 1 because it spends
+half its strength on the stiff$\leftrightarrow$middle pair. The obvious repair
+is to spend none of it there:
+
+$$J_{13} = \begin{pmatrix} 0 & 0 & a \\ 0 & 0 & 0 \\ -a & 0 & 0\end{pmatrix},
+\qquad \Sigma = \mathrm{diag}(0.01,\,0.1,\,1),$$
+
+one plane, stiffest axis against softest. Same target, same MCP penalty, same
+protocol: every field including $J = 0$ tuned over the stepsize against a fixed
+sliced-$W_2$ accuracy, five replications, and the whole thing repeated on a
+disjoint seed block. Taking only within-block ratios, over two seed blocks and
+four accuracy levels, from the $N(0, 10I_d)$ start:
+
+| field | $\lambda = 0.25$ | $\lambda = 0.5$ | exact rate ratio at $4\eta_0$ ($\lambda = 0.25$) |
+|---|---|---|---|
+| $J_{13}$, $a = 1$ | 1.85× (1.46–2.42) | 1.81× (1.29–2.74) | 1.94× |
+| $J_{13}$, $a = 1.3$ | 2.20× (1.46–3.11) | 2.33× (1.88–2.74) | 2.50× |
+| $J_{13}$, $a = 2$ | **3.11×** (1.88–4.53) | **2.95×** (2.13–4.53) | 3.55× |
+| $J_a$ tridiagonal, $a = 1$ | 1.13× (0.88–1.88) | 1.13× (0.88–1.46) | 1.46× |
+
+The tridiagonal row is re-measured here under the identical protocol -- five
+replications, same seed blocks, same stepsize grid -- so the two are directly
+comparable; it comes out at 1.13× rather than the 1.03× of §3d's wider sweep,
+which is the same answer within the resolution. Every $J_{13}$ cell is above
+1, which none of the tridiagonal's were, and
+the measured means land just under the exact same-stepsize rate ratios, and
+$\lambda$ between 0.25 and 0.5 barely moves them.
+
+**Not yet measured: the uniform start.** Everything above is the
+$N(0, 10I_d)$ ensemble. The $\mathrm{Uniform}(-5,5)^d$ start is the one that
+caught out the hyperbolic state-dependent field of §3c -- 5.31× Gaussian
+against 2.18× uniform -- so it is the check this field still owes, even though
+a constant matrix has no reason to be prior-fragile the way a field growing
+with $\|x\|$ does. The run is `exp16 ... --prior uniform5`.
+
+The last column is where the two matrices part company, and it is not where
+§3d guessed. Both fields are faster than $J = 0$ at a common $4\eta_0$ — the
+tridiagonal by 1.46×, the plane by 3.55× — so raw rate is only half the gap.
+The other half is that at $4\eta_0$ the tridiagonal's measured plateau is
+0.093, above the 0.087 threshold, so it cannot use that stepsize and falls back
+to $2.83\eta_0$ and its 1.03×; the plane's plateau at the same stepsize is
+0.077 and fits.
+
+That ordering is a measured fact and the exact stand-in does **not** reproduce
+it: on the stand-in the plane at $a = 2$ carries *more* covariance bias at
+$4\eta_0$ (0.238) than the tridiagonal does (0.185), which would predict the
+opposite. Two things differ between the scalar covariance bias and what the
+sliced $W_2$ sees — it is a distance between full one-dimensional marginals,
+weighted by each axis's own scale, not a summary of second moments — and the
+stand-in replaces the MCP by its curvature at the origin, an approximation a
+field that transports mass along the soft axis will strain harder than one that
+does not. Where the two disagree the measurement is the authority; the
+stand-in's same-stepsize *rates* are what it gets right here (3.55× predicted
+against 3.52× and 4.53× measured on the two blocks).
+
+**$a$ trades against the accuracy target.** The stand-in's strict
+*equal-covariance-bias* ceiling for this plane is 2.03× at $\lambda = 0.25$,
+below the measured 3.11×, for the reason just given: the run is not comparing at
+equal bias but at equal measured $W_2$, which at $n = 5000$ cannot separate
+plateaus of 0.077 and 0.070 under a threshold of 0.087. Ask for more accuracy
+and $a = 2$ is the first to fail — at $1.2\times$ the floor its plateau does not
+fit at any stepsize — while $a = 1.3$ still returns 1.88× and 2.42× on the two
+blocks. So $a \approx 1.3$ is the setting to quote when the accuracy target is
+not known in advance, and $a = 2$ only when a bias of a few tenths is
+acceptable.
+
+The comparison to keep in mind is with the smooth Student-t core, where the
+same plane is worth 4.38×. The regulariser costs it about a third of that at
+$\lambda = 0.25$ and nearly all of it by $\lambda = 1$ — the isotropising
+effect of §3d applies to this field exactly as it does to the others. What
+changes is that this field can use whatever anisotropy is left, and the
+tridiagonal cannot.
+
 ## 4. The price
 
 A constant $J$ makes the anchored drift linear in $x$ (for the canonical anchor

@@ -46,7 +46,8 @@ import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from skewanchor import analysis, metrics, nonsmooth, runner, samplers, skewfield as sf
+from skewanchor import (analysis, metrics, nonsmooth, runner, samplers, skew,
+                        skewfield as sf)
 from skewanchor.targets import anisotropic_student_t
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -63,6 +64,17 @@ def J_a_matrix(a):
     J[1, 2] = a
     J[2, 1] = -a
     return J
+
+
+def stiff_soft_matrix(Sigma, a):
+    """The single plane that matters: stiffest eigendirection against softest.
+
+    Thin wrapper on :func:`skewanchor.skew.stiff_soft`, which carries the
+    per-plane measurements that motivate it.  The tridiagonal ``J_a`` spends
+    half its strength on the stiff-middle pair instead, which costs stepsize
+    and buys almost no rate; this is the same idea with that half removed.
+    """
+    return skew.stiff_soft(Sigma, a)
 
 
 class CrossSkew:
@@ -184,7 +196,7 @@ def summarise(rows, lams):
             print(f"{k:>15}" + "".join(cells))
 
 
-def aggregate():
+def aggregate(pattern="exp16_*.json"):
     """Every field against ``J = 0`` *within its own block*, over all blocks and levels.
 
     Absolute crossings are not comparable across seed blocks -- the estimator
@@ -193,42 +205,44 @@ def aggregate():
     ``J = 0`` measured in the same block, and the only honest summary is that
     ratio's spread over blocks and accuracy levels.
     """
-    files = sorted(glob.glob(os.path.join(DATA, "exp16_stepsize_and_lambda_*.json")))
+    files = sorted(glob.glob(os.path.join(DATA, pattern)))
     if not files:
         print("nothing to aggregate")
         return
     agg, table = {}, []
     for f in files:
         b = json.load(open(f))
-        rows = b["rows"]
-        floor = rows[0]["floor"]
-        name = (os.path.basename(f)[len("exp16_stepsize_and_lambda_"):-len(".json")])
+        stem = os.path.basename(f)[len("exp16_"):-len(".json")]
+        for lam in dict.fromkeys(r["lam"] for r in b["rows"]):
+            rows = [r for r in b["rows"] if r["lam"] == lam]
+            floor = rows[0]["floor"]
+            name = f"{stem}  lam {lam:g}"
 
-        def best(label, level):
-            hits = [sustained(r["w2"], r["rec"], floor * level / 2.0)
-                    for r in rows if r["label"] == label]
-            hits = [h for h in hits if h > 0]
-            return min(hits) if hits else None
+            def best(label, level, rows=rows, floor=floor):
+                hits = [sustained(r["w2"], r["rec"], floor * level / 2.0)
+                        for r in rows if r["label"] == label]
+                hits = [h for h in hits if h > 0]
+                return min(hits) if hits else None
 
-        for label in dict.fromkeys(r["label"] for r in rows):
-            if label == "J = 0":
-                continue
-            row = []
-            for level in LEVELS:
-                z, k = best("J = 0", level), best(label, level)
-                v = (z / k) if (z and k) else None
-                row.append(v)
-                if v:
-                    agg.setdefault(label, []).append(v)
-            table.append((name, label, row))
+            for label in dict.fromkeys(r["label"] for r in rows):
+                if label == "J = 0":
+                    continue
+                row = []
+                for level in LEVELS:
+                    z, k = best("J = 0", level), best(label, level)
+                    v = (z / k) if (z and k) else None
+                    row.append(v)
+                    if v:
+                        agg.setdefault((lam, label), []).append(v)
+                table.append((name, label, row))
     print("\nevery field against J = 0 in its own block, at each accuracy level")
-    print(f"{'block':>26} {'field':>15}" + "".join(f"{(str(L) + 'x'):>10}" for L in LEVELS))
+    print(f"{'block':>40} {'field':>15}" + "".join(f"{(str(L) + 'x'):>10}" for L in LEVELS))
     for name, label, row in table:
-        print(f"{name:>26} {label:>15}"
+        print(f"{name:>40} {label:>15}"
               + "".join(f"{v:9.2f}x" if v else f"{'--':>10}" for v in row))
-    print(f"\n{'field':>15} {'cells':>6} {'geometric mean':>16} {'range':>16}")
-    for label, vs in agg.items():
-        print(f"{label:>15} {len(vs):6d} {np.exp(np.mean(np.log(vs))):15.2f}x "
+    print(f"\n{'lambda':>7} {'field':>15} {'cells':>6} {'geometric mean':>16} {'range':>16}")
+    for (lam, label), vs in sorted(agg.items()):
+        print(f"{lam:7g} {label:>15} {len(vs):6d} {np.exp(np.mean(np.log(vs))):15.2f}x "
               f"{min(vs):7.2f}-{max(vs):.2f}x")
     return agg
 
@@ -237,8 +251,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--lams", type=float, nargs="+", default=[0.25, 0.5, 1.0])
     ap.add_argument("--mults", type=float, nargs="+", default=[1, 1.41, 2, 2.83, 4, 5.66, 8])
-    ap.add_argument("--avals", type=float, nargs="+", default=[1.0, 2.0])
-    ap.add_argument("--svals", type=float, nargs="+", default=[0.05, 0.1])
+    ap.add_argument("--avals", type=float, nargs="*", default=[1.0, 2.0])
+    ap.add_argument("--svals", type=float, nargs="*", default=[0.05, 0.1])
+    ap.add_argument("--ssvals", type=float, nargs="*", default=[],
+                    help="strengths for the single stiff<->soft plane J_13")
     ap.add_argument("--prior", default="normal10")
     ap.add_argument("--n", type=int, default=5000)
     ap.add_argument("--reps", type=int, default=3)
@@ -250,12 +266,14 @@ def main():
     ap.add_argument("--ceiling-lams", type=float, nargs="+",
                     default=[0.0, 0.1, 0.25, 0.5, 0.75, 1.0, 1.5])
     ap.add_argument("--out", default=None)
+    ap.add_argument("--pattern", default="exp16_*.json",
+                    help="which result files --aggregate reads")
     ap.add_argument("--aggregate", action="store_true",
                     help="skip the chains; just summarise every exp16 json already written")
     args = ap.parse_args()
 
     if args.aggregate:
-        aggregate()
+        aggregate(args.pattern)
         return
 
     core = anisotropic_student_t(D, NU, KAPPA)
@@ -267,7 +285,10 @@ def main():
     fields = ([("J = 0", "zero", None, 0.0, 0.0)]
               + [(f"J_a,  a = {a:g}", "const", sf.ConstantSkew(J_a_matrix(a)), a, 20.0)
                  for a in args.avals]
-              + [(f"J_s,  s = {s:g}", "cross", CrossSkew(s), s, 40.0) for s in args.svals])
+              + [(f"J_s,  s = {s:g}", "cross", CrossSkew(s), s, 40.0) for s in args.svals]
+              + [(f"J_13,  a = {a:g}", "plane",
+                  sf.ConstantSkew(stiff_soft_matrix(core.Sigma, a)), a, 20.0)
+                 for a in args.ssvals])
 
     print(f"prior {args.prior}   n {args.n}   reps {args.reps}   steps {args.steps}   "
           f"seed block {args.seed}")

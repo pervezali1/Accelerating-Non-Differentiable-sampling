@@ -862,6 +862,95 @@ def fig_stepsize_and_lambda(mode):
     print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig16_stepsize_and_lambda_{mode}.png")))
 
 
+def fig_stiff_soft_plane(mode):
+    """MCP target: the single stiff<->soft plane against J = 0 and the tridiagonal.
+
+    A 2 x 2 grid -- the two MCP strengths down, the two starting ensembles
+    across -- each cell showing the three fields at their own best stepsize.
+    """
+    priors = [("normal10", r"$X_0 \sim N(0,\,10\,I_d)$"),
+              ("uniform5", r"$X_0 \sim \mathrm{Uniform}(-5,5)^d$")]
+    data = {}
+    for prior, _ in priors:
+        plane = os.path.join(DATA, f"exp16_plane_{prior}.json")
+        if not os.path.exists(plane):
+            continue
+        b = runner.load_json(plane)
+        rows = list(b["rows"])
+        tri = os.path.join(DATA, f"exp16_tridiag5_{prior}.json")
+        if os.path.exists(tri):        # same seed block, so same floor and reference
+            rows += [r for r in runner.load_json(tri)["rows"] if r["kind"] == "const"]
+        data[prior] = (rows, {c["lam"]: c for c in b["ceilings"]})
+    if not data:
+        print("  skip: exp16_plane_*.json not found")
+        return
+    priors = [q for q in priors if q[0] in data]
+    lams = sorted({r["lam"] for rows, _ in data.values() for r in rows})
+
+    p = plotting.use_style(mode)
+    fig, axes = plt.subplots(len(lams), len(priors),
+                             figsize=(5.9 * len(priors), 4.3 * len(lams)),
+                             sharey=True, squeeze=False)
+    pretty = {"zero": r"$J = 0$", "tri": r"$J_a$ tridiagonal",
+              "plane": r"$J_{13}$ stiff$\leftrightarrow$soft"}
+    for row, lam in enumerate(lams):
+        for col, (prior, ptitle) in enumerate(priors):
+            ax = axes[row][col]
+            rows, ceil = data[prior]
+            sub = [r for r in rows if r["lam"] == lam]
+            if not sub:
+                ax.set_visible(False)
+                continue
+            floor = sub[0]["floor"]
+            best = {}
+            for r in sub:
+                fam = ("zero" if r["kind"] == "zero"
+                       else "tri" if r["kind"] == "const" else "plane")
+                if r["iters"] > 0 and (fam not in best or r["iters"] < best[fam]["iters"]):
+                    best[fam] = r
+            base = best.get("zero", {}).get("iters")
+            for i, fam in enumerate(("zero", "tri", "plane")):
+                if fam not in best:
+                    continue
+                r = best[fam]
+                colour = p["categorical"][i % len(p["categorical"])]
+                it = np.asarray(r["rec"], dtype=float)
+                it[0] = max(it[1] * 0.5, 0.5)
+                lab = pretty[fam]
+                if fam != "zero":
+                    lab += r",  $a = %g$" % r["strength"]
+                lab += r"   $%.2g\,\eta_0$:  $\bf{%d}$ it, %.2f$\times$" % (
+                    r["mult"], r["iters"], base / r["iters"])
+                ax.plot(it, np.asarray(r["w2"], dtype=float), color=colour, lw=2.2,
+                        ls=(0, (5, 2.5)) if fam == "tri" else "-",
+                        label=lab, zorder=3 - 0.1 * i)
+                j = int(np.argmin(np.abs(it - r["iters"])))
+                ax.plot([it[j]], [np.asarray(r["w2"])[j]], "o", color=colour, ms=6,
+                        markeredgecolor=p["surface"], markeredgewidth=1.3, zorder=5)
+            ax.axhline(2 * floor, color=p["reference"], lw=0.9, ls="--")
+            c = ceil.get(lam)
+            if c:
+                ax.text(0.03, 0.06, "effective cond %.0f;  equal-bias ceiling "
+                        "%.2f$\\times$ any $J$, %.2f$\\times$ tridiagonal"
+                        % (c["cond"], c["stiff_soft"], c["tridiagonal"]),
+                        transform=ax.transAxes, fontsize=8, color=p["reference"],
+                        ha="left", va="bottom")
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_title(r"$\lambda = %g$,   %s" % (lam, ptitle), loc="left", fontsize=10.5)
+            ax.grid(True, which="major", lw=0.6, alpha=0.45)
+            ax.grid(True, which="minor", lw=0.4, alpha=0.20)
+            ax.set_axisbelow(True)
+            ax.legend(loc="upper right", fontsize=8.2, framealpha=0.93)
+            if row == len(lams) - 1:
+                ax.set_xlabel("iteration")
+            if col == 0:
+                ax.set_ylabel("Wasserstein distance")
+    axes[0][0].set_ylim(top=axes[0][0].get_ylim()[1] * 3.0)
+    fig.tight_layout()
+    print(" ", plotting.finish(fig, os.path.join(FIGS, f"fig17_stiff_soft_plane_{mode}.png")))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--modes", nargs="*", default=["light", "dark"])
@@ -885,6 +974,7 @@ def main():
         fig_simple_vs_state(mode)
         fig_mcp_user_matrices(mode)
         fig_stepsize_and_lambda(mode)
+        fig_stiff_soft_plane(mode)
 
 
 if __name__ == "__main__":

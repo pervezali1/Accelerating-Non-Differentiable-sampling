@@ -531,6 +531,54 @@ def test_the_regulariser_makes_the_target_rounder():
     assert loose > 4.0 * tight, (loose, tight)
 
 
+
+def test_stiff_soft_picks_the_extreme_eigenplane():
+    """The field lives entirely in the (softest, stiffest) eigenplane."""
+    t = anisotropic_student_t(3, 6.0, 100.0)
+    J = skew.stiff_soft(t.Sigma, 1.3)
+    assert skew.is_skew(J)
+    evals, evecs = np.linalg.eigh(t.Sigma)
+    u, v = evecs[:, int(np.argmin(evals))], evecs[:, int(np.argmax(evals))]
+    # it maps u -> -1.3 v and v -> 1.3 u, and annihilates everything orthogonal
+    assert np.allclose(J @ u, -1.3 * v, atol=1e-12)
+    assert np.allclose(J @ v, 1.3 * u, atol=1e-12)
+    mid = evecs[:, int(np.argsort(evals)[1])]
+    assert np.abs(J @ mid).max() < 1e-12
+    assert np.linalg.matrix_rank(J, tol=1e-10) == 2
+
+
+def test_stiff_soft_beats_the_tridiagonal_at_equal_bias():
+    """Exact arithmetic, no chains: one plane beats the tridiagonal on the MCP target.
+
+    Both are constant skew matrices, so the whole comparison is available in
+    closed form on the log-quadratic stand-in of the regularised target.
+    """
+    from skewanchor import analysis
+
+    def tridiagonal(a):
+        J = np.zeros((3, 3))
+        J[0, 1] = J[1, 2] = a
+        J[1, 0] = J[2, 1] = -a
+        return J
+
+    g = nonsmooth.gaussianised(nonsmooth.make(3, 6.0, 100.0, lam=0.25, a=2.0, eps=0.1))
+    r0 = analysis.ms_rate(g, None, analysis.eta_for_bias(g, None, 0.02))
+
+    def ceiling(family):
+        best = 0.0
+        for a in np.geomspace(0.1, 6.0, 30):
+            eta = analysis.eta_for_bias(g, family(a), 0.02)
+            if eta > 0:
+                best = max(best, analysis.ms_rate(g, family(a), eta) / r0)
+        return best
+
+    plane = ceiling(lambda a: skew.stiff_soft(g.Sigma, a))
+    tri = ceiling(tridiagonal)
+    assert plane > 1.8, plane
+    assert tri < 1.2, tri
+    assert plane > 1.7 * tri, (plane, tri)
+
+
 if __name__ == "__main__":
     import traceback
     failed = ran = 0

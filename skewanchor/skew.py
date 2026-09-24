@@ -38,6 +38,7 @@ __all__ = [
     "random_skew",
     "commuting",
     "eigenbasis_cyclic",
+    "stiff_soft",
     "optimal",
     "lnp_optimal",
     "scale_to_norm",
@@ -114,6 +115,37 @@ def eigenbasis_cyclic(Sigma, delta=1.0):
     Q = evecs[:, order]
     d = Q.shape[0]
     return scale_to_norm(Q @ cyclic(d, 1.0) @ Q.T, delta)
+
+
+def stiff_soft(Sigma, a=1.0):
+    r"""One rotation, in the plane of the stiffest and softest eigendirections.
+
+        J = a (u_min u_max^T - u_max u_min^T),
+
+    where ``u_min`` and ``u_max`` are the eigenvectors of ``Sigma`` for its
+    smallest and largest eigenvalues.
+
+    A skew perturbation earns its keep by moving mass between directions of
+    different stiffness, and what it can earn grows with the stiffness ratio,
+    so putting all of the field in the single extreme plane dominates spreading
+    it over several.  Measured on the ``kappa = 100``, ``nu = 6``, ``d = 3``
+    Student-t core, the exact equal-bias speedup of each single plane at its own
+    best strength is
+
+        stiff <-> middle   1.00x
+        middle <-> soft    2.71x
+        stiff <-> soft     4.37x
+
+    and a tridiagonal matrix carrying the first two at *equal* strength reaches
+    only 1.13x -- less than the middle-soft plane alone -- because the
+    stiff-middle entry forces the stepsize down without buying rate.  Unlike :func:`lnp_optimal`, which maximises the *continuous
+    time* gap, this is chosen for the quantity the discretised chain is
+    actually limited by.
+    """
+    Sigma = np.asarray(Sigma, dtype=np.float64)
+    evals, evecs = np.linalg.eigh(Sigma)
+    u, v = evecs[:, int(np.argmin(evals))], evecs[:, int(np.argmax(evals))]
+    return float(a) * (np.outer(u, v) - np.outer(v, u))
 
 
 def commuting(Sigma, delta=1.0, tol=1e-9):
@@ -305,7 +337,7 @@ def build(kind, target, delta=1.0, rng=None):
     """Build ``J`` for a :class:`~skewanchor.targets.LogQuadraticTarget`.
 
     ``kind`` is one of ``zero``, ``cyclic``, ``pairwise``, ``random``,
-    ``eigen``, ``commuting``, ``optimal``.
+    ``eigen``, ``commuting``, ``stiff_soft``, ``optimal``.
     """
     d = target.d
     A = target.Sigma_inv
@@ -321,6 +353,8 @@ def build(kind, target, delta=1.0, rng=None):
         return eigenbasis_cyclic(target.Sigma, delta)
     if kind == "commuting":
         return commuting(target.Sigma, delta)
+    if kind == "stiff_soft":
+        return stiff_soft(target.Sigma, delta)
     if kind == "lnp":
         return lnp_optimal(A)
     if kind == "lnp_scaled":
